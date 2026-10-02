@@ -153,16 +153,16 @@
   .flag-off{ background: var(--border); }
   .empty{ text-align:center; color: var(--text-muted); padding: 40px 10px; font-size:14px; }
 
-  .read-hero{ text-align:center; margin: 12px 0 32px; }
-  .read-hero-emoji{ font-size:58px; line-height:1; margin-bottom:10px; }
-  .read-hero-mood{ font-family: var(--serif); font-size:23px; }
-  .read-row{ display:flex; gap:14px; padding:16px 2px; border-bottom:1px solid var(--border); align-items:flex-start; }
+  .read-hero{ text-align:center; margin: 14px 0 34px; }
+  .read-hero-emoji{ font-size:64px; line-height:1; margin-bottom:12px; }
+  .read-hero-mood{ font-family: var(--serif); font-size:26px; }
+  .read-row{ display:flex; gap:16px; padding:19px 2px; border-bottom:1px solid var(--border); align-items:flex-start; }
   .read-row:last-child{ border-bottom:none; }
-  .read-icon{ font-size:26px; line-height:1.4; width:32px; text-align:center; flex-shrink:0; }
-  .read-label{ font-size:12px; color: var(--text-muted); margin-bottom:4px; }
-  .read-text{ font-size:15px; line-height:1.55; }
-  .read-big{ font-family: var(--serif); font-size:26px; }
-  .read-sub{ font-size:12px; color: var(--text-muted); margin-top:2px; }
+  .read-icon{ font-size:30px; line-height:1.4; width:36px; text-align:center; flex-shrink:0; }
+  .read-label{ font-size:14px; color: var(--text-muted); margin-bottom:5px; font-weight:600; }
+  .read-text{ font-size:18px; line-height:1.6; }
+  .read-big{ font-family: var(--serif); font-size:30px; }
+  .read-sub{ font-size:14px; color: var(--text-muted); margin-top:3px; }
 
   .section-block{ margin-bottom: 26px; }
   .section-head{ display:flex; align-items:baseline; gap:10px; margin-bottom: 12px; }
@@ -189,6 +189,10 @@
   .metric-tile .lbl .delta{ display:block; margin-top:3px; font-size:11px; }
   .delta-good{ color: var(--good); }
   .delta-bad{ color: var(--warn); }
+  .trend-wrap{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:14px 12px 10px; margin-top:16px; }
+  .trend-svg{ width:100%; height:120px; display:block; }
+  .trend-legend{ display:flex; justify-content:space-between; font-size:12px; color: var(--text-muted); margin-top:6px; flex-wrap:wrap; gap:8px; }
+  .trend-empty{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:24px 12px; margin-top:16px; text-align:center; color: var(--text-muted); font-size:13px; }
   .report-actions{ margin-top:20px; display:flex; flex-direction:column; gap:10px; }
   .report-row{ display:flex; gap:8px; align-items:stretch; }
   .report-row .btn-primary{ flex:1; }
@@ -349,21 +353,15 @@ async function signUp(email, password){
       state.loginBusy = false; render();
       return;
     }
-    if(data.access_token){
-      // email confirmation disabled on the project — logged in immediately
-      setSession(data);
-      state.loggedIn = true;
-      state.loginBusy = false;
-      await loadAll();
-      render();
-    } else {
-      // confirmation email required before a session can be created
-      state.loginBusy = false;
-      state.authMode = 'login';
-      state.loginError = null;
-      state.loginNotice = 'Профиль создан! Проверьте почту и подтвердите email, затем войдите.';
-      render();
-    }
+    // Profile created — do NOT log the person in automatically. They
+    // explicitly asked for registration and login to be separate steps.
+    state.loginBusy = false;
+    state.authMode = 'login';
+    state.loginError = null;
+    state.loginNotice = data.access_token
+      ? 'Профиль создан! Теперь войдите с вашим email и паролем.'
+      : 'Профиль создан! Проверьте почту и подтвердите email, затем войдите.';
+    render();
   }catch(e){
     state.loginError = 'Нет соединения с сервером';
     state.loginBusy = false; render();
@@ -674,6 +672,56 @@ function daysSinceStart(){
   const diff = Math.floor((startOfDay(Date.now()) - start.getTime()) / 86400000);
   return diff + 1;
 }
+function dayNumberForTs(ts){
+  if(!state.settings.startDate) return null;
+  const start = new Date(state.settings.startDate + 'T00:00:00');
+  const diff = Math.floor((startOfDay(ts) - start.getTime()) / 86400000);
+  return diff + 1;
+}
+
+/* ---------- all-time aggregates (Progress tab headline tiles) ---------- */
+function totalAttemptsCount(){ return state.entries.length; }
+function todayAttemptsCount(){
+  const k = todayKey();
+  return state.entries.filter(e=> dateKey(e.ts) === k).length;
+}
+function allTimeJournalDayKeys(){
+  const set = new Set();
+  state.journalEntries.forEach(e=>{ if(!isJournalEntryEmpty(e)) set.add(dateKey(e.ts)); });
+  return set;
+}
+function allTimeAttemptDayKeys(){
+  const set = new Set();
+  state.entries.forEach(e=> set.add(dateKey(e.ts)));
+  return set;
+}
+function allTimeFullDaysCount(){
+  const journalSet = allTimeJournalDayKeys();
+  const attemptSet = allTimeAttemptDayKeys();
+  let n = 0;
+  journalSet.forEach(k=>{ if(attemptSet.has(k)) n++; });
+  return n;
+}
+
+/* ---------- month trend (up/down "stock chart" of completed days) ---------- */
+function buildMonthTrend(monthDate){
+  const total = daysInMonth(monthDate);
+  const attemptsByDay = attemptsCountByDay(monthDate);
+  const journalDays = journalDaysInMonth(monthDate);
+  const today = new Date();
+  const isCurMonth = today.getFullYear()===monthDate.getFullYear() && today.getMonth()===monthDate.getMonth();
+  const isFutureMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1) > new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastDay = isFutureMonth ? 0 : (isCurMonth ? today.getDate() : total);
+
+  const points = [{ day: 0, val: 0, complete: null }];
+  let cum = 0;
+  for(let day=1; day<=lastDay; day++){
+    const complete = (attemptsByDay[day]||0) > 0 && journalDays.has(day);
+    cum += complete ? 1 : -1;
+    points.push({ day, val: cum, complete });
+  }
+  return points;
+}
 
 /* ---------- render root ---------- */
 function render(){
@@ -735,9 +783,9 @@ function renderLogin(){
 
 function renderTabbar(){
   const tabs = [
-    {id:'practice', ic:'●', label:'Подходы'},
-    {id:'journal', ic:'✎', label:'Дневник'},
-    {id:'progress', ic:'▲', label:'Прогресс'},
+    {id:'practice', ic:'🚶', label:'Подходы'},
+    {id:'journal', ic:'📓', label:'Дневник'},
+    {id:'progress', ic:'📈', label:'Прогресс'},
     {id:'settings', ic:'⚙', label:'Настройки'},
   ];
   return `<div class="tabbar">
@@ -866,12 +914,18 @@ function renderJournalHistory(){
     .filter(e=>!isJournalEntryEmpty(e) && dateKey(e.ts) !== todayK)
     .sort((a,b)=>b.ts-a.ts);
 
-  const listHtml = past.length ? past.map(e=>`
+  const listHtml = past.length ? past.map(e=>{
+      const dn = dayNumberForTs(e.ts);
+      return `
       <div class="journal-list-row" data-action="view-old-journal" data-jid="${e.ts}">
-        <div style="text-transform:capitalize;">${weekdayDateLabel(e.ts)}</div>
+        <div class="jd">
+          <div>${dn ? 'День ' + dn : capitalize(weekdayDateLabel(e.ts))}</div>
+          <div class="date" style="text-transform:capitalize;">${dn ? weekdayDateLabel(e.ts) : ''}</div>
+        </div>
         <div style="color:var(--text-muted); font-size:18px;">›</div>
       </div>
-  `).join('') : `<div class="empty">Прошлых записей пока нет</div>`;
+  `;
+  }).join('') : `<div class="empty">Прошлых записей пока нет</div>`;
 
   return `
     <div class="top-bar">
@@ -898,13 +952,15 @@ function renderJournalRead(entry){
 
   const moodVal = entry.mood;
   const moodIcon = MOOD_ICONS[moodVal] || '🙂';
+  const dn = dayNumberForTs(entry.ts);
 
   return `
     <div style="padding:22px 20px 40px;">
       <div class="top-bar">
         <button class="back-btn" data-action="journal-read-back">‹</button>
-        <h2 style="text-transform:capitalize;">${weekdayDateLabel(entry.ts)}</h2>
+        <h2 style="text-transform:capitalize;">${dn ? 'День ' + dn : weekdayDateLabel(entry.ts)}</h2>
       </div>
+      ${dn ? `<div style="text-align:center; color:var(--text-muted); font-size:13px; text-transform:capitalize; margin:-6px 0 4px;">${weekdayDateLabel(entry.ts)}</div>` : ''}
       <div class="read-hero">
         <div class="read-hero-emoji">🌇</div>
         <div class="read-hero-mood">${moodIcon} ${moodVal || ''}</div>
@@ -982,29 +1038,28 @@ function renderJournalWizardStep(){
 function renderProgress(){
   const monthDate = state.progressMonth;
   const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
-  const attempts = attemptsInMonth(monthDate);
-  const journalDays = journalDaysInMonth(monthDate);
-  const attemptsByDay = attemptsCountByDay(monthDate);
-  const total = daysInMonth(monthDate);
-  let fullDaysCount = 0;
-  for(let day=1; day<=total; day++){
-    if((attemptsByDay[day]||0) > 0 && journalDays.has(day)) fullDaysCount++;
-  }
 
   return `
     <div class="eyebrow">Прогресс</div>
     <h2 style="font-size:24px; margin-bottom:18px;">Календарь</h2>
-    <div class="period-row" style="align-items:center;">
+
+    <div class="metric-grid">
+      <div class="metric-tile"><div class="num">${totalAttemptsCount()}</div><div class="lbl">подходов всего</div></div>
+      <div class="metric-tile good"><div class="num">${todayAttemptsCount()}</div><div class="lbl">подходов сегодня</div></div>
+      <div class="metric-tile good"><div class="num">${allTimeJournalDayKeys().size}</div><div class="lbl">дней ведения дневника</div></div>
+      <div class="metric-tile good"><div class="num">${allTimeFullDaysCount()}</div><div class="lbl">дней выполнено всё</div></div>
+    </div>
+
+    <div class="period-row" style="align-items:center; margin-top:10px;">
       <button class="segment-btn" data-action="progress-prev-month" style="flex:0 0 46px;">‹</button>
       <div style="flex:1; text-align:center; font-family:Georgia,serif; font-size:16px;">${monthLabel}</div>
       <button class="segment-btn" data-action="progress-next-month" style="flex:0 0 46px;">›</button>
     </div>
     ${renderCalendar(monthDate)}
-    <div class="metric-grid" style="margin-top:22px;">
-      <div class="metric-tile"><div class="num">${attempts.length}</div><div class="lbl">подходов в месяце</div></div>
-      <div class="metric-tile good"><div class="num">${journalDays.size}</div><div class="lbl">дней с дневником из ${total}</div></div>
-      <div class="metric-tile good"><div class="num">${fullDaysCount}</div><div class="lbl">дней выполнено всё</div></div>
-    </div>
+
+    <div class="jc-title" style="margin-top:22px;">Динамика месяца</div>
+    ${renderTrendChart(monthDate)}
+
     <div class="report-actions">
       <div class="report-row">
         <button class="btn btn-primary" data-action="export-attempts-pdf">PDF: список подходов</button>
@@ -1060,6 +1115,42 @@ function renderCalendar(monthDate){
       <span>🚶 подход</span>
       <span style="color:var(--good);">↑ день выполнен</span>
       <span style="color:var(--warn);">↓ день пропущен</span>
+    </div>
+  `;
+}
+
+function renderTrendChart(monthDate){
+  const points = buildMonthTrend(monthDate);
+  if(points.length <= 1){
+    return `<div class="trend-empty">В этом месяце пока нет данных для графика</div>`;
+  }
+  const W = 600, H = 150, padX = 10, padY = 18;
+  const maxAbs = Math.max(2, ...points.map(p=>Math.abs(p.val)));
+  const lastDay = points[points.length-1].day;
+  const xFor = day => padX + (day / Math.max(1,lastDay)) * (W - padX*2);
+  const yFor = val => H/2 - (val / maxAbs) * (H/2 - padY);
+
+  let segments = '';
+  for(let i=1;i<points.length;i++){
+    const a = points[i-1], b = points[i];
+    const color = b.complete ? 'var(--good)' : 'var(--warn)';
+    segments += `<line x1="${xFor(a.day).toFixed(1)}" y1="${yFor(a.val).toFixed(1)}" x2="${xFor(b.day).toFixed(1)}" y2="${yFor(b.val).toFixed(1)}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`;
+  }
+  const last = points[points.length-1];
+  const lastColor = last.val > 0 ? 'var(--good)' : (last.val < 0 ? 'var(--warn)' : 'var(--text-muted)');
+
+  return `
+    <div class="trend-wrap">
+      <svg viewBox="0 0 ${W} ${H}" class="trend-svg" preserveAspectRatio="none">
+        <line x1="${padX}" y1="${(H/2).toFixed(1)}" x2="${W-padX}" y2="${(H/2).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 4"/>
+        ${segments}
+        <circle cx="${xFor(last.day).toFixed(1)}" cy="${yFor(last.val).toFixed(1)}" r="4.5" fill="${lastColor}"/>
+      </svg>
+      <div class="trend-legend">
+        <span style="color:var(--good);">↑ день выполнен</span>
+        <span style="color:var(--warn);">↓ день пропущен</span>
+        <span style="color:${lastColor}; font-weight:600;">сейчас: ${last.val > 0 ? '+' : ''}${last.val}</span>
+      </div>
     </div>
   `;
 }
@@ -1590,10 +1681,18 @@ function buildJournalPages(){
     if(y > PDF_P_H - 180){ ({ ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H)); y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', monthLabel + ' · записей: ' + entries.length); }
 
     // day header band
+    const dn = dayNumberForTs(e.ts);
+    const heading = dn ? `День ${dn}` : capitalize(weekdayDateLabel(e.ts));
+    const subheading = dn ? capitalize(weekdayDateLabel(e.ts)) : '';
     ctx.fillStyle = RC.band;
-    ctx.fillRect(tableLeft, y - 24, tableRight - tableLeft, 36);
+    ctx.fillRect(tableLeft, y - 24, tableRight - tableLeft, subheading ? 50 : 36);
     ctx.fillStyle = RC.bandText; ctx.font = 'bold 16px ' + REPORT_FONT;
-    ctx.fillText(capitalize(weekdayDateLabel(e.ts)), PDF_P_MARGIN, y);
+    ctx.fillText(heading, PDF_P_MARGIN, y);
+    if(subheading){
+      ctx.font = '12px ' + REPORT_FONT;
+      ctx.fillText(subheading, PDF_P_MARGIN, y + 17);
+      y += 14;
+    }
     y += 30;
 
     const rows = [];
