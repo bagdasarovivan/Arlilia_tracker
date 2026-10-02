@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Дневник подходов</title>
+<meta name="theme-color" content="#3FA7A0">
+<meta name="description" content="Дневник речевых подходов и самонаблюдений">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root{
     --bg: #F2F7F6;
@@ -234,10 +239,29 @@
 <body>
 <div id="app"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const SUPABASE_URL = 'https://zvstrubroelqaivgtooc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_cnIPiLyx12CBRvx175QrhQ_kKQgW6Eh';
+
+/* ---------- lazy-load jsPDF ----------
+   Only the two "скачать PDF" buttons actually need jsPDF — "копировать
+   картинкой" works off plain canvas and never touches it. Loading the
+   ~280KB library eagerly on every page open (even for people who never
+   export a PDF) slowed down first paint for no reason, so it's now
+   fetched on demand, once, the first time it's actually needed. */
+let jsPDFLoadPromise = null;
+function ensureJsPDF(){
+  if(window.jspdf) return Promise.resolve(true);
+  if(jsPDFLoadPromise) return jsPDFLoadPromise;
+  jsPDFLoadPromise = new Promise((resolve)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = ()=> resolve(!!window.jspdf);
+    s.onerror = ()=> resolve(false);
+    document.head.appendChild(s);
+  });
+  return jsPDFLoadPromise;
+}
 
 /* ---------- auth (Supabase email/password) ---------- */
 const auth = { accessToken: null, refreshToken: null, userId: null, email: null, expiresAt: 0 };
@@ -1644,10 +1668,12 @@ function buildAttemptsPages(){
 
   return { pages, filename: 'podhody-' + new Date().toISOString().slice(0,10) + '.pdf' };
 }
-function generateAttemptsPdf(){
-  if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
+async function generateAttemptsPdf(){
   const built = buildAttemptsPages();
   if(!built){ showToast('В этом месяце нет записанных подходов'); return; }
+  if(!window.jspdf) showToast('Готовим PDF…');
+  const ok = await ensureJsPDF();
+  if(!ok){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
   savePdfFromPages(built.pages, built.filename, true);
 }
 function copyAttemptsImage(){
@@ -1734,10 +1760,12 @@ function buildJournalPages(){
 
   return { pages, filename: 'dnevnik-' + new Date().toISOString().slice(0,10) + '.pdf' };
 }
-function generateJournalPdf(){
-  if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
+async function generateJournalPdf(){
   const built = buildJournalPages();
   if(!built){ showToast('В этом месяце нет записей дневника'); return; }
+  if(!window.jspdf) showToast('Готовим PDF…');
+  const ok = await ensureJsPDF();
+  if(!ok){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
   savePdfFromPages(built.pages, built.filename, false);
 }
 function copyJournalImage(){
@@ -1768,6 +1796,16 @@ async function boot(){
   render();
 }
 boot();
+
+// Register the service worker (app shell caching) only once the app is up
+// and running, so it never competes with real data loads for bandwidth.
+// Fails silently when sw.js isn't served next to this page (e.g. a local
+// file opened directly) — the app works identically either way.
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
