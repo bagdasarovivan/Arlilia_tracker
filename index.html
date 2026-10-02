@@ -133,7 +133,8 @@
     background: var(--surface); border:1px solid var(--border);
     border-radius: var(--radius-sm); color: var(--text); font-size:18px; padding:14px 14px; font-family: var(--sans);
   }
-  textarea{ min-height: 90px; resize:vertical; }
+  textarea{ min-height: 140px; resize:vertical; line-height:1.45; }
+  textarea[id^="jw-text-"]{ min-height: 220px; }
   /* Some mobile browsers reserve extra internal width for the date
      picker's calendar icon beyond the box's own width, which can push
      the control a few pixels past its card. Clipping the wrapper is a
@@ -458,16 +459,17 @@ const JOURNAL_STEPS = [
   { id:'dailyRoutine', type:'textarea', label:'Саморегуляция', hint:'Зевки, прогулка, баня и т.д. — что из приёмов применял' },
   { id:'sleepHours', type:'number', label:'Сон', hint:'Сколько часов спал' },
   { id:'difficulties', type:'textarea', label:'Трудная тетрадь', hint:'Паузы, ошибки — что было сложно сегодня' },
-  { id:'reflections', type:'textarea', label:'Вопросы и откровения' },
-  { id:'tricks', type:'textarea', label:'Уловки' },
-  { id:'praise', type:'textarea', label:'Похвала' },
+  { id:'questions', type:'textarea', label:'Вопросы' },
+  { id:'reflections', type:'textarea', label:'Откровения' },
+  { id:'tricks', type:'textarea', label:'Уловки', hint:'Были ли уловки, избегания или что-то ещё' },
+  { id:'praise', type:'textarea', label:'Похвала', hint:'За что могу себя похвалить сегодня' },
   { id:'intentions', type:'textarea', label:'Речевые планы', hint:'Какие подходы хотел бы ещё сделать' },
 ];
 
 const JOURNAL_ICONS = {
   glad:'✨', worry:'🌧️', dailyRoutine:'🎙️',
   difficulties:'⛅', sleepHours:'🌙',
-  reflections:'💭', tricks:'🎭', praise:'🏅', intentions:'🧭',
+  questions:'❓', reflections:'💭', tricks:'🎭', praise:'🏅', intentions:'🧭',
 };
 const MOOD_ICONS = {'Отлично':'🤩','Хорошо':'😊','Норм':'🙂','Тяжело':'😕','Плохо':'😞'};
 
@@ -539,6 +541,7 @@ function rowToJournal(r){
     dailyRoutine: r.daily_routine,
     sleepHours: r.sleep_hours,
     difficulties: r.difficulties,
+    questions: r.questions,
     reflections: r.reflections, tricks: r.tricks, praise: r.praise,
     intentions: r.intentions,
   };
@@ -551,6 +554,7 @@ function journalDraftToRow(e){
     daily_routine: e.dailyRoutine || null,
     sleep_hours: e.sleepHours ?? null,
     difficulties: e.difficulties || null,
+    questions: e.questions || null,
     reflections: e.reflections || null, tricks: e.tricks || null,
     praise: e.praise || null, intentions: e.intentions || null,
   };
@@ -780,9 +784,22 @@ function buildMonthTrend(monthDate){
   const isFutureMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1) > new Date(today.getFullYear(), today.getMonth(), 1);
   const lastDay = isFutureMonth ? 0 : (isCurMonth ? today.getDate() : total);
 
-  const points = [{ day: 0, val: 0, complete: null }];
+  // Don't count any day before the chosen start date — those were never
+  // meant to be tracked, so they shouldn't pull the trend down.
+  let firstDay = 1;
+  if(state.settings.startDate){
+    const start = new Date(state.settings.startDate + 'T00:00:00');
+    if(start.getFullYear() === monthDate.getFullYear() && start.getMonth() === monthDate.getMonth()){
+      firstDay = start.getDate();
+    } else if(start.getFullYear() > monthDate.getFullYear() ||
+      (start.getFullYear() === monthDate.getFullYear() && start.getMonth() > monthDate.getMonth())){
+      firstDay = total + 1; // start date is still in a later month — nothing to plot yet
+    }
+  }
+
+  const points = [{ day: firstDay - 1, val: 0, complete: null }];
   let cum = 0;
-  for(let day=1; day<=lastDay; day++){
+  for(let day=firstDay; day<=lastDay; day++){
     const complete = (attemptsByDay[day]||0) > 0 && journalDays.has(day);
     cum += complete ? 1 : -1;
     points.push({ day, val: cum, complete });
@@ -1148,6 +1165,7 @@ function renderCalendar(monthDate){
   const journalDays = journalDaysInMonth(monthDate);
   const today = new Date();
   const todayStart = startOfDay(Date.now());
+  const startDate = state.settings.startDate ? startOfDay(new Date(state.settings.startDate + 'T00:00:00').getTime()) : null;
   const isCurMonth = today.getFullYear()===monthDate.getFullYear() && today.getMonth()===monthDate.getMonth();
   const weekdays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 
@@ -1158,7 +1176,10 @@ function renderCalendar(monthDate){
     const hasJournal = journalDays.has(day);
     const cellDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
     const isToday = isCurMonth && today.getDate() === day;
-    const isPastOrToday = cellDate.getTime() <= todayStart;
+    // A day before the chosen start date was never meant to be tracked —
+    // don't mark it as a missed day, only days from the start date onward.
+    const isAfterStart = startDate === null || cellDate.getTime() >= startDate;
+    const isPastOrToday = cellDate.getTime() <= todayStart && isAfterStart;
     const complete = count > 0 && hasJournal;
     let arrow = '';
     if(isPastOrToday) arrow = complete
@@ -1780,7 +1801,7 @@ function buildJournalPages(){
   const fieldLabels = [
     ['mood','Самочувствие'], ['glad','Радует'], ['worry','Волнует'],
     ['dailyRoutine','Саморегуляция'], ['sleepHours','Сон, ч'],
-    ['difficulties','Трудная тетрадь'], ['reflections','Вопросы и откровения'],
+    ['difficulties','Трудная тетрадь'], ['questions','Вопросы'], ['reflections','Откровения'],
     ['tricks','Уловки'], ['praise','Похвала'], ['intentions','Речевые планы'],
   ];
   const valueX = PDF_P_MARGIN + JRN_LABEL_W + JRN_GAP;
