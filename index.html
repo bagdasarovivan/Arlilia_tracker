@@ -400,6 +400,27 @@ function logout(){
   render();
 }
 
+async function resetAllData(){
+  if(!auth.userId) return;
+  state.resetBusy = true; render();
+  try{
+    await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?user_id=eq.${auth.userId}`, { method:'DELETE' });
+    await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?user_id=eq.${auth.userId}`, { method:'DELETE' });
+    await saveStartDate(null);
+    state.entries = [];
+    state.journalEntries = [];
+    state.confirmReset = false;
+    state.resetBusy = false;
+    showToast('Все данные сброшены — можно начинать заново');
+    render();
+  }catch(e){
+    console.error(e);
+    state.resetBusy = false;
+    showToast('Не удалось сбросить данные — проверьте соединение');
+    render();
+  }
+}
+
 /* Вопросы к подходу — по мотивам таблицы "речевой поступок" методики саморегуляции */
 const TITLE_OPTIONS = ['Подход на улице', 'Звонок', 'Публичное выступление', 'Другое'];
 const MINDSET_OPTIONS = ['Супер', 'Хорошо', 'Нормально', 'Плохо', 'Другое'];
@@ -443,6 +464,9 @@ let state = {
   loginError: null,
   loginNotice: null,
   authMode: 'login',          // login | signup
+
+  confirmReset: false,
+  resetBusy: false,
 
   settings: { startDate: null, theme: 'light' },
 
@@ -1206,6 +1230,20 @@ function renderSettings(){
       <div class="autosave-hint" style="margin:0 0 14px;">${auth.email || ''}</div>
       <button class="btn btn-ghost" data-action="logout">Выйти</button>
     </div>
+
+    <div class="card" style="margin-bottom:16px; border-color: var(--warn);">
+      <div class="jc-title" style="color: var(--warn);">Сбросить данные</div>
+      ${state.confirmReset ? `
+        <div class="autosave-hint" style="margin:0 0 16px; color: var(--warn); font-size:14px;">Это навсегда удалит все подходы, записи дневника и дату начала занятий. Отменить не получится. Точно сбросить?</div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost" style="flex:1;" data-action="cancel-reset-data" ${state.resetBusy?'disabled':''}>Отмена</button>
+          <button class="btn btn-primary" style="flex:1; background: var(--warn);" data-action="confirm-reset-data" ${state.resetBusy?'disabled':''}>${state.resetBusy ? 'Удаляем…' : 'Да, удалить всё'}</button>
+        </div>
+      ` : `
+        <div class="autosave-hint" style="margin:0 0 16px;">Удалит все подходы и записи дневника, чтобы начать вести заново.</div>
+        <button class="btn btn-ghost" style="border-color: var(--warn); color: var(--warn);" data-action="ask-reset-data">Сбросить все данные</button>
+      `}
+    </div>
   `;
 }
 
@@ -1389,6 +1427,12 @@ async function onAction(e){
     state.authMode = 'signup'; state.loginError = null; state.loginNotice = null; render(); return;
   } else if(action === 'logout'){
     logout(); return;
+  } else if(action === 'ask-reset-data'){
+    state.confirmReset = true; render(); return;
+  } else if(action === 'cancel-reset-data'){
+    state.confirmReset = false; render(); return;
+  } else if(action === 'confirm-reset-data'){
+    resetAllData(); return;
   } else if(action === 'start-practice'){
     state.practiceActive = true; state.qIndex = 0; state.answers = {}; state.noteOpen = {};
     QUESTIONS.forEach(q => { if(q.type==='scale' || q.type==='scale_note') state.answers[q.id] = 5; });
