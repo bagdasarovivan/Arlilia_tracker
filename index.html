@@ -692,8 +692,20 @@ function fmtNum(n){
   return (Math.round(n*10)/10).toString().replace('.', ',');
 }
 function startOfDay(ts){ const d = new Date(ts); d.setHours(0,0,0,0); return d.getTime(); }
-function todayKey(){ return new Date().toISOString().slice(0,10); }
-function dateKey(ts){ return new Date(ts).toISOString().slice(0,10); }
+// Local calendar date as YYYY-MM-DD. Deliberately NOT toISOString() (which is
+// UTC): for timezones ahead of UTC (e.g. Moscow, UTC+3), toISOString() still
+// reports "yesterday" for roughly the first 3 hours after local midnight,
+// while everything else in the app (the calendar grid, dateLabel, etc.)
+// already shows the new local day — so an attempt logged just after midnight
+// would silently fail to count as "today" and could land under the wrong
+// calendar day. Building the key from local getFullYear/getMonth/getDate
+// keeps every "which day is this" check on the same (local) calendar.
+function localDateKey(d){
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function todayKey(){ return localDateKey(new Date()); }
+function dateKey(ts){ return localDateKey(new Date(ts)); }
 function dateLabel(ts){ return new Date(ts).toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'}); }
 function timeLabel(ts){ return new Date(ts).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}); }
 function weekdayDateLabel(ts){ return new Date(ts).toLocaleDateString('ru-RU', {weekday:'long', day:'numeric', month:'long'}); }
@@ -1670,7 +1682,7 @@ function downloadCanvasFallback(canvas){
   }
   const a = document.createElement('a');
   a.href = dataUrl;
-  a.download = 'otchet-' + new Date().toISOString().slice(0,10) + '.png';
+  a.download = 'otchet-' + todayKey() + '.png';
   document.body.appendChild(a); a.click(); a.remove();
   showToast('Браузер не поддерживает копирование — картинка скачана');
 }
@@ -1774,7 +1786,7 @@ function buildAttemptsPages(){
     y += 18;
   });
 
-  return { pages, filename: 'podhody-' + new Date().toISOString().slice(0,10) + '.pdf' };
+  return { pages, filename: 'podhody-' + todayKey() + '.pdf' };
 }
 async function generateAttemptsPdf(){
   const built = buildAttemptsPages();
@@ -1866,7 +1878,7 @@ function buildJournalPages(){
     y += 26;
   });
 
-  return { pages, filename: 'dnevnik-' + new Date().toISOString().slice(0,10) + '.pdf' };
+  return { pages, filename: 'dnevnik-' + todayKey() + '.pdf' };
 }
 async function generateJournalPdf(){
   const built = buildJournalPages();
