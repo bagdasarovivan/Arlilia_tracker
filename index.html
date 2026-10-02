@@ -1,0 +1,1773 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Дневник подходов</title>
+<style>
+  :root{
+    --bg: #F2F7F6;
+    --surface: #FFFFFF;
+    --surface-2: #E9F2F0;
+    --border: #DCE9E6;
+    --text: #1E3838;
+    --text-muted: #7E9896;
+    --accent: #3FA7A0;
+    --accent-soft: rgba(63,167,160,0.14);
+    --accent-text: #FFFFFF;
+    --good: #5FA87F;
+    --good-soft: rgba(95,168,127,0.15);
+    --warn: #D9695A;
+    --warn-soft: rgba(217,105,90,0.14);
+    --radius: 18px;
+    --radius-sm: 10px;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  :root[data-theme="dark"]{
+    --bg: #15211F;
+    --surface: #1C2B29;
+    --surface-2: #223634;
+    --border: #2C403D;
+    --text: #EAF3F1;
+    --text-muted: #8FA6A3;
+    --accent: #4FBDB6;
+    --accent-soft: rgba(79,189,182,0.18);
+    --accent-text: #0E2220;
+    --good: #7BC79A;
+    --good-soft: rgba(123,199,154,0.16);
+    --warn: #E08673;
+    --warn-soft: rgba(224,134,115,0.16);
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 17px;
+    -webkit-font-smoothing: antialiased;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  }
+  #app{
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display:flex;
+    flex-direction:column;
+    padding: 26px 20px 0;
+  }
+  h1,h2,h3{ font-family: var(--serif); font-weight:400; margin:0; }
+  .eyebrow{ color: var(--text-muted); font-size: 14px; margin-bottom: 6px; }
+  .btn{
+    border:none; border-radius: var(--radius-sm);
+    padding: 17px 20px; font-size:18px; font-family: var(--sans);
+    cursor:pointer; -webkit-tap-highlight-color: transparent;
+    transition: transform .08s ease, opacity .15s ease;
+  }
+  .btn:active{ transform: scale(0.97); }
+  .btn-primary{ background: var(--accent); color:var(--accent-text); font-weight:600; width:100%; }
+  .btn-ghost{ background: transparent; color: var(--text); border:1px solid var(--border); width:100%; }
+  .card{
+    background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .content{ flex:1; padding-bottom: 24px; }
+
+  /* ---- Bottom nav ---- */
+  .tabbar{
+    position: sticky; bottom:0; left:0; right:0;
+    display:flex; background: var(--surface);
+    border-top:1px solid var(--border);
+    padding: 10px 6px calc(10px + env(safe-area-inset-bottom));
+    margin: 0 -20px;
+  }
+  .tab-btn{
+    flex:1; background:none; border:none; color: var(--text-muted);
+    font-size:12px; padding:6px 4px; display:flex; flex-direction:column;
+    align-items:center; gap:4px; font-family: var(--sans);
+  }
+  .tab-btn .ic{ font-size:19px; }
+  .tab-btn.active{ color: var(--accent); }
+
+  /* ---- Home / Practice tab ---- */
+  .home-hero{ margin-top: 6vh; margin-bottom: 28px; }
+  .home-hero h1{ font-size: 34px; line-height:1.25; }
+  .stat-row{ display:flex; gap:12px; margin: 18px 0 26px; }
+  .stat-tile{ flex:1; background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; }
+  .stat-tile .num{ font-family: var(--serif); font-size: 30px; }
+  .stat-tile .lbl{ font-size: 14px; color: var(--text-muted); margin-top:2px; }
+
+  /* ---- Practice wizard ---- */
+  .progress-dots{ display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin-bottom: 6vh; margin-top: 4px; }
+  .dot{ width:7px; height:7px; border-radius:50%; background: var(--border); }
+  .dot.done{ background: var(--accent); }
+  .dot.current{ background: var(--text); }
+  .q-wrap{ flex:1; display:flex; flex-direction:column; justify-content:center; min-height: 46vh; }
+  .q-label{ font-size:26px; font-family: var(--serif); text-align:center; margin-bottom: 8px; }
+  .q-hint{ font-size:16px; color: var(--text-muted); text-align:center; margin-bottom: 34px; }
+  .scale-value{ font-family: var(--serif); font-size: 64px; text-align:center; margin-bottom: 18px; }
+  .scale-slider{ width:100%; -webkit-appearance:none; height:6px; border-radius:3px; background: var(--border); outline:none; }
+  .scale-slider::-webkit-slider-thumb{ -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background: var(--accent); border:3px solid var(--bg); box-shadow:0 0 0 1px var(--accent); }
+  .scale-ends{ display:flex; justify-content:space-between; font-size:13px; color: var(--text-muted); margin-top:8px; }
+  .choice-row{ display:flex; gap:12px; margin-top: 6px; }
+  .choice-btn{ flex:1; padding: 20px; border-radius: var(--radius-sm); border:1px solid var(--border); background: var(--surface); color: var(--text); font-size:18px; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+  .choice-btn.selected{ background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight:600; }
+  .choice-list{ display:flex; flex-direction:column; gap:10px; }
+  .choice-list-btn{ text-align:left; padding:18px 18px; border-radius: var(--radius-sm); border:1px solid var(--border); background: var(--surface); color: var(--text); font-size:18px; }
+  .choice-list-btn.selected{ background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight:600; }
+  textarea, input[type=text], input[type=number], input[type=email], input[type=password], input[type=date]{
+    width:100%; background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text); font-size:18px; padding:14px 14px; font-family: var(--sans);
+  }
+  textarea{ min-height: 90px; resize:vertical; }
+  .nav-row{ display:flex; gap:10px; margin-top: 6vh; padding-bottom: 24px; }
+  .nav-row .btn-ghost{ flex: 0 0 84px; }
+
+  /* ---- Top bar (sub-pages) ---- */
+  .top-bar{ display:flex; align-items:center; gap:10px; margin-bottom: 18px; }
+  .back-btn{ background:none; border:none; color: var(--text-muted); font-size:24px; padding:4px 8px 4px 0; cursor:pointer; }
+  .top-bar h2{ font-size:23px; flex:1; }
+  .top-bar .save-btn{ background:none; border:none; color: var(--accent); font-size:16px; font-weight:600; padding:4px; }
+
+  /* ---- Segmented control ---- */
+  .segment-row, .period-row{ display:flex; gap:8px; margin-bottom: 20px; }
+  .segment-btn, .period-btn{ flex:1; padding:10px; border-radius: 999px; border:1px solid var(--border); background:transparent; color: var(--text-muted); font-size:15px; }
+  .segment-btn.active, .period-btn.active{ background: var(--accent); color:var(--accent-text); border-color: var(--accent); font-weight:600; }
+
+  /* ---- Journal ---- */
+  .journal-today-card{ margin-bottom: 20px; }
+  .journal-today-card .date{ color: var(--text-muted); font-size:14px; margin-bottom:6px; }
+  .journal-today-card .mood{ font-family: var(--serif); font-size:24px; margin-bottom: 10px; }
+  .journal-list-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 16px; background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--radius-sm); margin-bottom:10px;
+  }
+  .journal-list-row .jd{ font-size:17px; max-width: 78%; }
+  .journal-list-row .jd > div:first-child{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .journal-list-row .jd .date{ color: var(--text-muted); font-size:13px; }
+  .journal-list-row .flags{ display:flex; gap:6px; }
+  .flag-dot{ width:8px; height:8px; border-radius:50%; }
+  .flag-good{ background: var(--good); }
+  .flag-off{ background: var(--border); }
+  .empty{ text-align:center; color: var(--text-muted); padding: 40px 10px; font-size:16px; }
+
+  .read-hero{ text-align:center; margin: 14px 0 34px; }
+  .read-hero-emoji{ font-size:64px; line-height:1; margin-bottom:12px; }
+  .read-hero-mood{ font-family: var(--serif); font-size:26px; }
+  .read-row{ display:flex; gap:16px; padding:19px 2px; border-bottom:1px solid var(--border); align-items:flex-start; }
+  .read-row:last-child{ border-bottom:none; }
+  .read-icon{ font-size:30px; line-height:1.4; width:36px; text-align:center; flex-shrink:0; }
+  .read-label{ font-size:14px; color: var(--text-muted); margin-bottom:5px; font-weight:600; }
+  .read-text{ font-size:18px; line-height:1.6; }
+  .read-big{ font-family: var(--serif); font-size:30px; }
+  .read-sub{ font-size:14px; color: var(--text-muted); margin-top:3px; }
+
+  .section-block{ margin-bottom: 26px; }
+  .section-head{ display:flex; align-items:baseline; gap:10px; margin-bottom: 12px; }
+  .section-num{ font-family: var(--serif); color: var(--accent); font-size:14px; }
+  .section-title{ font-family: var(--serif); font-size:20px; }
+  .journal-card{ margin-bottom: 16px; }
+  .jc-title{ font-family: var(--serif); font-size:19px; margin-bottom: 14px; }
+  .autosave-hint{ font-size:13px; color: var(--text-muted); margin: -6px 0 18px; }
+  .field-row{ display:flex; gap:12px; }
+  .field-row .field{ flex:1; }
+  .field{ margin-bottom: 12px; }
+  .field-label{ font-size:14px; color: var(--text-muted); margin-bottom:6px; }
+  .bool-row{ display:flex; gap:10px; }
+  .bool-chip{ flex:1; padding:14px; border-radius: var(--radius-sm); border:1px solid var(--border); background: var(--surface); color: var(--text-muted); font-size:16px; }
+  .bool-chip.selected-yes{ background: var(--good-soft); border-color: var(--good); color: var(--good); font-weight:600; }
+  .bool-chip.selected-no{ background: var(--warn-soft); border-color: var(--warn); color: var(--warn); font-weight:600; }
+
+  /* ---- Progress ---- */
+  .metric-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 22px; }
+  .metric-tile{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:16px; }
+  .metric-tile .num{ font-family: var(--serif); font-size: 30px; }
+  .metric-tile .lbl{ font-size:14px; color: var(--text-muted); margin-top:4px; }
+  .metric-tile.good .num{ color: var(--good); }
+  .metric-tile .lbl .delta{ display:block; margin-top:3px; font-size:11px; }
+  .delta-good{ color: var(--good); }
+  .delta-bad{ color: var(--warn); }
+  .trend-wrap{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:14px 12px 10px; margin-top:16px; }
+  .trend-svg{ width:100%; height:120px; display:block; }
+  .trend-legend{ display:flex; justify-content:space-between; font-size:12px; color: var(--text-muted); margin-top:6px; flex-wrap:wrap; gap:8px; }
+  .trend-empty{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:24px 12px; margin-top:16px; text-align:center; color: var(--text-muted); font-size:13px; }
+  .report-actions{ margin-top:20px; display:flex; flex-direction:column; gap:10px; }
+  .report-row{ display:flex; gap:8px; align-items:stretch; }
+  .report-row .btn-primary{ flex:1; }
+  .report-row .btn-ghost{ width:auto; flex:0 0 auto; padding-left:14px; padding-right:14px; white-space:nowrap; }
+  .delta-flat{ color: var(--text-muted); }
+  .chart-card{ margin-bottom: 20px; }
+  .chart-card h3{ font-size:15px; margin-bottom: 10px; color: var(--text-muted); font-family: var(--sans); }
+  canvas.chart{ width:100%; height:150px; display:block; }
+  .history-row{ display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); font-size:14px; gap:10px; }
+  .history-row:last-child{ border-bottom:none; }
+  .history-row .d{ color: var(--text-muted); white-space:nowrap; }
+  .history-row .m{ text-align:right; }
+  .digest-item{ padding: 14px 0; border-bottom:1px solid var(--border); }
+  .digest-item:last-child{ border-bottom:none; }
+  .digest-item .dd{ font-size:12px; color: var(--text-muted); margin-bottom:4px; }
+  .digest-item .dl{ font-size:11px; color: var(--accent); margin-bottom:2px; }
+  .digest-item .dt{ font-size:14px; }
+  .note-card{ padding:14px 18px; font-size:14px; color: var(--text-muted); margin-bottom:18px; }
+  .note-card b{ color: var(--text); font-weight:600; }
+
+  /* ---- Calendar ---- */
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .cal-weekdays{ margin-bottom:6px; }
+  .cal-weekday{ font-size:11px; color: var(--text-muted); text-align:center; padding-bottom:2px; }
+  .cal-cell{ position:relative; aspect-ratio:1; border-radius:12px; background: var(--surface); border:1px solid var(--border); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; padding-top:2px; }
+  .cal-cell.empty{ background:transparent; border:none; }
+  .cal-cell.today{ border-color: var(--accent); border-width:2px; }
+  .cal-day-num{ font-size:15px; font-family: var(--serif); color: var(--text); line-height:1; }
+  .cal-emojis{ display:flex; gap:2px; min-height:14px; align-items:center; font-size:12px; line-height:1; }
+  .cal-count{ font-size:9px; color: var(--accent); font-weight:600; line-height:1; min-height:10px; }
+  .cal-arrow{ position:absolute; top:3px; right:4px; font-size:10px; line-height:1; }
+  .cal-arrow.up{ color: var(--good); }
+  .cal-arrow.down{ color: var(--warn); }
+  .cal-legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; font-size:12px; color: var(--text-muted); align-items:center; }
+  .cal-legend span{ display:inline-flex; align-items:center; gap:5px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://zvstrubroelqaivgtooc.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_cnIPiLyx12CBRvx175QrhQ_kKQgW6Eh';
+
+/* ---------- auth (Supabase email/password) ---------- */
+const auth = { accessToken: null, refreshToken: null, userId: null, email: null, expiresAt: 0 };
+
+function sbHeaders(extra){
+  return {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + (auth.accessToken || SUPABASE_KEY),
+    'Content-Type': 'application/json',
+    ...(extra || {}),
+  };
+}
+function loadSession(){
+  try{
+    const raw = localStorage.getItem('arlilia_session');
+    if(!raw) return;
+    const s = JSON.parse(raw);
+    auth.accessToken = s.access_token; auth.refreshToken = s.refresh_token;
+    auth.userId = s.user_id; auth.email = s.email; auth.expiresAt = s.expires_at;
+  }catch(e){}
+}
+function setSession(data){
+  auth.accessToken = data.access_token;
+  auth.refreshToken = data.refresh_token;
+  if(data.user){ auth.userId = data.user.id; auth.email = data.user.email; }
+  auth.expiresAt = Date.now() + (data.expires_in || 3600) * 1000;
+  try{
+    localStorage.setItem('arlilia_session', JSON.stringify({
+      access_token: auth.accessToken, refresh_token: auth.refreshToken,
+      user_id: auth.userId, email: auth.email, expires_at: auth.expiresAt,
+    }));
+  }catch(e){}
+}
+function clearSession(){
+  auth.accessToken = null; auth.refreshToken = null; auth.userId = null; auth.email = null; auth.expiresAt = 0;
+  try{ localStorage.removeItem('arlilia_session'); }catch(e){}
+}
+async function refreshSession(){
+  if(!auth.refreshToken) return false;
+  try{
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: auth.refreshToken }),
+    });
+    if(!res.ok) return false;
+    const data = await res.json();
+    setSession(data);
+    return true;
+  }catch(e){ return false; }
+}
+async function sbFetch(url, options){
+  options = options || {};
+  options.headers = sbHeaders(options.headers);
+  let res = await fetch(url, options);
+  if(res.status === 401 && auth.refreshToken){
+    const ok = await refreshSession();
+    if(ok){
+      options.headers = sbHeaders(options.headers);
+      res = await fetch(url, options);
+    }
+  }
+  return res;
+}
+function translateAuthError(data, fallback){
+  const raw = (data && (data.error_description || data.msg || data.error_code || data.error)) || '';
+  const text = String(raw);
+  const waitMatch = text.match(/after (\d+) seconds?/i);
+  if(waitMatch) return `Слишком много попыток подряд — подождите ${waitMatch[1]} сек. и повторите.`;
+  if(/already registered|user_already_exists/i.test(text)) return 'Этот email уже зарегистрирован — попробуйте войти.';
+  if(/invalid login credentials/i.test(text)) return 'Неверный email или пароль.';
+  if(/email not confirmed/i.test(text)) return 'Email ещё не подтверждён — проверьте почту (или попросите админа отключить подтверждение в Supabase).';
+  if(/password.*at least|should be at least/i.test(text)) return 'Пароль слишком короткий — минимум 6 символов.';
+  if(/invalid.*email|unable to validate email/i.test(text)) return 'Проверьте формат email.';
+  if(/signup.*disabled|signups? not allowed/i.test(text)) return 'Регистрация сейчас отключена в настройках Supabase.';
+  if(/network|failed to fetch/i.test(text)) return 'Нет соединения с сервером.';
+  return text || fallback;
+}
+async function login(email, password){
+  state.loginBusy = true; state.loginError = null; state.loginNotice = null; render();
+  try{
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if(!res.ok){
+      state.loginError = translateAuthError(data, 'Неверный email или пароль');
+      state.loginBusy = false; render();
+      return;
+    }
+    setSession(data);
+    state.loggedIn = true;
+    state.loginBusy = false;
+    await loadAll();
+    render();
+  }catch(e){
+    state.loginError = 'Нет соединения с сервером';
+    state.loginBusy = false; render();
+  }
+}
+async function signUp(email, password){
+  state.loginBusy = true; state.loginError = null; render();
+  try{
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if(!res.ok){
+      state.loginError = translateAuthError(data, 'Не удалось создать профиль');
+      state.loginBusy = false; render();
+      return;
+    }
+    // Profile created — do NOT log the person in automatically. They
+    // explicitly asked for registration and login to be separate steps.
+    state.loginBusy = false;
+    state.authMode = 'login';
+    state.loginError = null;
+    state.loginNotice = data.access_token
+      ? 'Профиль создан! Теперь войдите с вашим email и паролем.'
+      : 'Профиль создан! Проверьте почту и подтвердите email, затем войдите.';
+    render();
+  }catch(e){
+    state.loginError = 'Нет соединения с сервером';
+    state.loginBusy = false; render();
+  }
+}
+function logout(){
+  clearSession();
+  state.loggedIn = false;
+  state.loaded = false;
+  state.entries = []; state.journalEntries = [];
+  render();
+}
+
+/* Вопросы к подходу — по мотивам таблицы "речевой поступок" методики саморегуляции */
+const TITLE_OPTIONS = ['Подход на улице', 'Звонок', 'Публичное выступление', 'Другое'];
+const MINDSET_OPTIONS = ['Супер', 'Хорошо', 'Нормально', 'Плохо', 'Другое'];
+
+const QUESTIONS = [
+  { id:'title', type:'choice_other', label:'Название речевого поступка', options: TITLE_OPTIONS, hint:'С кем и где был подход' },
+  { id:'mindsetBefore', type:'choice_other', label:'Настрой', options: MINDSET_OPTIONS, hint:'Каким было состояние перед подходом' },
+  { id:'reactionAfter', type:'text', label:'Реакция', hint:'Ощущение и реакция после подхода' },
+  { id:'ritual', type:'bool_manual', label:'Соблюдал речевой ритуал?', hint:'Расслабление, спокойный старт, зрительный контакт' },
+  { id:'voice', type:'scale_note', label:'Речь по методике', lowLabel:'сбивался', highLabel:'чисто', hint:'Темп, дыхание, слитность речи' },
+  { id:'hand', type:'scale_note', label:'Ощущение руки', lowLabel:'напряжена, скованно', highLabel:'свободно, естественно', hint:'Насколько легко и свободно ощущалась рука' },
+  { id:'anxiety', type:'scale_note', label:'Волнение', lowLabel:'спокоен', highLabel:'максимум' },
+];
+
+const JOURNAL_STEPS = [
+  { id:'mood', type:'choice', label:'Самочувствие', options:['Отлично','Хорошо','Норм','Тяжело','Плохо'] },
+  { id:'glad', type:'text', label:'Радует', hint:'Что порадовало сегодня' },
+  { id:'worry', type:'text', label:'Волнует', hint:'Что беспокоит' },
+  { id:'dailyRoutine', type:'textarea', label:'Саморегуляция', hint:'Зевки, прогулка, баня и т.д. — что из приёмов применял' },
+  { id:'sleepHours', type:'number', label:'Сон', hint:'Сколько часов спал' },
+  { id:'difficulties', type:'textarea', label:'Трудная тетрадь', hint:'Паузы, ошибки — что было сложно сегодня' },
+  { id:'reflections', type:'textarea', label:'Вопросы и откровения' },
+  { id:'tricks', type:'textarea', label:'Уловки' },
+  { id:'praise', type:'textarea', label:'Похвала' },
+  { id:'intentions', type:'textarea', label:'Речевые планы', hint:'Какие подходы хотел бы ещё сделать' },
+];
+
+const JOURNAL_ICONS = {
+  glad:'✨', worry:'🌧️', dailyRoutine:'🎙️',
+  difficulties:'⛅', sleepHours:'🌙',
+  reflections:'💭', tricks:'🎭', praise:'🏅', intentions:'🧭',
+};
+const MOOD_ICONS = {'Отлично':'🤩','Хорошо':'😊','Норм':'🙂','Тяжело':'😕','Плохо':'😞'};
+
+
+let state = {
+  tab: 'practice',            // practice | journal | progress | settings
+  loaded: false,
+  loggedIn: false,
+  loginBusy: false,
+  loginError: null,
+  loginNotice: null,
+  authMode: 'login',          // login | signup
+
+  settings: { startDate: null, theme: 'light' },
+
+  entries: [],
+  practiceActive: false,
+  qIndex: 0,
+  answers: {},
+  noteOpen: {},
+
+  journalEntries: [],
+  journalView: 'home',        // home | history | read
+  journalFormActive: false,
+  journalStepIndex: 0,
+  journalEditId: null,
+  journalDraft: {},
+  journalReadEntry: null,
+
+  progressMonth: (function(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
+};
+
+/* ---------- storage (Supabase) ---------- */
+function rowToAttempt(r){
+  return {
+    id: r.id,
+    ts: new Date(r.created_at).getTime(),
+    title: r.title,
+    mindsetBefore: r.mindset_before, reactionAfter: r.reaction_after,
+    ritual: r.ritual,
+    voice: r.voice, voiceNote: r.voice_note,
+    hand: r.hand, handNote: r.hand_note,
+    anxiety: r.anxiety, anxietyNote: r.anxiety_note,
+  };
+}
+function attemptToRow(e){
+  const title = e.title === 'other' ? (e.titleCustom || null) : (e.title || null);
+  const mindsetBefore = e.mindsetBefore === 'other' ? (e.mindsetBeforeCustom || null) : (e.mindsetBefore || null);
+  return {
+    user_id: auth.userId,
+    title,
+    mindset_before: mindsetBefore,
+    reaction_after: e.reactionAfter || null,
+    ritual: typeof e.ritual === 'boolean' ? e.ritual : null,
+    voice: e.voice ?? null, voice_note: e.voiceNote || null,
+    hand: e.hand ?? null, hand_note: e.handNote || null,
+    anxiety: e.anxiety ?? null, anxiety_note: e.anxietyNote || null,
+  };
+}
+function rowToJournal(r){
+  return {
+    id: r.id,
+    entryDate: r.entry_date,
+    ts: new Date(r.entry_date + 'T12:00:00').getTime(),
+    mood: r.mood, glad: r.glad, worry: r.worry,
+    dailyRoutine: r.daily_routine,
+    sleepHours: r.sleep_hours,
+    difficulties: r.difficulties,
+    reflections: r.reflections, tricks: r.tricks, praise: r.praise,
+    intentions: r.intentions,
+  };
+}
+function journalDraftToRow(e){
+  return {
+    user_id: auth.userId,
+    entry_date: e.entryDate,
+    mood: e.mood || null, glad: e.glad || null, worry: e.worry || null,
+    daily_routine: e.dailyRoutine || null,
+    sleep_hours: e.sleepHours ?? null,
+    difficulties: e.difficulties || null,
+    reflections: e.reflections || null, tricks: e.tricks || null,
+    praise: e.praise || null, intentions: e.intentions || null,
+  };
+}
+
+async function loadAll(){
+  try{
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?select=*&order=created_at.asc`);
+    if(res.status === 401){ return false; }
+    const rows = await res.json();
+    state.entries = Array.isArray(rows) ? rows.map(rowToAttempt) : [];
+  }catch(e){ console.error(e); state.entries = []; }
+  try{
+    const res2 = await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=*&order=entry_date.asc`);
+    const rows2 = await res2.json();
+    state.journalEntries = Array.isArray(rows2) ? rows2.map(rowToJournal) : [];
+  }catch(e){ console.error(e); state.journalEntries = []; }
+  try{
+    const res3 = await sbFetch(`${SUPABASE_URL}/rest/v1/app_settings?select=*&limit=1`);
+    const rows3 = await res3.json();
+    if(Array.isArray(rows3) && rows3[0]){
+      state.settings.startDate = rows3[0].start_date || null;
+    }
+  }catch(e){ console.error(e); }
+  try{
+    const savedTheme = localStorage.getItem('arlilia_theme');
+    if(savedTheme) state.settings.theme = savedTheme;
+  }catch(e){}
+  applyTheme();
+  state.loaded = true;
+  return true;
+}
+
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', state.settings.theme === 'dark' ? 'dark' : 'light');
+}
+
+async function saveStartDate(dateStr){
+  state.settings.startDate = dateStr || null;
+  try{
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/app_settings?on_conflict=user_id`, {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify([{ user_id: auth.userId, start_date: dateStr || null }]),
+    });
+    if(!res.ok){
+      const errText = await res.text();
+      console.error('saveStartDate failed', res.status, errText);
+      showToast('Не удалось сохранить дату: ' + res.status);
+    }
+  }catch(e){ console.error(e); showToast('Нет соединения — дата не сохранена'); }
+}
+
+function setTheme(theme){
+  state.settings.theme = theme;
+  applyTheme();
+  try{ localStorage.setItem('arlilia_theme', theme); }catch(e){}
+  render();
+}
+
+async function insertAttempt(answers){
+  try{
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts`, {
+      method: 'POST',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify(attemptToRow(answers)),
+    });
+    if(!res.ok){
+      const errText = await res.text();
+      console.error('insertAttempt failed', res.status, errText);
+      showToast('Не сохранилось: ' + res.status + ' ' + errText.slice(0,80));
+      return null;
+    }
+    const rows = await res.json();
+    if(Array.isArray(rows) && rows[0]) return rowToAttempt(rows[0]);
+    showToast('Подход не сохранился — пустой ответ сервера');
+    return null;
+  }catch(err){
+    console.error(err);
+    showToast('Нет соединения с сервером — подход не сохранён');
+    return null;
+  }
+}
+
+async function persistJournal(){
+  const draft = state.journalDraft;
+  if(!draft || !draft.entryDate) return;
+  try{
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?on_conflict=entry_date,user_id`, {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify([journalDraftToRow(draft)]),
+    });
+    if(!res.ok){
+      const errText = await res.text();
+      console.error('persistJournal failed', res.status, errText);
+      showToast('Дневник не сохранился: ' + res.status);
+      return;
+    }
+    const rows = await res.json();
+    if(Array.isArray(rows) && rows[0]){
+      const updated = rowToJournal(rows[0]);
+      const idx = state.journalEntries.findIndex(j => j.entryDate === updated.entryDate);
+      if(idx >= 0) state.journalEntries[idx] = updated; else state.journalEntries.push(updated);
+      if(state.journalDraft && state.journalDraft.entryDate === updated.entryDate){
+        state.journalDraft = updated;
+        state.journalEditId = updated.entryDate;
+      }
+    }
+  }catch(e){ console.error(e); showToast('Нет соединения — дневник не сохранён'); }
+}
+async function deleteJournalEntry(entryDate){
+  try{
+    await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?entry_date=eq.${entryDate}`, {
+      method: 'DELETE',
+    });
+  }catch(e){ console.error(e); }
+  state.journalEntries = state.journalEntries.filter(j => j.entryDate !== entryDate);
+}
+let journalSaveTimer = null;
+function scheduleJournalSave(){
+  clearTimeout(journalSaveTimer);
+  journalSaveTimer = setTimeout(persistJournal, 500);
+}
+function isJournalEntryEmpty(entry){
+  return !JOURNAL_STEPS.some(f => {
+    const v = entry[f.id];
+    return v !== undefined && v !== null && v !== '';
+  });
+}
+
+/* ---------- helpers ---------- */
+function fmtNum(n){
+  if(n === null || n === undefined || isNaN(n)) return '—';
+  return (Math.round(n*10)/10).toString().replace('.', ',');
+}
+function startOfDay(ts){ const d = new Date(ts); d.setHours(0,0,0,0); return d.getTime(); }
+function todayKey(){ return new Date().toISOString().slice(0,10); }
+function dateKey(ts){ return new Date(ts).toISOString().slice(0,10); }
+function dateLabel(ts){ return new Date(ts).toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'}); }
+function timeLabel(ts){ return new Date(ts).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}); }
+function weekdayDateLabel(ts){ return new Date(ts).toLocaleDateString('ru-RU', {weekday:'long', day:'numeric', month:'long'}); }
+
+function avg(arr, key){
+  const vals = arr.map(e=>e[key]).filter(v=>typeof v === 'number' && !isNaN(v));
+  if(!vals.length) return null;
+  return vals.reduce((a,b)=>a+b,0)/vals.length;
+}
+function capitalize(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+
+/* ---------- calendar helpers ---------- */
+function daysInMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); }
+function firstWeekdayMonIndex(d){
+  const first = new Date(d.getFullYear(), d.getMonth(), 1);
+  return (first.getDay() + 6) % 7; // Monday = 0
+}
+function attemptsInMonth(monthDate){
+  return state.entries.filter(e=>{
+    const d = new Date(e.ts);
+    return d.getFullYear()===monthDate.getFullYear() && d.getMonth()===monthDate.getMonth();
+  }).sort((a,b)=>a.ts-b.ts);
+}
+function journalEntriesInMonth(monthDate){
+  return state.journalEntries.filter(e=>{
+    if(isJournalEntryEmpty(e)) return false;
+    const d = new Date(e.ts);
+    return d.getFullYear()===monthDate.getFullYear() && d.getMonth()===monthDate.getMonth();
+  }).sort((a,b)=>a.ts-b.ts);
+}
+function attemptsCountByDay(monthDate){
+  const map = {};
+  attemptsInMonth(monthDate).forEach(e=>{
+    const day = new Date(e.ts).getDate();
+    map[day] = (map[day]||0) + 1;
+  });
+  return map;
+}
+function journalDaysInMonth(monthDate){
+  const set = new Set();
+  journalEntriesInMonth(monthDate).forEach(e=> set.add(new Date(e.ts).getDate()));
+  return set;
+}
+function daysSinceStart(){
+  if(!state.settings.startDate) return null;
+  const start = new Date(state.settings.startDate + 'T00:00:00');
+  const diff = Math.floor((startOfDay(Date.now()) - start.getTime()) / 86400000);
+  return diff + 1;
+}
+function dayNumberForTs(ts){
+  if(!state.settings.startDate) return null;
+  const start = new Date(state.settings.startDate + 'T00:00:00');
+  const diff = Math.floor((startOfDay(ts) - start.getTime()) / 86400000);
+  return diff + 1;
+}
+
+/* ---------- all-time aggregates (Progress tab headline tiles) ---------- */
+function totalAttemptsCount(){ return state.entries.length; }
+function todayAttemptsCount(){
+  const k = todayKey();
+  return state.entries.filter(e=> dateKey(e.ts) === k).length;
+}
+function allTimeJournalDayKeys(){
+  const set = new Set();
+  state.journalEntries.forEach(e=>{ if(!isJournalEntryEmpty(e)) set.add(dateKey(e.ts)); });
+  return set;
+}
+function allTimeAttemptDayKeys(){
+  const set = new Set();
+  state.entries.forEach(e=> set.add(dateKey(e.ts)));
+  return set;
+}
+function allTimeFullDaysCount(){
+  const journalSet = allTimeJournalDayKeys();
+  const attemptSet = allTimeAttemptDayKeys();
+  let n = 0;
+  journalSet.forEach(k=>{ if(attemptSet.has(k)) n++; });
+  return n;
+}
+
+/* ---------- month trend (up/down "stock chart" of completed days) ---------- */
+function buildMonthTrend(monthDate){
+  const total = daysInMonth(monthDate);
+  const attemptsByDay = attemptsCountByDay(monthDate);
+  const journalDays = journalDaysInMonth(monthDate);
+  const today = new Date();
+  const isCurMonth = today.getFullYear()===monthDate.getFullYear() && today.getMonth()===monthDate.getMonth();
+  const isFutureMonth = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1) > new Date(today.getFullYear(), today.getMonth(), 1);
+  const lastDay = isFutureMonth ? 0 : (isCurMonth ? today.getDate() : total);
+
+  const points = [{ day: 0, val: 0, complete: null }];
+  let cum = 0;
+  for(let day=1; day<=lastDay; day++){
+    const complete = (attemptsByDay[day]||0) > 0 && journalDays.has(day);
+    cum += complete ? 1 : -1;
+    points.push({ day, val: cum, complete });
+  }
+  return points;
+}
+
+/* ---------- render root ---------- */
+function render(){
+  const app = document.getElementById('app');
+  if(!state.loggedIn){
+    app.innerHTML = renderLogin();
+    attachHandlers();
+    return;
+  }
+  if(!state.loaded){ app.innerHTML = ''; return; }
+
+  if(state.practiceActive){
+    app.innerHTML = renderPracticeWizard();
+  } else if(state.journalFormActive){
+    app.innerHTML = renderJournalWizardStep();
+  } else if(state.journalView === 'read' && state.journalReadEntry){
+    app.innerHTML = renderJournalRead(state.journalReadEntry);
+  } else {
+    let body = '';
+    if(state.tab === 'practice') body = renderPracticeHome();
+    else if(state.tab === 'journal') body = renderJournalHome();
+    else if(state.tab === 'progress') body = renderProgress();
+    else body = renderSettings();
+    app.innerHTML = `<div class="content">${body}</div>${renderTabbar()}`;
+  }
+  attachHandlers();
+}
+
+function renderLogin(){
+  const isSignup = state.authMode === 'signup';
+  return `
+    <div style="padding:14vh 20px 24px; max-width:360px; margin:0 auto;">
+      <div class="eyebrow" style="text-align:center;">${isSignup ? 'Регистрация' : 'Вход'}</div>
+      <h1 style="text-align:center; margin-bottom:34px;">Дневник подходов</h1>
+      <div class="choice-row" style="margin-bottom:22px;">
+        <button class="choice-btn ${!isSignup?'selected':''}" data-action="auth-mode-login">Вход</button>
+        <button class="choice-btn ${isSignup?'selected':''}" data-action="auth-mode-signup">Регистрация</button>
+      </div>
+      <div class="field">
+        <div class="field-label">Email</div>
+        <input type="email" id="login-email" placeholder="you@example.com" autocomplete="username">
+      </div>
+      <div class="field">
+        <div class="field-label">Пароль</div>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="${isSignup?'new-password':'current-password'}">
+      </div>
+      ${isSignup ? `
+      <div class="field">
+        <div class="field-label">Повторите пароль</div>
+        <input type="password" id="login-password2" placeholder="••••••••" autocomplete="new-password">
+      </div>` : ''}
+      ${state.loginError ? `<div style="color:var(--warn); font-size:13px; margin:4px 0 14px;">${state.loginError}</div>` : ''}
+      ${state.loginNotice ? `<div style="color:var(--good); font-size:13px; margin:4px 0 14px;">${state.loginNotice}</div>` : ''}
+      ${(!state.loginError && !state.loginNotice) ? '<div style="height:10px"></div>' : ''}
+      <button class="btn btn-primary" data-action="${isSignup?'do-signup':'do-login'}" ${state.loginBusy ? 'disabled' : ''}>${state.loginBusy ? (isSignup?'Создаём…':'Входим…') : (isSignup?'Создать профиль':'Войти')}</button>
+    </div>
+  `;
+}
+
+function renderTabbar(){
+  const tabs = [
+    {id:'practice', ic:'🚶', label:'Подходы'},
+    {id:'journal', ic:'📓', label:'Дневник'},
+    {id:'progress', ic:'📈', label:'Прогресс'},
+    {id:'settings', ic:'⚙', label:'Настройки'},
+  ];
+  return `<div class="tabbar">
+    ${tabs.map(t=>`
+      <button class="tab-btn ${state.tab===t.id?'active':''}" data-tab="${t.id}">
+        <span class="ic">${t.ic}</span><span>${t.label}</span>
+      </button>
+    `).join('')}
+  </div>`;
+}
+
+/* ---------- Practice tab ---------- */
+function renderPracticeHome(){
+  const todayK = todayKey();
+  const todayCount = state.entries.filter(e => dateKey(e.ts) === todayK).length;
+  return `
+    <div class="home-hero">
+      <div class="eyebrow">Подходы</div>
+      <h1>Как прошёл сегодняшний подход?</h1>
+    </div>
+    <div class="stat-row">
+      <div class="stat-tile" style="flex:1;"><div class="num">${todayCount}</div><div class="lbl">подходов сегодня</div></div>
+    </div>
+    <button class="btn btn-primary" data-action="start-practice">Записать подход</button>
+  `;
+}
+
+function renderPracticeWizard(){
+  const q = QUESTIONS[state.qIndex];
+  const dots = QUESTIONS.map((_,i)=>{
+    let cls = 'dot';
+    if(i < state.qIndex) cls += ' done';
+    if(i === state.qIndex) cls += ' current';
+    return `<div class="${cls}"></div>`;
+  }).join('');
+
+  let control = '';
+  if(q.type === 'scale_note' || q.type === 'scale'){
+    const val = state.answers[q.id] ?? 5;
+    const noteKey = q.id + 'Note';
+    const noteVal = state.answers[noteKey] || '';
+    const noteOpen = (state.noteOpen && state.noteOpen[q.id]) || !!noteVal;
+    control = `
+      <div class="scale-value">${val}</div>
+      <input type="range" min="0" max="10" step="1" value="${val}" class="scale-slider" id="slider-${q.id}">
+      <div class="scale-ends"><span>0 · ${q.lowLabel}</span><span>${q.highLabel} · 10</span></div>
+      ${q.type === 'scale_note' ? `
+        <button type="button" class="btn-ghost" data-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen ? 'Скрыть описание' : '+ Добавить описание'}</button>
+        ${noteOpen ? `<textarea id="note-${q.id}" placeholder="Подробности, если нужно..." style="margin-top:10px;">${noteVal}</textarea>` : ''}
+      ` : ''}
+    `;
+  } else if(q.type === 'bool' || q.type === 'bool_manual'){
+    const val = state.answers[q.id];
+    const manual = q.type === 'bool_manual' ? '1' : '0';
+    control = `
+      <div class="choice-row">
+        <button class="choice-btn ${val===true?'selected':''}" data-bool-id="${q.id}" data-bool-val="true" data-manual="${manual}">Да</button>
+        <button class="choice-btn ${val===false?'selected':''}" data-bool-id="${q.id}" data-bool-val="false" data-manual="${manual}">Нет</button>
+      </div>
+    `;
+  } else if(q.type === 'choice_other'){
+    const val = state.answers[q.id];
+    const customVal = state.answers[q.id + 'Custom'] || '';
+    control = `<div class="choice-list">${q.options.map(opt => {
+      const optId = opt === 'Другое' ? 'other' : opt;
+      const selected = val === optId;
+      return `<button class="choice-list-btn ${selected?'selected':''}" data-choice-id="${q.id}" data-choice-val="${optId.replace(/"/g,'&quot;')}">${opt}</button>`;
+    }).join('')}
+    ${val === 'other' ? `<input type="text" id="text-${q.id}Custom" value="${customVal.replace(/"/g,'&quot;')}" placeholder="Напишите свой вариант" style="margin-top:10px;">` : ''}
+    </div>`;
+  } else if(q.type === 'choice'){
+    const val = state.answers[q.id];
+    control = `<div class="choice-list">${q.options.map(opt => `
+      <button class="choice-list-btn ${val===opt?'selected':''}" data-choice-id="${q.id}" data-choice-val="${opt.replace(/"/g,'&quot;')}">${opt}</button>
+    `).join('')}</div>`;
+  } else if(q.type === 'text'){
+    const val = state.answers[q.id] || '';
+    control = `<textarea id="text-${q.id}" placeholder="Коротко, по сути...">${val}</textarea>`;
+  }
+
+  const isFirst = state.qIndex === 0;
+  const isLast = state.qIndex === QUESTIONS.length - 1;
+
+  return `
+    <div style="padding:22px 20px 24px; display:flex; flex-direction:column; min-height:100vh;">
+      <div class="progress-dots">${dots}</div>
+      <div class="q-wrap">
+        <div class="q-label">${q.label}</div>
+        <div class="q-hint">${q.hint || ''}</div>
+        ${control}
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-ghost" data-action="${isFirst ? 'cancel-practice' : 'prev-question'}">${isFirst ? 'Отмена' : 'Назад'}</button>
+        <button class="btn btn-primary" data-action="${isLast ? 'save-practice' : 'next-question'}">${isLast ? 'Сохранить' : 'Далее'}</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- Journal tab ---------- */
+function findTodayJournal(){
+  const k = todayKey();
+  return state.journalEntries.find(e => dateKey(e.ts) === k);
+}
+
+function renderJournalHome(){
+  if(state.journalView === 'history') return renderJournalHistory();
+
+  const todayEntry = findTodayJournal();
+  const days = daysSinceStart();
+  return `
+    <div class="home-hero" style="margin-top:6vh;">
+      <div class="eyebrow">Дневник дня</div>
+      ${days ? `<div style="font-family:var(--serif); font-size:28px; color:var(--accent); margin:4px 0 10px;">День ${days}</div>` : ''}
+      <h1>${todayEntry ? 'Сегодняшняя запись уже есть' : 'Как прошёл день?'}</h1>
+    </div>
+    <button class="btn btn-primary" data-action="new-journal">${todayEntry ? 'Изменить сегодняшнюю запись' : 'Написать новый дневник'}</button>
+    <div style="height:12px"></div>
+    <button class="btn btn-ghost" data-action="show-journal-history">Посмотреть старые дневники</button>
+  `;
+}
+
+function renderJournalHistory(){
+  const todayK = todayKey();
+  const past = state.journalEntries.slice()
+    .filter(e=>!isJournalEntryEmpty(e) && dateKey(e.ts) !== todayK)
+    .sort((a,b)=>b.ts-a.ts);
+
+  const listHtml = past.length ? past.map(e=>{
+      const dn = dayNumberForTs(e.ts);
+      return `
+      <div class="journal-list-row" data-action="view-old-journal" data-jid="${e.ts}">
+        <div class="jd">
+          <div>${dn ? 'День ' + dn : capitalize(weekdayDateLabel(e.ts))}</div>
+          <div class="date" style="text-transform:capitalize;">${dn ? weekdayDateLabel(e.ts) : ''}</div>
+        </div>
+        <div style="color:var(--text-muted); font-size:18px;">›</div>
+      </div>
+  `;
+  }).join('') : `<div class="empty">Прошлых записей пока нет</div>`;
+
+  return `
+    <div class="top-bar">
+      <button class="back-btn" data-action="journal-history-back">‹</button>
+      <h2>Старые дневники</h2>
+    </div>
+    ${listHtml}
+  `;
+}
+
+/* ---------- read-only beautiful view ---------- */
+function renderJournalRead(entry){
+  const rowsHtml = JOURNAL_STEPS.map(f=>{
+    if(f.id === 'mood') return '';
+    const v = entry[f.id];
+    if(v === undefined || v === null || v === '') return '';
+
+    if(f.type === 'number'){
+      const unit = f.id === 'sleepHours' ? 'сон, часов' : f.label;
+      return readRow(JOURNAL_ICONS[f.id]||'🔹', v, unit);
+    }
+    return readRow(JOURNAL_ICONS[f.id]||'🔹', null, v, f.label);
+  }).join('');
+
+  const moodVal = entry.mood;
+  const moodIcon = MOOD_ICONS[moodVal] || '🙂';
+  const dn = dayNumberForTs(entry.ts);
+
+  return `
+    <div style="padding:22px 20px 40px;">
+      <div class="top-bar">
+        <button class="back-btn" data-action="journal-read-back">‹</button>
+        <h2 style="text-transform:capitalize;">${dn ? 'День ' + dn : weekdayDateLabel(entry.ts)}</h2>
+      </div>
+      ${dn ? `<div style="text-align:center; color:var(--text-muted); font-size:13px; text-transform:capitalize; margin:-6px 0 4px;">${weekdayDateLabel(entry.ts)}</div>` : ''}
+      <div class="read-hero">
+        <div class="read-hero-emoji">🌇</div>
+        <div class="read-hero-mood">${moodIcon} ${moodVal || ''}</div>
+      </div>
+      ${rowsHtml || '<div class="empty">Запись пуста</div>'}
+    </div>
+  `;
+}
+function readRow(icon, big, text, label){
+  return `
+    <div class="read-row">
+      <div class="read-icon">${icon}</div>
+      <div class="read-body">
+        ${label ? `<div class="read-label">${label}</div>` : ''}
+        ${big !== null && big !== undefined
+          ? `<div class="read-big">${big}</div><div class="read-sub">${text}</div>`
+          : `<div class="read-text">${text}</div>`}
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- step-by-step wizard for a new/current entry ---------- */
+function renderJournalWizardStep(){
+  const idx = state.journalStepIndex;
+  const q = JOURNAL_STEPS[idx];
+  const val = state.journalDraft[q.id];
+
+  const dots = JOURNAL_STEPS.map((_,i)=>{
+    let cls = 'dot';
+    if(i < idx) cls += ' done';
+    if(i === idx) cls += ' current';
+    return `<div class="${cls}"></div>`;
+  }).join('');
+
+  let control = '';
+  if(q.type === 'choice'){
+    control = `<div class="choice-list">${q.options.map(opt => `
+      <button class="choice-list-btn ${val===opt?'selected':''}" data-jw-choice="${q.id}" data-jw-val="${opt}">${opt}</button>
+    `).join('')}</div>`;
+  } else if(q.type === 'bool'){
+    control = `
+      <div class="choice-row">
+        <button class="choice-btn ${val===true?'selected':''}" data-jw-bool="${q.id}" data-jw-val="true">Да</button>
+        <button class="choice-btn ${val===false?'selected':''}" data-jw-bool="${q.id}" data-jw-val="false">Нет</button>
+      </div>`;
+  } else if(q.type === 'number'){
+    control = `<input type="number" inputmode="decimal" id="jw-number-${q.id}" value="${val ?? ''}" style="text-align:center; font-size:30px; padding:16px; font-family:Georgia,serif;">`;
+  } else if(q.type === 'text'){
+    control = `<input type="text" id="jw-text-${q.id}" value="${val ? String(val).replace(/"/g,'&quot;') : ''}" placeholder="Коротко, по сути...">`;
+  } else if(q.type === 'textarea'){
+    control = `<textarea id="jw-text-${q.id}" placeholder="Коротко, по сути...">${val || ''}</textarea>`;
+  }
+
+  const isFirst = idx === 0;
+  const isLast = idx === JOURNAL_STEPS.length - 1;
+
+  return `
+    <div style="padding:22px 20px 24px; display:flex; flex-direction:column; min-height:100vh;">
+      <div class="progress-dots">${dots}</div>
+      <div class="q-wrap">
+        <div class="q-label">${q.label}</div>
+        <div class="q-hint">${q.hint || ''}</div>
+        ${control}
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-ghost" data-action="${isFirst ? 'done-journal' : 'journal-prev-step'}">${isFirst ? 'Готово' : 'Назад'}</button>
+        <button class="btn btn-primary" data-action="${isLast ? 'done-journal' : 'journal-next-step'}">${isLast ? 'Готово' : 'Далее'}</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- Progress tab (calendar) ---------- */
+function renderProgress(){
+  const monthDate = state.progressMonth;
+  const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
+
+  return `
+    <div class="eyebrow">Прогресс</div>
+    <h2 style="font-size:24px; margin-bottom:18px;">Календарь</h2>
+
+    <div class="metric-grid">
+      <div class="metric-tile"><div class="num">${totalAttemptsCount()}</div><div class="lbl">подходов всего</div></div>
+      <div class="metric-tile good"><div class="num">${todayAttemptsCount()}</div><div class="lbl">подходов сегодня</div></div>
+    </div>
+
+    <div class="period-row" style="align-items:center; margin-top:10px;">
+      <button class="segment-btn" data-action="progress-prev-month" style="flex:0 0 46px;">‹</button>
+      <div style="flex:1; text-align:center; font-family:Georgia,serif; font-size:16px;">${monthLabel}</div>
+      <button class="segment-btn" data-action="progress-next-month" style="flex:0 0 46px;">›</button>
+    </div>
+    ${renderCalendar(monthDate)}
+
+    <div class="jc-title" style="margin-top:22px;">Динамика месяца</div>
+    ${renderTrendChart(monthDate)}
+
+    <div class="report-actions">
+      <div class="report-row">
+        <button class="btn btn-primary" data-action="export-attempts-pdf">PDF: список подходов</button>
+        <button class="btn btn-ghost" data-action="copy-attempts-image" title="Скопировать картинкой для Telegram">📋 Копировать</button>
+      </div>
+      <div class="report-row">
+        <button class="btn btn-primary" data-action="export-journal-pdf">PDF: записи дневника</button>
+        <button class="btn btn-ghost" data-action="copy-journal-image" title="Скопировать картинкой для Telegram">📋 Копировать</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderCalendar(monthDate){
+  const total = daysInMonth(monthDate);
+  const offset = firstWeekdayMonIndex(monthDate);
+  const countsByDay = attemptsCountByDay(monthDate);
+  const journalDays = journalDaysInMonth(monthDate);
+  const today = new Date();
+  const todayStart = startOfDay(Date.now());
+  const isCurMonth = today.getFullYear()===monthDate.getFullYear() && today.getMonth()===monthDate.getMonth();
+  const weekdays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+  let cells = '';
+  for(let i=0;i<offset;i++) cells += `<div class="cal-cell empty"></div>`;
+  for(let day=1; day<=total; day++){
+    const count = countsByDay[day] || 0;
+    const hasJournal = journalDays.has(day);
+    const cellDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
+    const isToday = isCurMonth && today.getDate() === day;
+    const isPastOrToday = cellDate.getTime() <= todayStart;
+    const complete = count > 0 && hasJournal;
+    let arrow = '';
+    if(isPastOrToday) arrow = complete
+      ? `<span class="cal-arrow up">↑</span>`
+      : `<span class="cal-arrow down">↓</span>`;
+    cells += `<div class="cal-cell${isToday?' today':''}">
+      ${arrow}
+      <div class="cal-day-num">${day}</div>
+      <div class="cal-emojis">
+        ${hasJournal ? `<span>📓</span>` : ''}
+        ${count ? `<span>🚶</span>` : ''}
+      </div>
+      <div class="cal-count">${count ? '×'+count : ''}</div>
+    </div>`;
+  }
+
+  return `
+    <div class="cal-grid cal-weekdays">${weekdays.map(w=>`<div class="cal-weekday">${w}</div>`).join('')}</div>
+    <div class="cal-grid">${cells}</div>
+    <div class="cal-legend">
+      <span>📓 дневник</span>
+      <span>🚶 подход</span>
+      <span style="color:var(--good);">↑ день выполнен</span>
+      <span style="color:var(--warn);">↓ день пропущен</span>
+    </div>
+  `;
+}
+
+function renderTrendChart(monthDate){
+  const points = buildMonthTrend(monthDate);
+  if(points.length <= 1){
+    return `<div class="trend-empty">В этом месяце пока нет данных для графика</div>`;
+  }
+  const W = 600, H = 150, padX = 10, padY = 18;
+  const maxAbs = Math.max(2, ...points.map(p=>Math.abs(p.val)));
+  const lastDay = points[points.length-1].day;
+  const xFor = day => padX + (day / Math.max(1,lastDay)) * (W - padX*2);
+  const yFor = val => H/2 - (val / maxAbs) * (H/2 - padY);
+
+  let segments = '';
+  for(let i=1;i<points.length;i++){
+    const a = points[i-1], b = points[i];
+    const color = b.complete ? 'var(--good)' : 'var(--warn)';
+    segments += `<line x1="${xFor(a.day).toFixed(1)}" y1="${yFor(a.val).toFixed(1)}" x2="${xFor(b.day).toFixed(1)}" y2="${yFor(b.val).toFixed(1)}" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`;
+  }
+  const last = points[points.length-1];
+  const lastColor = last.val > 0 ? 'var(--good)' : (last.val < 0 ? 'var(--warn)' : 'var(--text-muted)');
+
+  return `
+    <div class="trend-wrap">
+      <svg viewBox="0 0 ${W} ${H}" class="trend-svg" preserveAspectRatio="none">
+        <line x1="${padX}" y1="${(H/2).toFixed(1)}" x2="${W-padX}" y2="${(H/2).toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 4"/>
+        ${segments}
+        <circle cx="${xFor(last.day).toFixed(1)}" cy="${yFor(last.val).toFixed(1)}" r="4.5" fill="${lastColor}"/>
+      </svg>
+      <div class="trend-legend">
+        <span style="color:var(--good);">↑ день выполнен</span>
+        <span style="color:var(--warn);">↓ день пропущен</span>
+        <span style="color:${lastColor}; font-weight:600;">сейчас: ${last.val > 0 ? '+' : ''}${last.val}</span>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- Settings tab ---------- */
+function renderSettings(){
+  const days = daysSinceStart();
+  return `
+    <div class="eyebrow">Настройки</div>
+    <h2 style="font-size:24px; margin-bottom:18px;">Параметры</h2>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="jc-title">Дата начала занятий</div>
+      <input type="date" id="settings-start-date" value="${state.settings.startDate || ''}">
+      ${days ? `<div class="autosave-hint" style="margin:10px 0 0;">Сейчас: День ${days}</div>` : ''}
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="jc-title">Тема</div>
+      <div class="choice-row">
+        <button class="choice-btn ${state.settings.theme==='light'?'selected':''}" data-action="theme-light">Светлая</button>
+        <button class="choice-btn ${state.settings.theme==='dark'?'selected':''}" data-action="theme-dark">Тёмная</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="jc-title">Аккаунт</div>
+      <div class="autosave-hint" style="margin:0 0 14px;">${auth.email || ''}</div>
+      <button class="btn btn-ghost" data-action="logout">Выйти</button>
+    </div>
+  `;
+}
+
+/* ---------- events ---------- */
+function attachHandlers(){
+  const app = document.getElementById('app');
+  app.querySelectorAll('[data-action]').forEach(el=> el.addEventListener('click', onAction));
+  app.querySelectorAll('[data-tab]').forEach(el=> el.addEventListener('click', e=>{
+    state.tab = e.currentTarget.getAttribute('data-tab'); render();
+  }));
+  app.querySelectorAll('.scale-slider').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const id = e.target.id.replace('slider-','');
+      state.answers[id] = parseInt(e.target.value,10);
+      const valEl = e.target.parentElement.querySelector('.scale-value');
+      if(valEl) valEl.textContent = e.target.value;
+    });
+  });
+  app.querySelectorAll('[data-bool-id]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-bool-id');
+      const manual = e.currentTarget.getAttribute('data-manual') === '1';
+      state.answers[id] = e.currentTarget.getAttribute('data-bool-val') === 'true';
+      render();
+      if(manual) return;
+      const targetIndex = state.qIndex;
+      setTimeout(()=>{
+        if(state.qIndex === targetIndex && state.qIndex < QUESTIONS.length - 1){
+          state.qIndex++;
+          render();
+        }
+      }, 260);
+    });
+  });
+  app.querySelectorAll('[data-choice-id]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-choice-id');
+      const val = e.currentTarget.getAttribute('data-choice-val');
+      state.answers[id] = val;
+      render();
+      if(val === 'other') return;
+      const targetIndex = state.qIndex;
+      setTimeout(()=>{
+        if(state.qIndex === targetIndex && state.qIndex < QUESTIONS.length - 1){
+          state.qIndex++;
+          render();
+        }
+      }, 260);
+    });
+  });
+  app.querySelectorAll('[data-note-toggle]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-note-toggle');
+      state.noteOpen = state.noteOpen || {};
+      state.noteOpen[id] = !state.noteOpen[id];
+      render();
+    });
+  });
+  app.querySelectorAll('textarea[id^="note-"]').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const id = e.target.id.replace('note-','');
+      state.answers[id + 'Note'] = e.target.value;
+    });
+  });
+  app.querySelectorAll('[data-jw-bool]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-jw-bool');
+      state.journalDraft[id] = e.currentTarget.getAttribute('data-jw-val') === 'true';
+      scheduleJournalSave();
+      render();
+      const targetIndex = state.journalStepIndex;
+      setTimeout(()=>{
+        if(state.journalStepIndex === targetIndex && state.journalStepIndex < JOURNAL_STEPS.length - 1){
+          state.journalStepIndex++;
+          render();
+        }
+      }, 260);
+    });
+  });
+  app.querySelectorAll('[data-jw-choice]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-jw-choice');
+      state.journalDraft[id] = e.currentTarget.getAttribute('data-jw-val');
+      scheduleJournalSave();
+      render();
+      const targetIndex = state.journalStepIndex;
+      setTimeout(()=>{
+        if(state.journalStepIndex === targetIndex && state.journalStepIndex < JOURNAL_STEPS.length - 1){
+          state.journalStepIndex++;
+          render();
+        }
+      }, 260);
+    });
+  });
+  app.querySelectorAll('#app input[id^="jw-text-"], #app textarea[id^="jw-text-"]').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const id = e.target.id.replace('jw-text-','');
+      state.journalDraft[id] = e.target.value;
+      scheduleJournalSave();
+    });
+  });
+  app.querySelectorAll('#app input[id^="jw-number-"]').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const id = e.target.id.replace('jw-number-','');
+      state.journalDraft[id] = e.target.value === '' ? null : parseFloat(e.target.value);
+      scheduleJournalSave();
+    });
+  });
+  app.querySelectorAll('#app input[id^="text-"], #app textarea[id^="text-"]').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const id = e.target.id.replace('text-','');
+      state.answers[id] = e.target.value;
+    });
+  });
+  const startDateInput = app.querySelector('#settings-start-date');
+  if(startDateInput){
+    startDateInput.addEventListener('change', (e)=>{
+      saveStartDate(e.target.value).then(render);
+    });
+  }
+  ['login-password','login-password2'].forEach(id=>{
+    const el = app.querySelector('#'+id);
+    if(el){
+      el.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter') doAuthFromForm();
+      });
+    }
+  });
+}
+
+function doLoginFromForm(){
+  if(state.loginBusy) return;
+  const email = (document.getElementById('login-email')||{}).value || '';
+  const password = (document.getElementById('login-password')||{}).value || '';
+  if(!email.trim() || !password){
+    state.loginError = 'Введите email и пароль';
+    render();
+    return;
+  }
+  login(email.trim(), password);
+}
+
+function doSignupFromForm(){
+  if(state.loginBusy) return;
+  const email = (document.getElementById('login-email')||{}).value || '';
+  const password = (document.getElementById('login-password')||{}).value || '';
+  const password2 = (document.getElementById('login-password2')||{}).value || '';
+  if(!email.trim() || !password){
+    state.loginError = 'Введите email и пароль';
+    render();
+    return;
+  }
+  if(password.length < 6){
+    state.loginError = 'Пароль должен быть не короче 6 символов';
+    render();
+    return;
+  }
+  if(password !== password2){
+    state.loginError = 'Пароли не совпадают';
+    render();
+    return;
+  }
+  signUp(email.trim(), password);
+}
+
+function doAuthFromForm(){
+  if(state.authMode === 'signup') doSignupFromForm();
+  else doLoginFromForm();
+}
+
+async function onAction(e){
+  const action = e.currentTarget.getAttribute('data-action');
+
+  if(action === 'do-login'){
+    doLoginFromForm(); return;
+  } else if(action === 'do-signup'){
+    doSignupFromForm(); return;
+  } else if(action === 'auth-mode-login'){
+    state.authMode = 'login'; state.loginError = null; state.loginNotice = null; render(); return;
+  } else if(action === 'auth-mode-signup'){
+    state.authMode = 'signup'; state.loginError = null; state.loginNotice = null; render(); return;
+  } else if(action === 'logout'){
+    logout(); return;
+  } else if(action === 'start-practice'){
+    state.practiceActive = true; state.qIndex = 0; state.answers = {}; state.noteOpen = {};
+    QUESTIONS.forEach(q => { if(q.type==='scale' || q.type==='scale_note') state.answers[q.id] = 5; });
+  } else if(action === 'cancel-practice'){
+    state.practiceActive = false;
+  } else if(action === 'prev-question'){
+    state.qIndex = Math.max(0, state.qIndex - 1);
+  } else if(action === 'next-question'){
+    state.qIndex = Math.min(QUESTIONS.length - 1, state.qIndex + 1);
+  } else if(action === 'save-practice'){
+    state.practiceActive = false;
+    render();
+    const saved = await insertAttempt(state.answers);
+    if(saved) state.entries.push(saved);
+    render();
+    return;
+
+  } else if(action === 'new-journal'){
+    let entry = findTodayJournal();
+    if(!entry){
+      const entryDate = todayKey();
+      entry = { entryDate, ts: new Date(entryDate + 'T12:00:00').getTime() };
+      state.journalEntries.push(entry);
+    }
+    state.journalDraft = entry;
+    state.journalEditId = entry.entryDate;
+    state.journalStepIndex = 0;
+    state.journalFormActive = true;
+  } else if(action === 'view-old-journal'){
+    const jid = parseInt(e.currentTarget.getAttribute('data-jid'),10);
+    const existing = state.journalEntries.find(j=>j.ts === jid);
+    if(!existing) return;
+    state.journalReadEntry = existing;
+    state.journalView = 'read';
+  } else if(action === 'journal-read-back'){
+    state.journalReadEntry = null;
+    state.journalView = 'history';
+  } else if(action === 'show-journal-history'){
+    state.journalView = 'history';
+  } else if(action === 'journal-history-back'){
+    state.journalView = 'home';
+  } else if(action === 'journal-prev-step'){
+    state.journalStepIndex = Math.max(0, state.journalStepIndex - 1);
+  } else if(action === 'journal-next-step'){
+    state.journalStepIndex = Math.min(JOURNAL_STEPS.length - 1, state.journalStepIndex + 1);
+  } else if(action === 'done-journal'){
+    clearTimeout(journalSaveTimer);
+    const draft = state.journalDraft;
+    state.journalFormActive = false;
+    state.journalStepIndex = 0;
+    state.journalView = 'home';
+    render();
+    if(draft && draft.entryDate){
+      if(isJournalEntryEmpty(draft)){
+        if(state.journalEditId) await deleteJournalEntry(draft.entryDate);
+        else state.journalEntries = state.journalEntries.filter(j => j.entryDate !== draft.entryDate);
+      } else {
+        await persistJournal();
+      }
+    }
+    render();
+    return;
+
+  } else if(action === 'export-attempts-pdf'){
+    generateAttemptsPdf(); return;
+  } else if(action === 'export-journal-pdf'){
+    generateJournalPdf(); return;
+  } else if(action === 'copy-attempts-image'){
+    copyAttemptsImage(); return;
+  } else if(action === 'copy-journal-image'){
+    copyJournalImage(); return;
+  } else if(action === 'progress-prev-month'){
+    const d = new Date(state.progressMonth); d.setMonth(d.getMonth()-1); state.progressMonth = d;
+  } else if(action === 'progress-next-month'){
+    const d = new Date(state.progressMonth); d.setMonth(d.getMonth()+1); state.progressMonth = d;
+  } else if(action === 'theme-light'){
+    setTheme('light'); return;
+  } else if(action === 'theme-dark'){
+    setTheme('dark'); return;
+  }
+  render();
+}
+
+/* ---------- toast ---------- */
+function showToast(msg){
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#1E3838;color:#F2F7F6;padding:11px 20px;border-radius:999px;font-size:14px;z-index:999;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:0;transition:opacity .2s ease;font-family:-apple-system,sans-serif;max-width:88vw;text-align:center;';
+  document.body.appendChild(t);
+  requestAnimationFrame(()=>{ t.style.opacity = '1'; });
+  setTimeout(()=>{
+    t.style.opacity = '0';
+    setTimeout(()=> t.remove(), 250);
+  }, 2600);
+}
+
+/* ---------- PDF / image reports ----------
+   jsPDF's built-in fonts don't cover Cyrillic, so every page is drawn on an
+   off-screen canvas first (the browser's own font renderer handles Cyrillic
+   fine) and then embedded into the PDF as an image (or copied straight to
+   the clipboard as a PNG for pasting into Telegram etc). This keeps text
+   crisp and sidesteps font-embedding entirely. */
+const REPORT_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+const REPORT_SERIF = 'Georgia, "Times New Roman", serif';
+const RC = { // report colors — mirrors the app's teal palette
+  bg: '#FFFFFF', band: '#3FA7A0', bandText: '#FFFFFF',
+  text: '#1E3838', muted: '#5C7977', border: '#DCE9E6',
+  stripe: '#EFF6F5', headBg: '#E9F2F0', accent: '#2E8B85',
+  good: '#3E8A61', warn: '#C14F3F'
+};
+
+// Portrait page (journal: Q&A table)
+const PDF_P_W = 1060, PDF_P_H = 1500, PDF_P_MARGIN = 64;
+// Landscape page (attempts: wide multi-column table)
+const PDF_L_W = 1500, PDF_L_H = 1060, PDF_L_MARGIN = 56;
+
+function newReportPage(pages, w, h){
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = RC.bg; ctx.fillRect(0,0,w,h);
+  pages.push(canvas);
+  return { canvas, ctx, y: 0, w, h };
+}
+function wrapLines(ctx, text, maxWidth){
+  const words = String(text).split(' ');
+  const lines = []; let line = '';
+  words.forEach(w=>{
+    const test = line ? line + ' ' + w : w;
+    if(ctx.measureText(test).width > maxWidth && line){ lines.push(line); line = w; }
+    else line = test;
+  });
+  if(line) lines.push(line);
+  return lines.length ? lines : [''];
+}
+function drawReportHeader(ctx, w, margin, title, subtitle){
+  let y = margin + 4;
+  ctx.fillStyle = RC.accent; ctx.font = '32px ' + REPORT_SERIF;
+  ctx.fillText(title, margin, y + 28); y += 44;
+  ctx.fillStyle = RC.muted; ctx.font = '17px ' + REPORT_FONT;
+  ctx.fillText(subtitle, margin, y + 14); y += 32;
+  ctx.strokeStyle = RC.accent; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(margin, y + 14); ctx.lineTo(w - margin, y + 14); ctx.stroke();
+  return y + 40;
+}
+function savePdfFromPages(pages, filename, landscape){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4', orientation: landscape ? 'landscape' : 'portrait' });
+  const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
+  pages.forEach((pg,i)=>{
+    if(i>0) doc.addPage();
+    doc.addImage(pg.toDataURL('image/png'), 'PNG', 0, 0, pw, ph);
+  });
+  doc.save(filename);
+}
+function copyCanvasImage(canvas, extraCount){
+  canvas.toBlob(blob=>{
+    if(!blob){ showToast('Не удалось подготовить изображение'); return; }
+    if(navigator.clipboard && window.ClipboardItem){
+      navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ])
+        .then(()=> showToast(extraCount > 0
+          ? `Скопировано! (ещё ${extraCount} стр. — скачайте PDF, если нужны все)`
+          : 'Скопировано — вставьте в Telegram'))
+        .catch(()=> downloadCanvasFallback(canvas));
+    } else {
+      downloadCanvasFallback(canvas);
+    }
+  }, 'image/png');
+}
+function downloadCanvasFallback(canvas){
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = 'otchet-' + new Date().toISOString().slice(0,10) + '.png';
+  document.body.appendChild(a); a.click(); a.remove();
+  showToast('Браузер не поддерживает копирование — картинка скачана');
+}
+
+/* ---- Attempts: wide multi-column table, landscape ---- */
+const ATT_COLS = [
+  { id:'num',      label:'№',          w:44  },
+  { id:'date',     label:'Дата, время',w:128 },
+  { id:'title',    label:'Тип',        w:110 },
+  { id:'mindset',  label:'Настрой',    w:168 },
+  { id:'reaction', label:'Реакция',    w:168 },
+  { id:'voice',    label:'Речь',       w:60  },
+  { id:'hand',     label:'Рука',       w:60  },
+  { id:'anxiety',  label:'Волнение',   w:78  },
+  { id:'ritual',   label:'Ритуал',     w:70  },
+];
+function attColX(){
+  const gap = 16; let x = PDF_L_MARGIN; const map = {};
+  ATT_COLS.forEach(c=>{ map[c.id] = x; x += c.w + gap; });
+  return map;
+}
+function buildAttemptsPages(){
+  const monthDate = state.progressMonth;
+  const entries = attemptsInMonth(monthDate);
+  if(!entries.length) return null;
+  const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
+  const colX = attColX();
+  const notesStartX = colX.num;
+  const tableRight = PDF_L_W - PDF_L_MARGIN;
+
+  const pages = [];
+  let { ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H);
+  y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Дневник подходов', monthLabel + ' · всего подходов: ' + entries.length);
+
+  function drawTableHeader(){
+    ctx.fillStyle = RC.headBg;
+    ctx.fillRect(PDF_L_MARGIN - 10, y - 20, tableRight - PDF_L_MARGIN + 20, 34);
+    ctx.fillStyle = RC.accent; ctx.font = 'bold 14px ' + REPORT_FONT;
+    ATT_COLS.forEach(c=> ctx.fillText(c.label, colX[c.id], y));
+    y += 24;
+  }
+  drawTableHeader();
+
+  entries.forEach((e,i)=>{
+    const rowVals = {
+      num: 'Подход ' + (i+1),
+      date: dateLabel(e.ts) + ', ' + timeLabel(e.ts),
+      title: e.title || '—',
+      mindset: e.mindsetBefore || '—',
+      reaction: e.reactionAfter || '—',
+      voice: fmtNum(e.voice),
+      hand: fmtNum(e.hand),
+      anxiety: fmtNum(e.anxiety),
+      ritual: e.ritual===true?'да':e.ritual===false?'нет':'—',
+    };
+    ctx.font = '13px ' + REPORT_FONT;
+    const wrapped = {};
+    let maxLines = 1;
+    ATT_COLS.forEach(c=>{
+      const lines = wrapLines(ctx, rowVals[c.id], c.w);
+      wrapped[c.id] = lines;
+      if(lines.length > maxLines) maxLines = lines.length;
+    });
+    const lineH = 17;
+    const rowH = Math.max(28, maxLines * lineH + 10);
+
+    const notes = [];
+    if(e.voiceNote) notes.push('Речь — подробно: ' + e.voiceNote);
+    if(e.handNote) notes.push('Рука — подробно: ' + e.handNote);
+    if(e.anxietyNote) notes.push('Волнение — подробно: ' + e.anxietyNote);
+    let noteLines = [];
+    if(notes.length){
+      ctx.font = 'italic 12px ' + REPORT_FONT;
+      notes.forEach(n=> wrapLines(ctx, n, tableRight - notesStartX).forEach(l=> noteLines.push(l)));
+    }
+    const noteH = noteLines.length ? noteLines.length * 15 + 10 : 0;
+
+    if(y + rowH + noteH > PDF_L_H - 54){
+      ({ ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H));
+      y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Дневник подходов', monthLabel + ' · всего подходов: ' + entries.length);
+      drawTableHeader();
+    }
+
+    if(i % 2 === 1){
+      ctx.fillStyle = RC.stripe;
+      ctx.fillRect(PDF_L_MARGIN - 10, y - 14, tableRight - PDF_L_MARGIN + 20, rowH);
+    }
+    ctx.fillStyle = RC.text; ctx.font = '13px ' + REPORT_FONT;
+    ATT_COLS.forEach(c=>{
+      wrapped[c.id].forEach((line, li)=> ctx.fillText(line, colX[c.id], y + li*lineH));
+    });
+    y += rowH;
+
+    if(noteLines.length){
+      ctx.font = 'italic 12px ' + REPORT_FONT; ctx.fillStyle = RC.muted;
+      noteLines.forEach(l=>{ ctx.fillText(l, notesStartX, y); y += 15; });
+      y += 6;
+    }
+
+    ctx.strokeStyle = RC.border; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PDF_L_MARGIN - 10, y); ctx.lineTo(tableRight + 10, y); ctx.stroke();
+    y += 18;
+  });
+
+  return { pages, filename: 'podhody-' + new Date().toISOString().slice(0,10) + '.pdf' };
+}
+function generateAttemptsPdf(){
+  if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
+  const built = buildAttemptsPages();
+  if(!built){ showToast('В этом месяце нет записанных подходов'); return; }
+  savePdfFromPages(built.pages, built.filename, true);
+}
+function copyAttemptsImage(){
+  const built = buildAttemptsPages();
+  if(!built){ showToast('В этом месяце нет записанных подходов'); return; }
+  copyCanvasImage(built.pages[0], built.pages.length - 1);
+}
+
+/* ---- Journal: question → answer table, portrait ---- */
+const JRN_LABEL_W = 260, JRN_GAP = 24;
+function buildJournalPages(){
+  const monthDate = state.progressMonth;
+  const entries = journalEntriesInMonth(monthDate);
+  if(!entries.length) return null;
+  const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
+
+  const fieldLabels = [
+    ['mood','Самочувствие'], ['glad','Радует'], ['worry','Волнует'],
+    ['dailyRoutine','Саморегуляция'], ['sleepHours','Сон, ч'],
+    ['difficulties','Трудная тетрадь'], ['reflections','Вопросы и откровения'],
+    ['tricks','Уловки'], ['praise','Похвала'], ['intentions','Речевые планы'],
+  ];
+  const valueX = PDF_P_MARGIN + JRN_LABEL_W + JRN_GAP;
+  const valueW = PDF_P_W - PDF_P_MARGIN - valueX;
+  const tableLeft = PDF_P_MARGIN - 10, tableRight = PDF_P_W - PDF_P_MARGIN + 10;
+
+  const pages = [];
+  let { ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H);
+  y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', monthLabel + ' · записей: ' + entries.length);
+
+  entries.forEach(e=>{
+    if(y > PDF_P_H - 180){ ({ ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H)); y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', monthLabel + ' · записей: ' + entries.length); }
+
+    // day header band
+    const dn = dayNumberForTs(e.ts);
+    const heading = dn ? `День ${dn}` : capitalize(weekdayDateLabel(e.ts));
+    const subheading = dn ? capitalize(weekdayDateLabel(e.ts)) : '';
+    ctx.fillStyle = RC.band;
+    ctx.fillRect(tableLeft, y - 24, tableRight - tableLeft, subheading ? 50 : 36);
+    ctx.fillStyle = RC.bandText; ctx.font = 'bold 16px ' + REPORT_FONT;
+    ctx.fillText(heading, PDF_P_MARGIN, y);
+    if(subheading){
+      ctx.font = '12px ' + REPORT_FONT;
+      ctx.fillText(subheading, PDF_P_MARGIN, y + 17);
+      y += 14;
+    }
+    y += 30;
+
+    const rows = [];
+    fieldLabels.forEach(([id,lbl])=>{
+      let val = e[id];
+      if(id === 'sleepHours' && val != null) val = fmtNum(val);
+      if(val === null || val === undefined || val === '') return;
+      rows.push([lbl, String(val)]);
+    });
+
+    rows.forEach((row,ri)=>{
+      const [lbl, val] = row;
+      ctx.font = '14px ' + REPORT_FONT;
+      const valLines = wrapLines(ctx, val, valueW);
+      const rowH = Math.max(26, valLines.length * 19 + 8);
+
+      if(y + rowH > PDF_P_H - 70){
+        ({ ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H));
+        y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', monthLabel + ' · записей: ' + entries.length);
+      }
+
+      if(ri % 2 === 1){
+        ctx.fillStyle = RC.stripe;
+        ctx.fillRect(tableLeft, y - 16, tableRight - tableLeft, rowH);
+      }
+      ctx.fillStyle = RC.accent; ctx.font = 'bold 14px ' + REPORT_FONT;
+      ctx.fillText(lbl, PDF_P_MARGIN, y);
+      ctx.fillStyle = RC.text; ctx.font = '14px ' + REPORT_FONT;
+      valLines.forEach((l,li)=> ctx.fillText(l, valueX, y + li*19));
+      y += rowH;
+    });
+
+    y += 6;
+    ctx.strokeStyle = RC.border; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(tableLeft, y); ctx.lineTo(tableRight, y); ctx.stroke();
+    y += 26;
+  });
+
+  return { pages, filename: 'dnevnik-' + new Date().toISOString().slice(0,10) + '.pdf' };
+}
+function generateJournalPdf(){
+  if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
+  const built = buildJournalPages();
+  if(!built){ showToast('В этом месяце нет записей дневника'); return; }
+  savePdfFromPages(built.pages, built.filename, false);
+}
+function copyJournalImage(){
+  const built = buildJournalPages();
+  if(!built){ showToast('В этом месяце нет записей дневника'); return; }
+  copyCanvasImage(built.pages[0], built.pages.length - 1);
+}
+
+async function boot(){
+  loadSession();
+  try{
+    const savedTheme = localStorage.getItem('arlilia_theme');
+    if(savedTheme) state.settings.theme = savedTheme;
+  }catch(e){}
+  applyTheme();
+  if(!auth.accessToken){
+    state.loggedIn = false;
+    render();
+    return;
+  }
+  state.loggedIn = true;
+  render();
+  const ok = await loadAll();
+  if(ok === false){
+    clearSession();
+    state.loggedIn = false;
+  }
+  render();
+}
+boot();
+</script>
+</body>
+</html>
