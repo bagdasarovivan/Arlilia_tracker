@@ -137,10 +137,21 @@
   textarea[id^="jw-text-"]{ min-height: 220px; }
   /* Some mobile browsers reserve extra internal width for the date
      picker's calendar icon beyond the box's own width, which can push
-     the control a few pixels past its card. Clipping the wrapper is a
-     belt-and-braces fix that works regardless of the quirk's cause. */
-  .date-input-wrap{ overflow:hidden; border-radius: var(--radius-sm); }
-  .date-input-wrap input[type=date]{ display:block; border-radius: var(--radius-sm); padding-right:8px; }
+     the control a few pixels past its card. The wrapper alone now owns
+     the visible border/background/radius; the input itself is borderless
+     and transparent, so there's no second edge of its own that could peek
+     out past the wrapper's rounded corner (the earlier overflow:hidden-only
+     fix still left the input's own 1px border visibly breaking out of the
+     curve in Safari). */
+  .date-input-wrap{
+    overflow:hidden; border-radius: var(--radius-sm);
+    border:1px solid var(--border); background: var(--surface);
+  }
+  .date-input-wrap input[type=date]{
+    display:block; width:100%; border:none; background:transparent;
+    border-radius:0; padding-right:8px;
+    -webkit-appearance:none; appearance:none;
+  }
   input[type=number]{ -moz-appearance: textfield; }
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
