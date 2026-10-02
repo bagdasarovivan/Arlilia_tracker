@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Дневник подходов</title>
+<style>
+  :root{
+    --bg: #17212B;
+    --surface: #1F2C38;
+    --surface-2: #253544;
+    --border: #2E3F4E;
+    --text: #EDE7DA;
+    --text-muted: #8A97A3;
+    --accent: #D9A441;
+    --accent-soft: rgba(217,164,65,0.16);
+    --good: #6FA886;
+    --good-soft: rgba(111,168,134,0.16);
+    --warn: #C77B5E;
+    --radius: 18px;
+    --radius-sm: 10px;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  }
+  #app{
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display:flex;
+    flex-direction:column;
+    padding: 26px 20px 0;
+  }
+  h1,h2,h3{ font-family: var(--serif); font-weight:400; margin:0; }
+  .eyebrow{ color: var(--text-muted); font-size: 13px; margin-bottom: 6px; }
+  .btn{
+    border:none; border-radius: var(--radius-sm);
+    padding: 15px 20px; font-size:16px; font-family: var(--sans);
+    cursor:pointer; -webkit-tap-highlight-color: transparent;
+    transition: transform .08s ease, opacity .15s ease;
+  }
+  .btn:active{ transform: scale(0.97); }
+  .btn-primary{ background: var(--accent); color:#1A1408; font-weight:600; width:100%; }
+  .btn-ghost{ background: transparent; color: var(--text); border:1px solid var(--border); width:100%; }
+  .card{
+    background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .content{ flex:1; padding-bottom: 24px; }
+
+  /* ---- Bottom nav ---- */
+  .tabbar{
+    position: sticky; bottom:0; left:0; right:0;
+    display:flex; background: var(--surface);
+    border-top:1px solid var(--border);
+    padding: 10px 6px calc(10px + env(safe-area-inset-bottom));
+    margin: 0 -20px;
+  }
+  .tab-btn{
+    flex:1; background:none; border:none; color: var(--text-muted);
+    font-size:12px; padding:6px 4px; display:flex; flex-direction:column;
+    align-items:center; gap:4px; font-family: var(--sans);
+  }
+  .tab-btn .ic{ font-size:19px; }
+  .tab-btn.active{ color: var(--accent); }
+
+  /* ---- Home / Practice tab ---- */
+  .home-hero{ margin-top: 6vh; margin-bottom: 28px; }
+  .home-hero h1{ font-size: 30px; line-height:1.25; }
+  .stat-row{ display:flex; gap:12px; margin: 18px 0 26px; }
+  .stat-tile{ flex:1; background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; }
+  .stat-tile .num{ font-family: var(--serif); font-size: 26px; }
+  .stat-tile .lbl{ font-size: 12px; color: var(--text-muted); margin-top:2px; }
+
+  /* ---- Practice wizard ---- */
+  .progress-dots{ display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin-bottom: 6vh; margin-top: 4px; }
+  .dot{ width:7px; height:7px; border-radius:50%; background: var(--border); }
+  .dot.done{ background: var(--accent); }
+  .dot.current{ background: var(--text); }
+  .q-wrap{ flex:1; display:flex; flex-direction:column; justify-content:center; min-height: 46vh; }
+  .q-label{ font-size:21px; font-family: var(--serif); text-align:center; margin-bottom: 6px; }
+  .q-hint{ font-size:13px; color: var(--text-muted); text-align:center; margin-bottom: 34px; }
+  .scale-value{ font-family: var(--serif); font-size: 60px; text-align:center; margin-bottom: 18px; }
+  .scale-slider{ width:100%; -webkit-appearance:none; height:6px; border-radius:3px; background: var(--border); outline:none; }
+  .scale-slider::-webkit-slider-thumb{ -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background: var(--accent); border:3px solid var(--bg); box-shadow:0 0 0 1px var(--accent); }
+  .scale-ends{ display:flex; justify-content:space-between; font-size:12px; color: var(--text-muted); margin-top:8px; }
+  .choice-row{ display:flex; gap:12px; margin-top: 6px; }
+  .choice-btn{ flex:1; padding: 20px; border-radius: var(--radius-sm); border:1px solid var(--border); background: var(--surface); color: var(--text); font-size:16px; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+  .choice-btn.selected{ background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight:600; }
+  .choice-list{ display:flex; flex-direction:column; gap:10px; }
+  .choice-list-btn{ text-align:left; padding:16px 18px; border-radius: var(--radius-sm); border:1px solid var(--border); background: var(--surface); color: var(--text); font-size:15px; }
+  .choice-list-btn.selected{ background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight:600; }
+  textarea, input[type=text], input[type=number]{
+    width:100%; background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text); font-size:15px; padding:13px 14px; font-family: var(--sans);
+  }
+  textarea{ min-height: 90px; resize:vertical; }
+  .nav-row{ display:flex; gap:10px; margin-top: 6vh; padding-bottom: 24px; }
+  .nav-row .btn-ghost{ flex: 0 0 84px; }
+
+  /* ---- Top bar (sub-pages) ---- */
+  .top-bar{ display:flex; align-items:center; gap:10px; margin-bottom: 18px; }
+  .back-btn{ background:none; border:none; color: var(--text-muted); font-size:22px; padding:4px 8px 4px 0; cursor:pointer; }
+  .top-bar h2{ font-size:20px; flex:1; }
+  .top-bar .save-btn{ background:none; border:none; color: var(--accent); font-size:15px; font-weight:600; padding:4px; }
+
+  /* ---- Segmented control ---- */
+  .segment-row, .period-row{ display:flex; gap:8px; margin-bottom: 20px; }
+  .segment-btn, .period-btn{ flex:1; padding:10px; border-radius: 999px; border:1px solid var(--border); background:transparent; color: var(--text-muted); font-size:14px; }
+  .segment-btn.active, .period-btn.active{ background: var(--accent); color:#1A1408; border-color: var(--accent); font-weight:600; }
+
+  /* ---- Journal ---- */
+  .journal-today-card{ margin-bottom: 20px; }
+  .journal-today-card .date{ color: var(--text-muted); font-size:13px; margin-bottom:6px; }
+  .journal-today-card .mood{ font-family: var(--serif); font-size:22px; margin-bottom: 10px; }
+  .journal-list-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 16px; background: var(--surface); border:1px solid var(--border);
+    border-radius: var(--radius-sm); margin-bottom:10px;
+  }
+  .journal-list-row .jd{ font-size:14px; max-width: 78%; }
+  .journal-list-row .jd > div:first-child{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .journal-list-row .jd .date{ color: var(--text-muted); font-size:12px; }
+  .journal-list-row .flags{ display:flex; gap:6px; }
+  .flag-dot{ width:8px; height:8px; border-radius:50%; }
+  .flag-good{ background: var(--good); }
+  .flag-off{ background: var(--border); }
+  .empty{ text-align:center; color: var(--text-muted); padding: 40px 10px; font-size:14px; }
+
+  .read-hero{ text-align:center; margin: 12px 0 32px; }
+  .read-hero-emoji{ font-size:58px; line-height:1; margin-bottom:10px; }
+  .read-hero-mood{ font-family: var(--serif); font-size:23px; }
+  .read-row{ display:flex; gap:14px; padding:16px 2px; border-bottom:1px solid var(--border); align-items:flex-start; }
+  .read-row:last-child{ border-bottom:none; }
+  .read-icon{ font-size:26px; line-height:1.4; width:32px; text-align:center; flex-shrink:0; }
+  .read-label{ font-size:12px; color: var(--text-muted); margin-bottom:4px; }
+  .read-text{ font-size:15px; line-height:1.55; }
+  .read-big{ font-family: var(--serif); font-size:26px; }
+  .read-sub{ font-size:12px; color: var(--text-muted); margin-top:2px; }
+
+  .section-block{ margin-bottom: 26px; }
+  .section-head{ display:flex; align-items:baseline; gap:10px; margin-bottom: 12px; }
+  .section-num{ font-family: var(--serif); color: var(--accent); font-size:14px; }
+  .section-title{ font-family: var(--serif); font-size:18px; }
+  .journal-card{ margin-bottom: 16px; }
+  .jc-title{ font-family: var(--serif); font-size:17px; margin-bottom: 14px; }
+  .autosave-hint{ font-size:12px; color: var(--text-muted); margin: -6px 0 18px; }
+  .field-row{ display:flex; gap:12px; }
+  .field-row .field{ flex:1; }
+  .field{ margin-bottom: 12px; }
+  .field-label{ font-size:12px; color: var(--text-muted); margin-bottom:6px; }
+  .bool-row{ display:flex; gap:10px; }
+  .bool-chip{ flex:1; padding:12px; border-radius: var(--radius-sm); border:1px solid var(--border); background: var(--surface); color: var(--text-muted); font-size:14px; }
+  .bool-chip.selected-yes{ background: var(--good-soft); border-color: var(--good); color: var(--good); font-weight:600; }
+  .bool-chip.selected-no{ background: rgba(199,123,94,0.14); border-color: var(--warn); color: var(--warn); font-weight:600; }
+
+  /* ---- Progress ---- */
+  .metric-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 22px; }
+  .metric-tile{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:16px; }
+  .metric-tile .num{ font-family: var(--serif); font-size: 26px; }
+  .metric-tile .lbl{ font-size:12px; color: var(--text-muted); margin-top:4px; }
+  .metric-tile.good .num{ color: var(--good); }
+  .metric-tile .lbl .delta{ display:block; margin-top:3px; font-size:11px; }
+  .delta-good{ color: var(--good); }
+  .delta-bad{ color: var(--warn); }
+  .delta-flat{ color: var(--text-muted); }
+  .chart-card{ margin-bottom: 20px; }
+  .chart-card h3{ font-size:15px; margin-bottom: 10px; color: var(--text-muted); font-family: var(--sans); }
+  canvas.chart{ width:100%; height:150px; display:block; }
+  .history-row{ display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); font-size:14px; gap:10px; }
+  .history-row:last-child{ border-bottom:none; }
+  .history-row .d{ color: var(--text-muted); white-space:nowrap; }
+  .history-row .m{ text-align:right; }
+  .digest-item{ padding: 14px 0; border-bottom:1px solid var(--border); }
+  .digest-item:last-child{ border-bottom:none; }
+  .digest-item .dd{ font-size:12px; color: var(--text-muted); margin-bottom:4px; }
+  .digest-item .dl{ font-size:11px; color: var(--accent); margin-bottom:2px; }
+  .digest-item .dt{ font-size:14px; }
+  .note-card{ padding:14px 18px; font-size:14px; color: var(--text-muted); margin-bottom:18px; }
+  .note-card b{ color: var(--text); font-weight:600; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://zvstrubroelqaivgtooc.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_cnIPiLyx12CBRvx175QrhQ_kKQgW6Eh';
+const SB_HEADERS = {
+  'apikey': SUPABASE_KEY,
+  'Authorization': 'Bearer ' + SUPABASE_KEY,
+  'Content-Type': 'application/json',
+};
+
+/* Вопросы к подходу — по мотивам таблицы "речевой поступок" методики саморегуляции */
+const TITLE_OPTIONS = ['Подход на улице', 'Звонок', 'Публичное выступление', 'Другое'];
+const MINDSET_OPTIONS = ['Супер', 'Хорошо', 'Нормально', 'Плохо', 'Другое'];
+
+const QUESTIONS = [
+  { id:'title', type:'choice_other', label:'Название речевого поступка', options: TITLE_OPTIONS, hint:'С кем и где был подход' },
+  { id:'mindsetBefore', type:'choice_other', label:'Настрой', options: MINDSET_OPTIONS, hint:'Каким было состояние перед подходом' },
+  { id:'reactionAfter', type:'text', label:'Реакция', hint:'Ощущение и реакция после подхода' },
+  { id:'ritual', type:'bool_manual', label:'Соблюдал речевой ритуал?', hint:'Расслабление, спокойный старт, зрительный контакт' },
+  { id:'voice', type:'scale_note', label:'Речь по методике', lowLabel:'сбивался', highLabel:'чисто', hint:'Темп, дыхание, слитность речи' },
+  { id:'hand', type:'scale_note', label:'Ощущение руки', lowLabel:'напряжена, скованно', highLabel:'свободно, естественно', hint:'Насколько легко и свободно ощущалась рука' },
+  { id:'anxiety', type:'scale_note', label:'Волнение', lowLabel:'спокоен', highLabel:'максимум' },
+];
+
+const JOURNAL_STEPS = [
+  { id:'mood', type:'choice', label:'Самочувствие', options:['Отлично','Хорошо','Норм','Тяжело','Плохо'] },
+  { id:'glad', type:'text', label:'Радует', hint:'Что порадовало сегодня' },
+  { id:'worry', type:'text', label:'Волнует', hint:'Что беспокоит' },
+  { id:'dailyRoutine', type:'textarea', label:'Саморегуляция', hint:'Зевки, прогулка, баня и т.д. — что из приёмов применял' },
+  { id:'sleepHours', type:'number', label:'Сон', hint:'Сколько часов спал' },
+  { id:'difficulties', type:'textarea', label:'Трудная тетрадь', hint:'Паузы, ошибки — что было сложно сегодня' },
+  { id:'reflections', type:'textarea', label:'Вопросы и откровения' },
+  { id:'tricks', type:'textarea', label:'Уловки' },
+  { id:'praise', type:'textarea', label:'Похвала' },
+  { id:'intentions', type:'textarea', label:'Речевые планы', hint:'Какие подходы хотел бы ещё сделать' },
+];
+
+const JOURNAL_ICONS = {
+  glad:'✨', worry:'🌧️', dailyRoutine:'🎙️',
+  difficulties:'⛅', sleepHours:'🌙',
+  reflections:'💭', tricks:'🎭', praise:'🏅', intentions:'🧭',
+};
+const MOOD_ICONS = {'Отлично':'🤩','Хорошо':'😊','Норм':'🙂','Тяжело':'😕','Плохо':'😞'};
+
+
+let state = {
+  tab: 'practice',            // practice | journal | progress
+  loaded: false,
+
+  entries: [],
+  practiceActive: false,
+  qIndex: 0,
+  answers: {},
+  noteOpen: {},
+
+  journalEntries: [],
+  journalView: 'home',        // home | history | read
+  journalFormActive: false,
+  journalStepIndex: 0,
+  journalEditId: null,
+  journalDraft: {},
+  journalReadEntry: null,
+
+  progressSection: 'attempts', // attempts | journal
+  period: 'day',               // day | week | month
+};
+
+/* ---------- storage (Supabase) ---------- */
+function rowToAttempt(r){
+  return {
+    id: r.id,
+    ts: new Date(r.created_at).getTime(),
+    title: r.title,
+    mindsetBefore: r.mindset_before, reactionAfter: r.reaction_after,
+    ritual: r.ritual,
+    voice: r.voice, voiceNote: r.voice_note,
+    hand: r.hand, handNote: r.hand_note,
+    anxiety: r.anxiety, anxietyNote: r.anxiety_note,
+  };
+}
+function attemptToRow(e){
+  const title = e.title === 'other' ? (e.titleCustom || null) : (e.title || null);
+  const mindsetBefore = e.mindsetBefore === 'other' ? (e.mindsetBeforeCustom || null) : (e.mindsetBefore || null);
+  return {
+    title,
+    mindset_before: mindsetBefore,
+    reaction_after: e.reactionAfter || null,
+    ritual: typeof e.ritual === 'boolean' ? e.ritual : null,
+    voice: e.voice ?? null, voice_note: e.voiceNote || null,
+    hand: e.hand ?? null, hand_note: e.handNote || null,
+    anxiety: e.anxiety ?? null, anxiety_note: e.anxietyNote || null,
+  };
+}
+function rowToJournal(r){
+  return {
+    id: r.id,
+    entryDate: r.entry_date,
+    ts: new Date(r.entry_date + 'T12:00:00').getTime(),
+    mood: r.mood, glad: r.glad, worry: r.worry,
+    dailyRoutine: r.daily_routine,
+    sleepHours: r.sleep_hours,
+    difficulties: r.difficulties,
+    reflections: r.reflections, tricks: r.tricks, praise: r.praise,
+    intentions: r.intentions,
+  };
+}
+function journalDraftToRow(e){
+  return {
+    entry_date: e.entryDate,
+    mood: e.mood || null, glad: e.glad || null, worry: e.worry || null,
+    daily_routine: e.dailyRoutine || null,
+    sleep_hours: e.sleepHours ?? null,
+    difficulties: e.difficulties || null,
+    reflections: e.reflections || null, tricks: e.tricks || null,
+    praise: e.praise || null, intentions: e.intentions || null,
+  };
+}
+
+async function loadAll(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/attempts?select=*&order=created_at.asc`, { headers: SB_HEADERS });
+    const rows = await res.json();
+    state.entries = Array.isArray(rows) ? rows.map(rowToAttempt) : [];
+  }catch(e){ console.error(e); state.entries = []; }
+  try{
+    const res2 = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=*&order=entry_date.asc`, { headers: SB_HEADERS });
+    const rows2 = await res2.json();
+    state.journalEntries = Array.isArray(rows2) ? rows2.map(rowToJournal) : [];
+  }catch(e){ console.error(e); state.journalEntries = []; }
+  state.loaded = true;
+}
+
+async function insertAttempt(answers){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/attempts`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Prefer': 'return=representation' },
+      body: JSON.stringify(attemptToRow(answers)),
+    });
+    if(!res.ok){
+      const errText = await res.text();
+      console.error('insertAttempt failed', res.status, errText);
+      showToast('Не сохранилось: ' + res.status + ' ' + errText.slice(0,80));
+      return null;
+    }
+    const rows = await res.json();
+    if(Array.isArray(rows) && rows[0]) return rowToAttempt(rows[0]);
+    showToast('Подход не сохранился — пустой ответ сервера');
+    return null;
+  }catch(err){
+    console.error(err);
+    showToast('Нет соединения с сервером — подход не сохранён');
+    return null;
+  }
+}
+
+async function persistJournal(){
+  const draft = state.journalDraft;
+  if(!draft || !draft.entryDate) return;
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?on_conflict=entry_date`, {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify([journalDraftToRow(draft)]),
+    });
+    if(!res.ok){
+      const errText = await res.text();
+      console.error('persistJournal failed', res.status, errText);
+      showToast('Дневник не сохранился: ' + res.status);
+      return;
+    }
+    const rows = await res.json();
+    if(Array.isArray(rows) && rows[0]){
+      const updated = rowToJournal(rows[0]);
+      const idx = state.journalEntries.findIndex(j => j.entryDate === updated.entryDate);
+      if(idx >= 0) state.journalEntries[idx] = updated; else state.journalEntries.push(updated);
+      if(state.journalDraft && state.journalDraft.entryDate === updated.entryDate){
+        state.journalDraft = updated;
+        state.journalEditId = updated.entryDate;
+      }
+    }
+  }catch(e){ console.error(e); showToast('Нет соединения — дневник не сохранён'); }
+}
+async function deleteJournalEntry(entryDate){
+  try{
+    await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?entry_date=eq.${entryDate}`, {
+      method: 'DELETE', headers: SB_HEADERS,
+    });
+  }catch(e){ console.error(e); }
+  state.journalEntries = state.journalEntries.filter(j => j.entryDate !== entryDate);
+}
+let journalSaveTimer = null;
+function scheduleJournalSave(){
+  clearTimeout(journalSaveTimer);
+  journalSaveTimer = setTimeout(persistJournal, 500);
+}
+function isJournalEntryEmpty(entry){
+  return !JOURNAL_STEPS.some(f => {
+    const v = entry[f.id];
+    return v !== undefined && v !== null && v !== '';
+  });
+}
+
+/* ---------- helpers ---------- */
+function fmtNum(n){
+  if(n === null || n === undefined || isNaN(n)) return '—';
+  return (Math.round(n*10)/10).toString().replace('.', ',');
+}
+function startOfDay(ts){ const d = new Date(ts); d.setHours(0,0,0,0); return d.getTime(); }
+function todayKey(){ return new Date().toISOString().slice(0,10); }
+function dateKey(ts){ return new Date(ts).toISOString().slice(0,10); }
+function dateLabel(ts){ return new Date(ts).toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'}); }
+function timeLabel(ts){ return new Date(ts).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}); }
+function weekdayDateLabel(ts){ return new Date(ts).toLocaleDateString('ru-RU', {weekday:'long', day:'numeric', month:'long'}); }
+
+function entriesForPeriod(list, period){
+  const now = Date.now();
+  let fromTs;
+  if(period === 'day') fromTs = startOfDay(now);
+  else if(period === 'week') fromTs = now - 6*24*3600*1000;
+  else fromTs = now - 29*24*3600*1000;
+  return list.filter(e => e.ts >= fromTs).sort((a,b)=>a.ts-b.ts);
+}
+function entriesForPreviousPeriod(list, period){
+  const now = Date.now();
+  let curFrom, spanMs;
+  if(period === 'day'){ curFrom = startOfDay(now); spanMs = 24*3600*1000; }
+  else if(period === 'week'){ curFrom = now - 6*24*3600*1000; spanMs = 7*24*3600*1000; }
+  else { curFrom = now - 29*24*3600*1000; spanMs = 30*24*3600*1000; }
+  const prevFrom = curFrom - spanMs;
+  return list.filter(e => e.ts >= prevFrom && e.ts < curFrom).sort((a,b)=>a.ts-b.ts);
+}
+function deltaBadge(cur, prev, higherIsBetter){
+  if(cur === null || cur === undefined || prev === null || prev === undefined || isNaN(cur) || isNaN(prev)) return '';
+  const diff = cur - prev;
+  if(Math.abs(diff) < 0.05) return `<span class="delta delta-flat">без изменений</span>`;
+  const improved = higherIsBetter ? diff > 0 : diff < 0;
+  const arrow = diff > 0 ? '▲' : '▼';
+  const cls = improved ? 'delta-good' : 'delta-bad';
+  return `<span class="delta ${cls}">${arrow} ${fmtNum(Math.abs(diff))} к пред. периоду</span>`;
+}
+function avg(arr, key){
+  const vals = arr.map(e=>e[key]).filter(v=>typeof v === 'number' && !isNaN(v));
+  if(!vals.length) return null;
+  return vals.reduce((a,b)=>a+b,0)/vals.length;
+}
+function computeAttemptStats(entries){
+  const ritualVals = entries.map(e=>e.ritual).filter(v=>typeof v==='boolean');
+  return {
+    count: entries.length,
+    voice: avg(entries,'voice'),
+    hand: avg(entries,'hand'),
+    anxiety: avg(entries,'anxiety'),
+    ritualPct: ritualVals.length ? Math.round(100*ritualVals.filter(v=>v).length/ritualVals.length) : null,
+  };
+}
+function buildSeries(period, entries, key){
+  if(period === 'day'){
+    return entries.map(e => ({ label: timeLabel(e.ts), value: e[key] }));
+  }
+  const byDay = {};
+  entries.forEach(e=>{
+    const k = dateKey(e.ts);
+    if(!byDay[k]) byDay[k] = [];
+    if(typeof e[key] === 'number') byDay[k].push(e[key]);
+  });
+  return Object.keys(byDay).sort().map(k=>{
+    const vals = byDay[k];
+    return { label: dateLabel(new Date(k).getTime()), value: vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null };
+  });
+}
+function journalStreak(){
+  const days = new Set(state.journalEntries.map(e=>dateKey(e.ts)));
+  let streak = 0;
+  let cursor = startOfDay(Date.now());
+  while(days.has(dateKey(cursor))){
+    streak++;
+    cursor -= 24*3600*1000;
+  }
+  return streak;
+}
+function computeJournalStats(entries){
+  return {
+    count: entries.length,
+    sleepHours: avg(entries,'sleepHours'),
+  };
+}
+function capitalize(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+
+/* ---------- render root ---------- */
+function render(){
+  const app = document.getElementById('app');
+  if(!state.loaded){ app.innerHTML = ''; return; }
+
+  if(state.practiceActive){
+    app.innerHTML = renderPracticeWizard();
+  } else if(state.journalFormActive){
+    app.innerHTML = renderJournalWizardStep();
+  } else if(state.journalView === 'read' && state.journalReadEntry){
+    app.innerHTML = renderJournalRead(state.journalReadEntry);
+  } else {
+    let body = '';
+    if(state.tab === 'practice') body = renderPracticeHome();
+    else if(state.tab === 'journal') body = renderJournalHome();
+    else body = renderProgress();
+    app.innerHTML = `<div class="content">${body}</div>${renderTabbar()}`;
+  }
+  attachHandlers();
+  if(!state.practiceActive && !state.journalFormActive && state.journalView !== 'read' && state.tab === 'progress') drawProgressCharts();
+}
+
+function renderTabbar(){
+  const tabs = [
+    {id:'practice', ic:'●', label:'Подходы'},
+    {id:'journal', ic:'✎', label:'Дневник'},
+    {id:'progress', ic:'▲', label:'Прогресс'},
+  ];
+  return `<div class="tabbar">
+    ${tabs.map(t=>`
+      <button class="tab-btn ${state.tab===t.id?'active':''}" data-tab="${t.id}">
+        <span class="ic">${t.ic}</span><span>${t.label}</span>
+      </button>
+    `).join('')}
+  </div>`;
+}
+
+/* ---------- Practice tab ---------- */
+function renderPracticeHome(){
+  const today = entriesForPeriod(state.entries, 'day');
+  const s = computeAttemptStats(today);
+  return `
+    <div class="home-hero">
+      <div class="eyebrow">Подходы</div>
+      <h1>Как прошёл сегодняшний подход?</h1>
+    </div>
+    <div class="stat-row">
+      <div class="stat-tile"><div class="num">${s.count}</div><div class="lbl">подходов сегодня</div></div>
+      <div class="stat-tile"><div class="num">${fmtNum(s.anxiety)}</div><div class="lbl">среднее волнение</div></div>
+    </div>
+    <button class="btn btn-primary" data-action="start-practice">Записать подход</button>
+  `;
+}
+
+function renderPracticeWizard(){
+  const q = QUESTIONS[state.qIndex];
+  const dots = QUESTIONS.map((_,i)=>{
+    let cls = 'dot';
+    if(i < state.qIndex) cls += ' done';
+    if(i === state.qIndex) cls += ' current';
+    return `<div class="${cls}"></div>`;
+  }).join('');
+
+  let control = '';
+  if(q.type === 'scale_note' || q.type === 'scale'){
+    const val = state.answers[q.id] ?? 5;
+    const noteKey = q.id + 'Note';
+    const noteVal = state.answers[noteKey] || '';
+    const noteOpen = (state.noteOpen && state.noteOpen[q.id]) || !!noteVal;
+    control = `
+      <div class="scale-value">${val}</div>
+      <input type="range" min="0" max="10" step="1" value="${val}" class="scale-slider" id="slider-${q.id}">
+      <div class="scale-ends"><span>0 · ${q.lowLabel}</span><span>${q.highLabel} · 10</span></div>
+      ${q.type === 'scale_note' ? `
+        <button type="button" class="btn-ghost" data-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen ? 'Скрыть описание' : '+ Добавить описание'}</button>
+        ${noteOpen ? `<textarea id="note-${q.id}" placeholder="Подробности, если нужно..." style="margin-top:10px;">${noteVal}</textarea>` : ''}
+      ` : ''}
+    `;
+  } else if(q.type === 'bool' || q.type === 'bool_manual'){
+    const val = state.answers[q.id];
+    const manual = q.type === 'bool_manual' ? '1' : '0';
+    control = `
+      <div class="choice-row">
+        <button class="choice-btn ${val===true?'selected':''}" data-bool-id="${q.id}" data-bool-val="true" data-manual="${manual}">Да</button>
+        <button class="choice-btn ${val===false?'selected':''}" data-bool-id="${q.id}" data-bool-val="false" data-manual="${manual}">Нет</button>
+      </div>
+    `;
+  } else if(q.type === 'choice_other'){
+    const val = state.answers[q.id];
+    const customVal = state.answers[q.id + 'Custom'] || '';
+    control = `<div class="choice-list">${q.options.map(opt => {
+      const optId = opt === 'Другое' ? 'other' : opt;
+      const selected = val === optId;
+      return `<button class="choice-list-btn ${selected?'selected':''}" data-choice-id="${q.id}" data-choice-val="${optId.replace(/"/g,'&quot;')}">${opt}</button>`;
+    }).join('')}
+    ${val === 'other' ? `<input type="text" id="text-${q.id}Custom" value="${customVal.replace(/"/g,'&quot;')}" placeholder="Напишите свой вариант" style="margin-top:10px;">` : ''}
+    </div>`;
+  } else if(q.type === 'choice'){
+    const val = state.answers[q.id];
+    control = `<div class="choice-list">${q.options.map(opt => `
+      <button class="choice-list-btn ${val===opt?'selected':''}" data-choice-id="${q.id}" data-choice-val="${opt.replace(/"/g,'&quot;')}">${opt}</button>
+    `).join('')}</div>`;
+  } else if(q.type === 'text'){
+    const val = state.answers[q.id] || '';
+    control = `<textarea id="text-${q.id}" placeholder="Коротко, по сути...">${val}</textarea>`;
+  }
+
+  const isFirst = state.qIndex === 0;
+  const isLast = state.qIndex === QUESTIONS.length - 1;
+
+  return `
+    <div style="padding:22px 20px 24px; display:flex; flex-direction:column; min-height:100vh;">
+      <div class="progress-dots">${dots}</div>
+      <div class="q-wrap">
+        <div class="q-label">${q.label}</div>
+        <div class="q-hint">${q.hint || ''}</div>
+        ${control}
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-ghost" data-action="${isFirst ? 'cancel-practice' : 'prev-question'}">${isFirst ? 'Отмена' : 'Назад'}</button>
+        <button class="btn btn-primary" data-action="${isLast ? 'save-practice' : 'next-question'}">${isLast ? 'Сохранить' : 'Далее'}</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- Journal tab ---------- */
+function findTodayJournal(){
+  const k = todayKey();
+  return state.journalEntries.find(e => dateKey(e.ts) === k);
+}
+
+function renderJournalHome(){
+  if(state.journalView === 'history') return renderJournalHistory();
+
+  const todayEntry = findTodayJournal();
+  return `
+    <div class="home-hero" style="margin-top:8vh;">
+      <div class="eyebrow">Дневник дня</div>
+      <h1>${todayEntry ? 'Сегодняшняя запись уже есть' : 'Как прошёл день?'}</h1>
+    </div>
+    <button class="btn btn-primary" data-action="new-journal">${todayEntry ? 'Изменить сегодняшнюю запись' : 'Написать новый дневник'}</button>
+    <div style="height:12px"></div>
+    <button class="btn btn-ghost" data-action="show-journal-history">Посмотреть старые дневники</button>
+  `;
+}
+
+function renderJournalHistory(){
+  const todayK = todayKey();
+  const past = state.journalEntries.slice()
+    .filter(e=>!isJournalEntryEmpty(e) && dateKey(e.ts) !== todayK)
+    .sort((a,b)=>b.ts-a.ts);
+
+  const listHtml = past.length ? past.map(e=>`
+      <div class="journal-list-row" data-action="view-old-journal" data-jid="${e.ts}">
+        <div style="text-transform:capitalize;">${weekdayDateLabel(e.ts)}</div>
+        <div style="color:var(--text-muted); font-size:18px;">›</div>
+      </div>
+  `).join('') : `<div class="empty">Прошлых записей пока нет</div>`;
+
+  return `
+    <div class="top-bar">
+      <button class="back-btn" data-action="journal-history-back">‹</button>
+      <h2>Старые дневники</h2>
+    </div>
+    ${listHtml}
+  `;
+}
+
+/* ---------- read-only beautiful view ---------- */
+function renderJournalRead(entry){
+  const rowsHtml = JOURNAL_STEPS.map(f=>{
+    if(f.id === 'mood') return '';
+    const v = entry[f.id];
+    if(v === undefined || v === null || v === '') return '';
+
+    if(f.type === 'number'){
+      const unit = f.id === 'sleepHours' ? 'сон, часов' : f.label;
+      return readRow(JOURNAL_ICONS[f.id]||'🔹', v, unit);
+    }
+    return readRow(JOURNAL_ICONS[f.id]||'🔹', null, v, f.label);
+  }).join('');
+
+  const moodVal = entry.mood;
+  const moodIcon = MOOD_ICONS[moodVal] || '🙂';
+
+  return `
+    <div style="padding:22px 20px 40px;">
+      <div class="top-bar">
+        <button class="back-btn" data-action="journal-read-back">‹</button>
+        <h2 style="text-transform:capitalize;">${weekdayDateLabel(entry.ts)}</h2>
+      </div>
+      <div class="read-hero">
+        <div class="read-hero-emoji">🌇</div>
+        <div class="read-hero-mood">${moodIcon} ${moodVal || ''}</div>
+      </div>
+      ${rowsHtml || '<div class="empty">Запись пуста</div>'}
+    </div>
+  `;
+}
+function readRow(icon, big, text, label){
+  return `
+    <div class="read-row">
+      <div class="read-icon">${icon}</div>
+      <div class="read-body">
+        ${label ? `<div class="read-label">${label}</div>` : ''}
+        ${big !== null && big !== undefined
+          ? `<div class="read-big">${big}</div><div class="read-sub">${text}</div>`
+          : `<div class="read-text">${text}</div>`}
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- step-by-step wizard for a new/current entry ---------- */
+function renderJournalWizardStep(){
+  const idx = state.journalStepIndex;
+  const q = JOURNAL_STEPS[idx];
+  const val = state.journalDraft[q.id];
+
+  const dots = JOURNAL_STEPS.map((_,i)=>{
+    let cls = 'dot';
+    if(i < idx) cls += ' done';
+    if(i === idx) cls += ' current';
+    return `<div class="${cls}"></div>`;
+  }).join('');
+
+  let control = '';
+  if(q.type === 'choice'){
+    control = `<div class="choice-list">${q.options.map(opt => `
+      <button class="choice-list-btn ${val===opt?'selected':''}" data-jw-choice="${q.id}" data-jw-val="${opt}">${opt}</button>
+    `).join('')}</div>`;
+  } else if(q.type === 'bool'){
+    control = `
+      <div class="choice-row">
+        <button class="choice-btn ${val===true?'selected':''}" data-jw-bool="${q.id}" data-jw-val="true">Да</button>
+        <button class="choice-btn ${val===false?'selected':''}" data-jw-bool="${q.id}" data-jw-val="false">Нет</button>
+      </div>`;
+  } else if(q.type === 'number'){
+    control = `<input type="number" inputmode="decimal" id="jw-number-${q.id}" value="${val ?? ''}" style="text-align:center; font-size:30px; padding:16px; font-family:Georgia,serif;">`;
+  } else if(q.type === 'text'){
+    control = `<input type="text" id="jw-text-${q.id}" value="${val ? String(val).replace(/"/g,'&quot;') : ''}" placeholder="Коротко, по сути...">`;
+  } else if(q.type === 'textarea'){
+    control = `<textarea id="jw-text-${q.id}" placeholder="Коротко, по сути...">${val || ''}</textarea>`;
+  }
+
+  const isFirst = idx === 0;
+  const isLast = idx === JOURNAL_STEPS.length - 1;
+
+  return `
+    <div style="padding:22px 20px 24px; display:flex; flex-direction:column; min-height:100vh;">
+      <div class="progress-dots">${dots}</div>
+      <div class="q-wrap">
+        <div class="q-label">${q.label}</div>
+        <div class="q-hint">${q.hint || ''}</div>
+        ${control}
+      </div>
+      <div class="nav-row">
+        <button class="btn btn-ghost" data-action="${isFirst ? 'done-journal' : 'journal-prev-step'}">${isFirst ? 'Готово' : 'Назад'}</button>
+        <button class="btn btn-primary" data-action="${isLast ? 'done-journal' : 'journal-next-step'}">${isLast ? 'Готово' : 'Далее'}</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- Progress tab ---------- */
+function renderProgress(){
+  const periodLabel = {day:'День', week:'Неделя', month:'Месяц'};
+  const seg = `
+    <div class="segment-row">
+      <button class="segment-btn ${state.progressSection==='attempts'?'active':''}" data-section="attempts">Подходы</button>
+      <button class="segment-btn ${state.progressSection==='journal'?'active':''}" data-section="journal">Дневник</button>
+    </div>
+  `;
+  const periodRow = `
+    <div class="period-row">
+      ${['day','week','month'].map(p => `<button class="period-btn ${state.period===p?'active':''}" data-period="${p}">${periodLabel[p]}</button>`).join('')}
+    </div>
+    <div class="autosave-hint" style="margin-top:-12px;">Показатели сравниваются с таким же предыдущим периодом</div>
+  `;
+
+  let body;
+  if(state.progressSection === 'attempts') body = renderAttemptsProgress();
+  else body = renderJournalProgress();
+
+  return `
+    <div class="eyebrow">Прогресс</div>
+    <h2 style="font-size:24px; margin-bottom:18px;">Аналитика</h2>
+    ${seg}
+    ${periodRow}
+    ${body}
+  `;
+}
+
+function renderAttemptsProgress(){
+  const entries = entriesForPeriod(state.entries, state.period);
+  const s = computeAttemptStats(entries);
+  if(!entries.length) return `<div class="empty">За этот период нет записей подходов.</div>`;
+  const prevS = computeAttemptStats(entriesForPreviousPeriod(state.entries, state.period));
+
+  const historyHtml = entries.slice().reverse().slice(0,8).map(e => `
+    <div class="history-row">
+      <span class="d">${dateLabel(e.ts)}, ${timeLabel(e.ts)}</span>
+      <span class="m">${e.title ? e.title + ' · ' : ''}речь ${fmtNum(e.voice)} · рука ${fmtNum(e.hand)} · волн. ${fmtNum(e.anxiety)}</span>
+    </div>
+  `).join('');
+
+  return `
+    <div class="metric-grid">
+      <div class="metric-tile"><div class="num">${s.count}</div><div class="lbl">подходов</div></div>
+      <div class="metric-tile good"><div class="num">${fmtNum(s.voice)}</div><div class="lbl">речь по методике${deltaBadge(s.voice, prevS.voice, true)}</div></div>
+      <div class="metric-tile"><div class="num">${fmtNum(s.hand)}</div><div class="lbl">ощущение руки${deltaBadge(s.hand, prevS.hand, true)}</div></div>
+      <div class="metric-tile"><div class="num">${fmtNum(s.anxiety)}</div><div class="lbl">волнение${deltaBadge(s.anxiety, prevS.anxiety, false)}</div></div>
+      <div class="metric-tile"><div class="num">${s.ritualPct===null?'—':s.ritualPct+'%'}</div><div class="lbl">соблюдал ритуал${deltaBadge(s.ritualPct, prevS.ritualPct, true)}</div></div>
+    </div>
+    <div class="chart-card"><h3>Речь по методике</h3><canvas class="chart" id="chart-voice" width="440" height="150"></canvas></div>
+    <div class="chart-card"><h3>Ощущение руки</h3><canvas class="chart" id="chart-hand" width="440" height="150"></canvas></div>
+    <div class="chart-card"><h3>Волнение</h3><canvas class="chart" id="chart-anxiety" width="440" height="150"></canvas></div>
+    <div class="card" style="margin-bottom:18px; padding:6px 18px;">${historyHtml}</div>
+    <button class="btn btn-primary" data-action="export-attempts-pdf">Скачать PDF-отчёт</button>
+  `;
+}
+
+function renderJournalProgress(){
+  const entries = entriesForPeriod(state.journalEntries, state.period);
+  const s = computeJournalStats(entries);
+  const streak = journalStreak();
+
+  if(!entries.length) return `<div class="empty">За этот период нет записей дневника.</div>`;
+  const prevS = computeJournalStats(entriesForPreviousPeriod(state.journalEntries, state.period));
+
+  const digestSource = entries.slice().reverse().slice(0,5);
+  const digestHtml = digestSource.map(e=>{
+    const bits = [];
+    if(e.glad) bits.push({lbl:'Радует', txt:e.glad});
+    if(e.worry) bits.push({lbl:'Волнует', txt:e.worry});
+    if(e.praise) bits.push({lbl:'Похвала', txt:e.praise});
+    if(e.intentions) bits.push({lbl:'Речевые планы', txt:e.intentions});
+    if(!bits.length) return '';
+    return `
+      <div class="digest-item">
+        <div class="dd">${dateLabel(e.ts)}</div>
+        ${bits.map(b=>`<div class="dl">${b.lbl}</div><div class="dt" style="margin-bottom:8px;">${b.txt}</div>`).join('')}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="metric-grid">
+      <div class="metric-tile good"><div class="num">${streak}</div><div class="lbl">дней подряд с записью</div></div>
+      <div class="metric-tile"><div class="num">${s.count}</div><div class="lbl">записей за период</div></div>
+      <div class="metric-tile"><div class="num">${fmtNum(s.sleepHours)}</div><div class="lbl">средний сон, ч${deltaBadge(s.sleepHours, prevS.sleepHours, true)}</div></div>
+    </div>
+    <div class="chart-card"><h3>Сон, часов</h3><canvas class="chart" id="chart-sleep" width="440" height="150"></canvas></div>
+    ${digestHtml ? `<div class="card" style="margin-bottom:18px;">${digestHtml}</div>` : ''}
+    <button class="btn btn-primary" data-action="export-journal-pdf">Скачать PDF-отчёт</button>
+  `;
+}
+
+/* ---------- events ---------- */
+function attachHandlers(){
+  const app = document.getElementById('app');
+  app.querySelectorAll('[data-action]').forEach(el=> el.addEventListener('click', onAction));
+  app.querySelectorAll('[data-tab]').forEach(el=> el.addEventListener('click', e=>{
+    state.tab = e.currentTarget.getAttribute('data-tab'); render();
+  }));
+  app.querySelectorAll('[data-section]').forEach(el=> el.addEventListener('click', e=>{
+    state.progressSection = e.currentTarget.getAttribute('data-section'); render();
+  }));
+  app.querySelectorAll('[data-period]').forEach(el=> el.addEventListener('click', e=>{
+    state.period = e.currentTarget.getAttribute('data-period'); render();
+  }));
+  app.querySelectorAll('.scale-slider').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const id = e.target.id.replace('slider-','');
+      state.answers[id] = parseInt(e.target.value,10);
+      const valEl = e.target.parentElement.querySelector('.scale-value');
+      if(valEl) valEl.textContent = e.target.value;
+    });
+  });
+  app.querySelectorAll('[data-bool-id]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-bool-id');
+      const manual = e.currentTarget.getAttribute('data-manual') === '1';
+      state.answers[id] = e.currentTarget.getAttribute('data-bool-val') === 'true';
+      render();
+      if(manual) return;
+      const targetIndex = state.qIndex;
+      setTimeout(()=>{
+        if(state.qIndex === targetIndex && state.qIndex < QUESTIONS.length - 1){
+          state.qIndex++;
+          render();
+        }
+      }, 260);
+    });
+  });
+  app.querySelectorAll('[data-choice-id]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-choice-id');
+      const val = e.currentTarget.getAttribute('data-choice-val');
+      state.answers[id] = val;
+      render();
+      if(val === 'other') return;
+      const targetIndex = state.qIndex;
+      setTimeout(()=>{
+        if(state.qIndex === targetIndex && state.qIndex < QUESTIONS.length - 1){
+          state.qIndex++;
+          render();
+        }
+      }, 260);
+    });
+  });
+  app.querySelectorAll('[data-note-toggle]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-note-toggle');
+      state.noteOpen = state.noteOpen || {};
+      state.noteOpen[id] = !state.noteOpen[id];
+      render();
+    });
+  });
+  app.querySelectorAll('textarea[id^="note-"]').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const id = e.target.id.replace('note-','');
+      state.answers[id + 'Note'] = e.target.value;
+    });
+  });
+  app.querySelectorAll('[data-jw-bool]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-jw-bool');
+      state.journalDraft[id] = e.currentTarget.getAttribute('data-jw-val') === 'true';
+      scheduleJournalSave();
+      render();
+      const targetIndex = state.journalStepIndex;
+      setTimeout(()=>{
+        if(state.journalStepIndex === targetIndex && state.journalStepIndex < JOURNAL_STEPS.length - 1){
+          state.journalStepIndex++;
+          render();
+        }
+      }, 260);
+    });
+  });
+  app.querySelectorAll('[data-jw-choice]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-jw-choice');
+      state.journalDraft[id] = e.currentTarget.getAttribute('data-jw-val');
+      scheduleJournalSave();
+      render();
+      const targetIndex = state.journalStepIndex;
+      setTimeout(()=>{
+        if(state.journalStepIndex === targetIndex && state.journalStepIndex < JOURNAL_STEPS.length - 1){
+          state.journalStepIndex++;
+          render();
+        }
+      }, 260);
+    });
+  });
+  app.querySelectorAll('#app input[id^="jw-text-"], #app textarea[id^="jw-text-"]').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const id = e.target.id.replace('jw-text-','');
+      state.journalDraft[id] = e.target.value;
+      scheduleJournalSave();
+    });
+  });
+  app.querySelectorAll('#app input[id^="jw-number-"]').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const id = e.target.id.replace('jw-number-','');
+      state.journalDraft[id] = e.target.value === '' ? null : parseFloat(e.target.value);
+      scheduleJournalSave();
+    });
+  });
+  app.querySelectorAll('#app input[id^="text-"], #app textarea[id^="text-"]').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const id = e.target.id.replace('text-','');
+      state.answers[id] = e.target.value;
+    });
+  });
+}
+
+async function onAction(e){
+  const action = e.currentTarget.getAttribute('data-action');
+
+  if(action === 'start-practice'){
+    state.practiceActive = true; state.qIndex = 0; state.answers = {}; state.noteOpen = {};
+    QUESTIONS.forEach(q => { if(q.type==='scale' || q.type==='scale_note') state.answers[q.id] = 5; });
+  } else if(action === 'cancel-practice'){
+    state.practiceActive = false;
+  } else if(action === 'prev-question'){
+    state.qIndex = Math.max(0, state.qIndex - 1);
+  } else if(action === 'next-question'){
+    state.qIndex = Math.min(QUESTIONS.length - 1, state.qIndex + 1);
+  } else if(action === 'save-practice'){
+    state.practiceActive = false;
+    render();
+    const saved = await insertAttempt(state.answers);
+    if(saved) state.entries.push(saved);
+    render();
+    return;
+
+  } else if(action === 'new-journal'){
+    let entry = findTodayJournal();
+    if(!entry){
+      const entryDate = todayKey();
+      entry = { entryDate, ts: new Date(entryDate + 'T12:00:00').getTime() };
+      state.journalEntries.push(entry);
+    }
+    state.journalDraft = entry;
+    state.journalEditId = entry.entryDate;
+    state.journalStepIndex = 0;
+    state.journalFormActive = true;
+  } else if(action === 'view-old-journal'){
+    const jid = parseInt(e.currentTarget.getAttribute('data-jid'),10);
+    const existing = state.journalEntries.find(j=>j.ts === jid);
+    if(!existing) return;
+    state.journalReadEntry = existing;
+    state.journalView = 'read';
+  } else if(action === 'journal-read-back'){
+    state.journalReadEntry = null;
+    state.journalView = 'history';
+  } else if(action === 'show-journal-history'){
+    state.journalView = 'history';
+  } else if(action === 'journal-history-back'){
+    state.journalView = 'home';
+  } else if(action === 'journal-prev-step'){
+    state.journalStepIndex = Math.max(0, state.journalStepIndex - 1);
+  } else if(action === 'journal-next-step'){
+    state.journalStepIndex = Math.min(JOURNAL_STEPS.length - 1, state.journalStepIndex + 1);
+  } else if(action === 'done-journal'){
+    clearTimeout(journalSaveTimer);
+    const draft = state.journalDraft;
+    state.journalFormActive = false;
+    state.journalStepIndex = 0;
+    state.journalView = 'home';
+    render();
+    if(draft && draft.entryDate){
+      if(isJournalEntryEmpty(draft)){
+        if(state.journalEditId) await deleteJournalEntry(draft.entryDate);
+        else state.journalEntries = state.journalEntries.filter(j => j.entryDate !== draft.entryDate);
+      } else {
+        await persistJournal();
+      }
+    }
+    render();
+    return;
+
+  } else if(action === 'export-attempts-pdf'){
+    generateAttemptsPdf(); return;
+  } else if(action === 'export-journal-pdf'){
+    generateJournalPdf(); return;
+  }
+  render();
+}
+
+/* ---------- charts (in-page) ---------- */
+function paintBarChart(ctx, w, h, series, opts){
+  opts = opts || {};
+  const maxVal = opts.max || 10;
+  ctx.clearRect(0,0,w,h);
+  const padL = 24, padR = 12, padT = 10, padB = 22;
+  const chartW = w - padL - padR, chartH = h - padT - padB;
+  ctx.strokeStyle = '#2E3F4E'; ctx.lineWidth = 1;
+  for(let i=0;i<=2;i++){
+    const y = padT + chartH*i/2;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke();
+  }
+  ctx.fillStyle = '#8A97A3'; ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillText(String(Math.round(maxVal)), 2, padT+4);
+  ctx.fillText('0', 2, padT+chartH+4);
+  if(!series.length) return;
+  const n = series.length;
+  const barW = Math.min(34, chartW/n*0.55);
+  const gap = chartW/n;
+  series.forEach((pt,i)=>{
+    const cx = padL + gap*i + gap/2;
+    const val = pt.value ?? 0;
+    const barH = chartH * Math.max(0, Math.min(1, val/maxVal));
+    const x = cx - barW/2, y = padT + chartH - barH;
+    const grad = ctx.createLinearGradient(0,y,0,padT+chartH);
+    grad.addColorStop(0, opts.color1 || '#D9A441');
+    grad.addColorStop(1, opts.color2 || '#8A6A2A');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    if(ctx.roundRect) ctx.roundRect(x,y,barW,barH,4); else ctx.rect(x,y,barW,barH);
+    ctx.fill();
+    ctx.fillStyle = '#8A97A3'; ctx.font = '9px -apple-system, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(pt.label, cx, h-6);
+  });
+  ctx.textAlign = 'left';
+}
+
+function drawProgressCharts(){
+  if(state.progressSection === 'attempts'){
+    const entries = entriesForPeriod(state.entries, state.period);
+    const voiceC = document.getElementById('chart-voice');
+    if(voiceC){
+      const series = buildSeries(state.period, entries, 'voice');
+      paintBarChart(voiceC.getContext('2d'), voiceC.width, voiceC.height, series, {max:10});
+    }
+    const handC = document.getElementById('chart-hand');
+    if(handC){
+      const seriesHand = buildSeries(state.period, entries, 'hand');
+      paintBarChart(handC.getContext('2d'), handC.width, handC.height, seriesHand, {max:10, color1:'#6FA886', color2:'#3F6E56'});
+    }
+    const anxC = document.getElementById('chart-anxiety');
+    if(anxC){
+      const series2 = buildSeries(state.period, entries, 'anxiety');
+      paintBarChart(anxC.getContext('2d'), anxC.width, anxC.height, series2, {max:10, color1:'#C77B5E', color2:'#7A4A36'});
+    }
+  } else {
+    const entries = entriesForPeriod(state.journalEntries, state.period);
+    const sleepC = document.getElementById('chart-sleep');
+    if(sleepC){
+      const series = buildSeries(state.period, entries, 'sleepHours');
+      paintBarChart(sleepC.getContext('2d'), sleepC.width, sleepC.height, series, {max:10, color1:'#6FA886', color2:'#3F6E56'});
+    }
+  }
+}
+
+/* ---------- toast ---------- */
+function showToast(msg){
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#253544;color:#EDE7DA;padding:11px 20px;border-radius:999px;font-size:14px;z-index:999;box-shadow:0 6px 18px rgba(0,0,0,.35);opacity:0;transition:opacity .2s ease;font-family:-apple-system,sans-serif;max-width:88vw;text-align:center;';
+  document.body.appendChild(t);
+  requestAnimationFrame(()=>{ t.style.opacity = '1'; });
+  setTimeout(()=>{
+    t.style.opacity = '0';
+    setTimeout(()=> t.remove(), 250);
+  }, 2600);
+}
+
+/* ---------- PDF reports ---------- */
+function pdfHeaderBand(doc, pageW, eyebrow, title, periodLabel){
+  doc.setFillColor(23,33,43);
+  doc.rect(0,0,pageW,92,'F');
+  doc.setTextColor(217,164,65); doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text(eyebrow, 40, 34);
+  doc.setTextColor(237,231,218); doc.setFontSize(20);
+  doc.text(title + ' — ' + periodLabel, 40, 58);
+  doc.setTextColor(138,151,163); doc.setFontSize(10);
+  doc.text(new Date().toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'}), 40, 76);
+}
+function pdfMetricTiles(doc, pageW, marginX, y, metrics){
+  const tileW = (pageW - marginX*2 - (metrics.length-1)*10) / metrics.length;
+  let mx = marginX;
+  metrics.forEach(([lbl,val])=>{
+    doc.setDrawColor(222,222,222); doc.setLineWidth(1);
+    doc.roundedRect(mx, y, tileW, 58, 6, 6);
+    doc.setFontSize(15); doc.setTextColor(23,33,43); doc.setFont('helvetica','bold');
+    doc.text(String(val), mx+10, y+26);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
+    doc.text(doc.splitTextToSize(lbl, tileW-16), mx+10, y+40);
+    mx += tileW + 10;
+  });
+  return y + 58;
+}
+function ensureSpace(doc, y, needed, pageH, marginTop){
+  if(y + needed > pageH - 50){ doc.addPage(); return marginTop; }
+  return y;
+}
+
+function generateAttemptsPdf(){
+  const entries = entriesForPeriod(state.entries, state.period);
+  if(!entries.length){ showToast('Нет записей за этот период'); return; }
+  if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
+  const s = computeAttemptStats(entries);
+  const periodLabel = {day:'за сегодня', week:'за неделю', month:'за месяц'}[state.period];
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 40;
+
+  pdfHeaderBand(doc, pageW, 'ДНЕВНИК ПОДХОДОВ', 'Отчёт', periodLabel);
+
+  let y = 120;
+  y = pdfMetricTiles(doc, pageW, marginX, y, [
+    ['Подходов', s.count],
+    ['Речь по методике', fmtNum(s.voice)],
+    ['Ощущение руки', fmtNum(s.hand)],
+    ['Волнение', fmtNum(s.anxiety)],
+    ['Ритуал', s.ritualPct===null?'—':s.ritualPct+'%'],
+  ]);
+
+  y += 34;
+  doc.setDrawColor(230,230,230); doc.line(marginX,y,pageW-marginX,y);
+  y += 24;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(23,33,43);
+  doc.text('Подходы по порядку', marginX, y);
+  y += 20;
+
+  entries.slice().reverse().forEach(e=>{
+    y = ensureSpace(doc, y, 60, pageH, 50);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(23,33,43);
+    doc.text(`${dateLabel(e.ts)}, ${timeLabel(e.ts)} — ${e.title || 'Подход'}`, marginX, y);
+    y += 15;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(90,90,90);
+    doc.text(`Речь: ${fmtNum(e.voice)}   Рука: ${fmtNum(e.hand)}   Волнение: ${fmtNum(e.anxiety)}   Ритуал: ${e.ritual===true?'да':e.ritual===false?'нет':'—'}`, marginX, y);
+    y += 15;
+
+    const detail = [];
+    if(e.mindsetBefore) detail.push('Настрой: ' + e.mindsetBefore);
+    if(e.reactionAfter) detail.push('Реакция: ' + e.reactionAfter);
+    if(e.voiceNote) detail.push('Речь — подробно: ' + e.voiceNote);
+    if(e.handNote) detail.push('Рука — подробно: ' + e.handNote);
+    if(e.anxietyNote) detail.push('Волнение — подробно: ' + e.anxietyNote);
+    detail.forEach(line=>{
+      const wrapped = doc.splitTextToSize(line, pageW - marginX*2);
+      y = ensureSpace(doc, y, wrapped.length*12 + 4, pageH, 50);
+      doc.setFontSize(9.5); doc.setTextColor(110,110,110);
+      doc.text(wrapped, marginX, y);
+      y += wrapped.length*12 + 4;
+    });
+
+    y += 8;
+    doc.setDrawColor(238,238,238); doc.line(marginX, y, pageW-marginX, y);
+    y += 16;
+  });
+
+  doc.save('podhody-' + new Date().toISOString().slice(0,10) + '.pdf');
+}
+
+function generateJournalPdf(){
+  const entries = entriesForPeriod(state.journalEntries, state.period);
+  if(!entries.length){ showToast('Нет записей за этот период'); return; }
+  if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
+  const s = computeJournalStats(entries);
+  const streak = journalStreak();
+  const periodLabel = {day:'за сегодня', week:'за неделю', month:'за месяц'}[state.period];
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const marginX = 40;
+
+  pdfHeaderBand(doc, pageW, 'ДНЕВНИК ДНЯ', 'Отчёт', periodLabel);
+
+  let y = 120;
+  y = pdfMetricTiles(doc, pageW, marginX, y, [
+    ['Дней подряд', streak],
+    ['Записей за период', s.count],
+    ['Средний сон, ч', fmtNum(s.sleepHours)],
+  ]);
+
+  y += 34;
+  doc.setDrawColor(230,230,230); doc.line(marginX,y,pageW-marginX,y);
+  y += 24;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(23,33,43);
+  doc.text('Записи по дням', marginX, y);
+  y += 20;
+
+  const fieldLabels = [
+    ['mood','Самочувствие'], ['glad','Радует'], ['worry','Волнует'],
+    ['dailyRoutine','Саморегуляция'], ['sleepHours','Сон, ч'],
+    ['difficulties','Трудная тетрадь'], ['reflections','Вопросы и откровения'],
+    ['tricks','Уловки'], ['praise','Похвала'], ['intentions','Речевые планы'],
+  ];
+
+  entries.slice().reverse().forEach(e=>{
+    y = ensureSpace(doc, y, 40, pageH, 50);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11.5); doc.setTextColor(23,33,43);
+    doc.text(capitalize(weekdayDateLabel(e.ts)), marginX, y);
+    y += 17;
+
+    fieldLabels.forEach(([id,lbl])=>{
+      let val = e[id];
+      if(id === 'sleepHours' && val != null) val = fmtNum(val);
+      if(val === null || val === undefined || val === '') return;
+      const wrapped = doc.splitTextToSize(`${lbl}: ${val}`, pageW - marginX*2);
+      y = ensureSpace(doc, y, wrapped.length*12 + 3, pageH, 50);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(90,90,90);
+      doc.text(wrapped, marginX, y);
+      y += wrapped.length*12 + 3;
+    });
+
+    y += 8;
+    doc.setDrawColor(238,238,238); doc.line(marginX, y, pageW-marginX, y);
+    y += 16;
+  });
+
+  doc.save('dnevnik-' + new Date().toISOString().slice(0,10) + '.pdf');
+}
+
+loadAll().then(render);
+</script>
+</body>
+</html>
