@@ -41,14 +41,17 @@ create table if not exists journal_entries (
 
 -- ---------------------------------------------------------------------
 -- Миграция с более ранней версии схемы (если таблицы уже существовали
--- со старыми именами колонок) — выполнить один раз:
+-- с другим набором колонок) — безопасно выполнять повторно:
 --
--- alter table attempts rename column mindset to mindset_before;
+-- alter table attempts add column if not exists mindset_before text;
 -- alter table attempts add column if not exists reaction_after text;
--- alter table attempts rename column anxiety_speech to anxiety;
+-- alter table attempts add column if not exists anxiety numeric;
 -- alter table attempts add column if not exists voice_note text;
 -- alter table attempts add column if not exists hand_note text;
 -- alter table attempts add column if not exists anxiety_note text;
+--
+-- alter table attempts drop column if exists mindset;
+-- alter table attempts drop column if exists anxiety_speech;
 -- alter table attempts drop column if exists errors_work;
 -- alter table attempts drop column if exists anxiety_general;
 -- alter table attempts drop column if exists causes;
