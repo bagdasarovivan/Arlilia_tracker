@@ -187,6 +187,21 @@
   .digest-item .dt{ font-size:14px; }
   .note-card{ padding:14px 18px; font-size:14px; color: var(--text-muted); margin-bottom:18px; }
   .note-card b{ color: var(--text); font-weight:600; }
+
+  /* ---- Calendar ---- */
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .cal-weekdays{ margin-bottom:6px; }
+  .cal-weekday{ font-size:11px; color: var(--text-muted); text-align:center; padding-bottom:2px; }
+  .cal-cell{ aspect-ratio:1; border-radius:10px; background: var(--surface); border:1px solid var(--border); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; }
+  .cal-cell.empty{ background:transparent; border:none; }
+  .cal-cell.today{ border-color: var(--accent); }
+  .cal-day-num{ font-size:12px; color: var(--text); }
+  .cal-dots{ display:flex; gap:3px; min-height:6px; }
+  .cal-dot{ width:6px; height:6px; border-radius:50%; display:inline-block; }
+  .cal-dot.attempt{ background: var(--accent); }
+  .cal-dot.journal{ background: var(--good); }
+  .cal-legend{ display:flex; gap:18px; margin-top:12px; font-size:12px; color: var(--text-muted); align-items:center; }
+  .cal-legend .cal-dot{ margin-right:5px; vertical-align:middle; }
 </style>
 </head>
 <body>
@@ -255,8 +270,7 @@ let state = {
   journalDraft: {},
   journalReadEntry: null,
 
-  progressSection: 'attempts', // attempts | journal
-  period: 'day',               // day | week | month
+  progressMonth: (function(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
 };
 
 /* ---------- storage (Supabase) ---------- */
@@ -407,79 +421,45 @@ function dateLabel(ts){ return new Date(ts).toLocaleDateString('ru-RU', {day:'2-
 function timeLabel(ts){ return new Date(ts).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}); }
 function weekdayDateLabel(ts){ return new Date(ts).toLocaleDateString('ru-RU', {weekday:'long', day:'numeric', month:'long'}); }
 
-function entriesForPeriod(list, period){
-  const now = Date.now();
-  let fromTs;
-  if(period === 'day') fromTs = startOfDay(now);
-  else if(period === 'week') fromTs = now - 6*24*3600*1000;
-  else fromTs = now - 29*24*3600*1000;
-  return list.filter(e => e.ts >= fromTs).sort((a,b)=>a.ts-b.ts);
-}
-function entriesForPreviousPeriod(list, period){
-  const now = Date.now();
-  let curFrom, spanMs;
-  if(period === 'day'){ curFrom = startOfDay(now); spanMs = 24*3600*1000; }
-  else if(period === 'week'){ curFrom = now - 6*24*3600*1000; spanMs = 7*24*3600*1000; }
-  else { curFrom = now - 29*24*3600*1000; spanMs = 30*24*3600*1000; }
-  const prevFrom = curFrom - spanMs;
-  return list.filter(e => e.ts >= prevFrom && e.ts < curFrom).sort((a,b)=>a.ts-b.ts);
-}
-function deltaBadge(cur, prev, higherIsBetter){
-  if(cur === null || cur === undefined || prev === null || prev === undefined || isNaN(cur) || isNaN(prev)) return '';
-  const diff = cur - prev;
-  if(Math.abs(diff) < 0.05) return `<span class="delta delta-flat">без изменений</span>`;
-  const improved = higherIsBetter ? diff > 0 : diff < 0;
-  const arrow = diff > 0 ? '▲' : '▼';
-  const cls = improved ? 'delta-good' : 'delta-bad';
-  return `<span class="delta ${cls}">${arrow} ${fmtNum(Math.abs(diff))} к пред. периоду</span>`;
-}
 function avg(arr, key){
   const vals = arr.map(e=>e[key]).filter(v=>typeof v === 'number' && !isNaN(v));
   if(!vals.length) return null;
   return vals.reduce((a,b)=>a+b,0)/vals.length;
 }
-function computeAttemptStats(entries){
-  const ritualVals = entries.map(e=>e.ritual).filter(v=>typeof v==='boolean');
-  return {
-    count: entries.length,
-    voice: avg(entries,'voice'),
-    hand: avg(entries,'hand'),
-    anxiety: avg(entries,'anxiety'),
-    ritualPct: ritualVals.length ? Math.round(100*ritualVals.filter(v=>v).length/ritualVals.length) : null,
-  };
-}
-function buildSeries(period, entries, key){
-  if(period === 'day'){
-    return entries.map(e => ({ label: timeLabel(e.ts), value: e[key] }));
-  }
-  const byDay = {};
-  entries.forEach(e=>{
-    const k = dateKey(e.ts);
-    if(!byDay[k]) byDay[k] = [];
-    if(typeof e[key] === 'number') byDay[k].push(e[key]);
-  });
-  return Object.keys(byDay).sort().map(k=>{
-    const vals = byDay[k];
-    return { label: dateLabel(new Date(k).getTime()), value: vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null };
-  });
-}
-function journalStreak(){
-  const days = new Set(state.journalEntries.map(e=>dateKey(e.ts)));
-  let streak = 0;
-  let cursor = startOfDay(Date.now());
-  while(days.has(dateKey(cursor))){
-    streak++;
-    cursor -= 24*3600*1000;
-  }
-  return streak;
-}
-function computeJournalStats(entries){
-  return {
-    count: entries.length,
-    sleepHours: avg(entries,'sleepHours'),
-  };
-}
 function capitalize(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : s; }
+
+/* ---------- calendar helpers ---------- */
+function daysInMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); }
+function firstWeekdayMonIndex(d){
+  const first = new Date(d.getFullYear(), d.getMonth(), 1);
+  return (first.getDay() + 6) % 7; // Monday = 0
+}
+function attemptsInMonth(monthDate){
+  return state.entries.filter(e=>{
+    const d = new Date(e.ts);
+    return d.getFullYear()===monthDate.getFullYear() && d.getMonth()===monthDate.getMonth();
+  }).sort((a,b)=>a.ts-b.ts);
+}
+function journalEntriesInMonth(monthDate){
+  return state.journalEntries.filter(e=>{
+    if(isJournalEntryEmpty(e)) return false;
+    const d = new Date(e.ts);
+    return d.getFullYear()===monthDate.getFullYear() && d.getMonth()===monthDate.getMonth();
+  }).sort((a,b)=>a.ts-b.ts);
+}
+function attemptsCountByDay(monthDate){
+  const map = {};
+  attemptsInMonth(monthDate).forEach(e=>{
+    const day = new Date(e.ts).getDate();
+    map[day] = (map[day]||0) + 1;
+  });
+  return map;
+}
+function journalDaysInMonth(monthDate){
+  const set = new Set();
+  journalEntriesInMonth(monthDate).forEach(e=> set.add(new Date(e.ts).getDate()));
+  return set;
+}
 
 /* ---------- render root ---------- */
 function render(){
@@ -500,7 +480,6 @@ function render(){
     app.innerHTML = `<div class="content">${body}</div>${renderTabbar()}`;
   }
   attachHandlers();
-  if(!state.practiceActive && !state.journalFormActive && state.journalView !== 'read' && state.tab === 'progress') drawProgressCharts();
 }
 
 function renderTabbar(){
@@ -520,16 +499,15 @@ function renderTabbar(){
 
 /* ---------- Practice tab ---------- */
 function renderPracticeHome(){
-  const today = entriesForPeriod(state.entries, 'day');
-  const s = computeAttemptStats(today);
+  const todayK = todayKey();
+  const todayCount = state.entries.filter(e => dateKey(e.ts) === todayK).length;
   return `
     <div class="home-hero">
       <div class="eyebrow">Подходы</div>
       <h1>Как прошёл сегодняшний подход?</h1>
     </div>
     <div class="stat-row">
-      <div class="stat-tile"><div class="num">${s.count}</div><div class="lbl">подходов сегодня</div></div>
-      <div class="stat-tile"><div class="num">${fmtNum(s.anxiety)}</div><div class="lbl">среднее волнение</div></div>
+      <div class="stat-tile" style="flex:1;"><div class="num">${todayCount}</div><div class="lbl">подходов сегодня</div></div>
     </div>
     <button class="btn btn-primary" data-action="start-practice">Записать подход</button>
   `;
@@ -746,97 +724,64 @@ function renderJournalWizardStep(){
   `;
 }
 
-/* ---------- Progress tab ---------- */
+/* ---------- Progress tab (calendar) ---------- */
 function renderProgress(){
-  const periodLabel = {day:'День', week:'Неделя', month:'Месяц'};
-  const seg = `
-    <div class="segment-row">
-      <button class="segment-btn ${state.progressSection==='attempts'?'active':''}" data-section="attempts">Подходы</button>
-      <button class="segment-btn ${state.progressSection==='journal'?'active':''}" data-section="journal">Дневник</button>
-    </div>
-  `;
-  const periodRow = `
-    <div class="period-row">
-      ${['day','week','month'].map(p => `<button class="period-btn ${state.period===p?'active':''}" data-period="${p}">${periodLabel[p]}</button>`).join('')}
-    </div>
-    <div class="autosave-hint" style="margin-top:-12px;">Показатели сравниваются с таким же предыдущим периодом</div>
-  `;
-
-  let body;
-  if(state.progressSection === 'attempts') body = renderAttemptsProgress();
-  else body = renderJournalProgress();
+  const monthDate = state.progressMonth;
+  const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
+  const attempts = attemptsInMonth(monthDate);
+  const journalDays = journalDaysInMonth(monthDate);
+  const total = daysInMonth(monthDate);
 
   return `
     <div class="eyebrow">Прогресс</div>
-    <h2 style="font-size:24px; margin-bottom:18px;">Аналитика</h2>
-    ${seg}
-    ${periodRow}
-    ${body}
+    <h2 style="font-size:24px; margin-bottom:18px;">Календарь</h2>
+    <div class="period-row" style="align-items:center;">
+      <button class="segment-btn" data-action="progress-prev-month" style="flex:0 0 46px;">‹</button>
+      <div style="flex:1; text-align:center; font-family:Georgia,serif; font-size:16px;">${monthLabel}</div>
+      <button class="segment-btn" data-action="progress-next-month" style="flex:0 0 46px;">›</button>
+    </div>
+    ${renderCalendar(monthDate)}
+    <div class="metric-grid" style="margin-top:22px;">
+      <div class="metric-tile"><div class="num">${attempts.length}</div><div class="lbl">подходов в месяце</div></div>
+      <div class="metric-tile good"><div class="num">${journalDays.size}</div><div class="lbl">дней с дневником из ${total}</div></div>
+    </div>
+    <button class="btn btn-primary" data-action="export-attempts-pdf" style="margin-top:20px;">PDF: список подходов</button>
+    <div style="height:10px"></div>
+    <button class="btn btn-ghost" data-action="export-journal-pdf">PDF: записи дневника</button>
   `;
 }
 
-function renderAttemptsProgress(){
-  const entries = entriesForPeriod(state.entries, state.period);
-  const s = computeAttemptStats(entries);
-  if(!entries.length) return `<div class="empty">За этот период нет записей подходов.</div>`;
-  const prevS = computeAttemptStats(entriesForPreviousPeriod(state.entries, state.period));
+function renderCalendar(monthDate){
+  const total = daysInMonth(monthDate);
+  const offset = firstWeekdayMonIndex(monthDate);
+  const countsByDay = attemptsCountByDay(monthDate);
+  const journalDays = journalDaysInMonth(monthDate);
+  const today = new Date();
+  const isCurMonth = today.getFullYear()===monthDate.getFullYear() && today.getMonth()===monthDate.getMonth();
+  const weekdays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 
-  const historyHtml = entries.slice().reverse().slice(0,8).map(e => `
-    <div class="history-row">
-      <span class="d">${dateLabel(e.ts)}, ${timeLabel(e.ts)}</span>
-      <span class="m">${e.title ? e.title + ' · ' : ''}речь ${fmtNum(e.voice)} · рука ${fmtNum(e.hand)} · волн. ${fmtNum(e.anxiety)}</span>
-    </div>
-  `).join('');
-
-  return `
-    <div class="metric-grid">
-      <div class="metric-tile"><div class="num">${s.count}</div><div class="lbl">подходов</div></div>
-      <div class="metric-tile good"><div class="num">${fmtNum(s.voice)}</div><div class="lbl">речь по методике${deltaBadge(s.voice, prevS.voice, true)}</div></div>
-      <div class="metric-tile"><div class="num">${fmtNum(s.hand)}</div><div class="lbl">ощущение руки${deltaBadge(s.hand, prevS.hand, true)}</div></div>
-      <div class="metric-tile"><div class="num">${fmtNum(s.anxiety)}</div><div class="lbl">волнение${deltaBadge(s.anxiety, prevS.anxiety, false)}</div></div>
-      <div class="metric-tile"><div class="num">${s.ritualPct===null?'—':s.ritualPct+'%'}</div><div class="lbl">соблюдал ритуал${deltaBadge(s.ritualPct, prevS.ritualPct, true)}</div></div>
-    </div>
-    <div class="chart-card"><h3>Речь по методике</h3><canvas class="chart" id="chart-voice" width="440" height="150"></canvas></div>
-    <div class="chart-card"><h3>Ощущение руки</h3><canvas class="chart" id="chart-hand" width="440" height="150"></canvas></div>
-    <div class="chart-card"><h3>Волнение</h3><canvas class="chart" id="chart-anxiety" width="440" height="150"></canvas></div>
-    <div class="card" style="margin-bottom:18px; padding:6px 18px;">${historyHtml}</div>
-    <button class="btn btn-primary" data-action="export-attempts-pdf">Скачать PDF-отчёт</button>
-  `;
-}
-
-function renderJournalProgress(){
-  const entries = entriesForPeriod(state.journalEntries, state.period);
-  const s = computeJournalStats(entries);
-  const streak = journalStreak();
-
-  if(!entries.length) return `<div class="empty">За этот период нет записей дневника.</div>`;
-  const prevS = computeJournalStats(entriesForPreviousPeriod(state.journalEntries, state.period));
-
-  const digestSource = entries.slice().reverse().slice(0,5);
-  const digestHtml = digestSource.map(e=>{
-    const bits = [];
-    if(e.glad) bits.push({lbl:'Радует', txt:e.glad});
-    if(e.worry) bits.push({lbl:'Волнует', txt:e.worry});
-    if(e.praise) bits.push({lbl:'Похвала', txt:e.praise});
-    if(e.intentions) bits.push({lbl:'Речевые планы', txt:e.intentions});
-    if(!bits.length) return '';
-    return `
-      <div class="digest-item">
-        <div class="dd">${dateLabel(e.ts)}</div>
-        ${bits.map(b=>`<div class="dl">${b.lbl}</div><div class="dt" style="margin-bottom:8px;">${b.txt}</div>`).join('')}
+  let cells = '';
+  for(let i=0;i<offset;i++) cells += `<div class="cal-cell empty"></div>`;
+  for(let day=1; day<=total; day++){
+    const count = countsByDay[day] || 0;
+    const hasJournal = journalDays.has(day);
+    const isToday = isCurMonth && today.getDate() === day;
+    cells += `<div class="cal-cell${isToday?' today':''}">
+      <div class="cal-day-num">${day}</div>
+      <div class="cal-dots">
+        ${count ? `<span class="cal-dot attempt"></span>` : ''}
+        ${hasJournal ? `<span class="cal-dot journal"></span>` : ''}
       </div>
-    `;
-  }).join('');
+    </div>`;
+  }
 
   return `
-    <div class="metric-grid">
-      <div class="metric-tile good"><div class="num">${streak}</div><div class="lbl">дней подряд с записью</div></div>
-      <div class="metric-tile"><div class="num">${s.count}</div><div class="lbl">записей за период</div></div>
-      <div class="metric-tile"><div class="num">${fmtNum(s.sleepHours)}</div><div class="lbl">средний сон, ч${deltaBadge(s.sleepHours, prevS.sleepHours, true)}</div></div>
+    <div class="cal-grid cal-weekdays">${weekdays.map(w=>`<div class="cal-weekday">${w}</div>`).join('')}</div>
+    <div class="cal-grid">${cells}</div>
+    <div class="cal-legend">
+      <span><span class="cal-dot attempt"></span> был подход</span>
+      <span><span class="cal-dot journal"></span> заполнен дневник</span>
     </div>
-    <div class="chart-card"><h3>Сон, часов</h3><canvas class="chart" id="chart-sleep" width="440" height="150"></canvas></div>
-    ${digestHtml ? `<div class="card" style="margin-bottom:18px;">${digestHtml}</div>` : ''}
-    <button class="btn btn-primary" data-action="export-journal-pdf">Скачать PDF-отчёт</button>
   `;
 }
 
@@ -846,12 +791,6 @@ function attachHandlers(){
   app.querySelectorAll('[data-action]').forEach(el=> el.addEventListener('click', onAction));
   app.querySelectorAll('[data-tab]').forEach(el=> el.addEventListener('click', e=>{
     state.tab = e.currentTarget.getAttribute('data-tab'); render();
-  }));
-  app.querySelectorAll('[data-section]').forEach(el=> el.addEventListener('click', e=>{
-    state.progressSection = e.currentTarget.getAttribute('data-section'); render();
-  }));
-  app.querySelectorAll('[data-period]').forEach(el=> el.addEventListener('click', e=>{
-    state.period = e.currentTarget.getAttribute('data-period'); render();
   }));
   app.querySelectorAll('.scale-slider').forEach(el=>{
     el.addEventListener('input', (e)=>{
@@ -1029,73 +968,12 @@ async function onAction(e){
     generateAttemptsPdf(); return;
   } else if(action === 'export-journal-pdf'){
     generateJournalPdf(); return;
+  } else if(action === 'progress-prev-month'){
+    const d = new Date(state.progressMonth); d.setMonth(d.getMonth()-1); state.progressMonth = d;
+  } else if(action === 'progress-next-month'){
+    const d = new Date(state.progressMonth); d.setMonth(d.getMonth()+1); state.progressMonth = d;
   }
   render();
-}
-
-/* ---------- charts (in-page) ---------- */
-function paintBarChart(ctx, w, h, series, opts){
-  opts = opts || {};
-  const maxVal = opts.max || 10;
-  ctx.clearRect(0,0,w,h);
-  const padL = 24, padR = 12, padT = 10, padB = 22;
-  const chartW = w - padL - padR, chartH = h - padT - padB;
-  ctx.strokeStyle = '#2E3F4E'; ctx.lineWidth = 1;
-  for(let i=0;i<=2;i++){
-    const y = padT + chartH*i/2;
-    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke();
-  }
-  ctx.fillStyle = '#8A97A3'; ctx.font = '10px -apple-system, sans-serif';
-  ctx.fillText(String(Math.round(maxVal)), 2, padT+4);
-  ctx.fillText('0', 2, padT+chartH+4);
-  if(!series.length) return;
-  const n = series.length;
-  const barW = Math.min(34, chartW/n*0.55);
-  const gap = chartW/n;
-  series.forEach((pt,i)=>{
-    const cx = padL + gap*i + gap/2;
-    const val = pt.value ?? 0;
-    const barH = chartH * Math.max(0, Math.min(1, val/maxVal));
-    const x = cx - barW/2, y = padT + chartH - barH;
-    const grad = ctx.createLinearGradient(0,y,0,padT+chartH);
-    grad.addColorStop(0, opts.color1 || '#D9A441');
-    grad.addColorStop(1, opts.color2 || '#8A6A2A');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    if(ctx.roundRect) ctx.roundRect(x,y,barW,barH,4); else ctx.rect(x,y,barW,barH);
-    ctx.fill();
-    ctx.fillStyle = '#8A97A3'; ctx.font = '9px -apple-system, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(pt.label, cx, h-6);
-  });
-  ctx.textAlign = 'left';
-}
-
-function drawProgressCharts(){
-  if(state.progressSection === 'attempts'){
-    const entries = entriesForPeriod(state.entries, state.period);
-    const voiceC = document.getElementById('chart-voice');
-    if(voiceC){
-      const series = buildSeries(state.period, entries, 'voice');
-      paintBarChart(voiceC.getContext('2d'), voiceC.width, voiceC.height, series, {max:10});
-    }
-    const handC = document.getElementById('chart-hand');
-    if(handC){
-      const seriesHand = buildSeries(state.period, entries, 'hand');
-      paintBarChart(handC.getContext('2d'), handC.width, handC.height, seriesHand, {max:10, color1:'#6FA886', color2:'#3F6E56'});
-    }
-    const anxC = document.getElementById('chart-anxiety');
-    if(anxC){
-      const series2 = buildSeries(state.period, entries, 'anxiety');
-      paintBarChart(anxC.getContext('2d'), anxC.width, anxC.height, series2, {max:10, color1:'#C77B5E', color2:'#7A4A36'});
-    }
-  } else {
-    const entries = entriesForPeriod(state.journalEntries, state.period);
-    const sleepC = document.getElementById('chart-sleep');
-    if(sleepC){
-      const series = buildSeries(state.period, entries, 'sleepHours');
-      paintBarChart(sleepC.getContext('2d'), sleepC.width, sleepC.height, series, {max:10, color1:'#6FA886', color2:'#3F6E56'});
-    }
-  }
 }
 
 /* ---------- toast ---------- */
@@ -1111,74 +989,86 @@ function showToast(msg){
   }, 2600);
 }
 
-/* ---------- PDF reports ---------- */
-function pdfHeaderBand(doc, pageW, eyebrow, title, periodLabel){
-  doc.setFillColor(23,33,43);
-  doc.rect(0,0,pageW,92,'F');
-  doc.setTextColor(217,164,65); doc.setFont('helvetica','normal'); doc.setFontSize(11);
-  doc.text(eyebrow, 40, 34);
-  doc.setTextColor(237,231,218); doc.setFontSize(20);
-  doc.text(title + ' — ' + periodLabel, 40, 58);
-  doc.setTextColor(138,151,163); doc.setFontSize(10);
-  doc.text(new Date().toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'}), 40, 76);
+/* ---------- PDF reports ----------
+   jsPDF's built-in fonts don't cover Cyrillic, so every page is drawn on an
+   off-screen canvas first (the browser's own font renderer handles Cyrillic
+   fine) and then embedded into the PDF as an image. This keeps text crisp
+   and sidesteps font-embedding entirely. */
+const PDF_PAGE_W = 1000, PDF_PAGE_H = 1414, PDF_MARGIN = 60;
+
+function newReportPage(pages){
+  const canvas = document.createElement('canvas');
+  canvas.width = PDF_PAGE_W; canvas.height = PDF_PAGE_H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0,0,PDF_PAGE_W,PDF_PAGE_H);
+  pages.push(canvas);
+  return { canvas, ctx, y: 70 };
 }
-function pdfMetricTiles(doc, pageW, marginX, y, metrics){
-  const tileW = (pageW - marginX*2 - (metrics.length-1)*10) / metrics.length;
-  let mx = marginX;
-  metrics.forEach(([lbl,val])=>{
-    doc.setDrawColor(222,222,222); doc.setLineWidth(1);
-    doc.roundedRect(mx, y, tileW, 58, 6, 6);
-    doc.setFontSize(15); doc.setTextColor(23,33,43); doc.setFont('helvetica','bold');
-    doc.text(String(val), mx+10, y+26);
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
-    doc.text(doc.splitTextToSize(lbl, tileW-16), mx+10, y+40);
-    mx += tileW + 10;
+function wrapLines(ctx, text, maxWidth){
+  const words = String(text).split(' ');
+  const lines = []; let line = '';
+  words.forEach(w=>{
+    const test = line ? line + ' ' + w : w;
+    if(ctx.measureText(test).width > maxWidth && line){ lines.push(line); line = w; }
+    else line = test;
   });
-  return y + 58;
+  if(line) lines.push(line);
+  return lines;
 }
-function ensureSpace(doc, y, needed, pageH, marginTop){
-  if(y + needed > pageH - 50){ doc.addPage(); return marginTop; }
-  return y;
+function savePdfFromPages(pages, filename){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
+  pages.forEach((pg,i)=>{
+    if(i>0) doc.addPage();
+    doc.addImage(pg.toDataURL('image/png'), 'PNG', 0, 0, pw, ph);
+  });
+  doc.save(filename);
 }
 
 function generateAttemptsPdf(){
-  const entries = entriesForPeriod(state.entries, state.period);
-  if(!entries.length){ showToast('Нет записей за этот период'); return; }
   if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
-  const s = computeAttemptStats(entries);
-  const periodLabel = {day:'за сегодня', week:'за неделю', month:'за месяц'}[state.period];
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:'pt', format:'a4' });
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const marginX = 40;
+  const monthDate = state.progressMonth;
+  const entries = attemptsInMonth(monthDate);
+  if(!entries.length){ showToast('В этом месяце нет записанных подходов'); return; }
+  const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
 
-  pdfHeaderBand(doc, pageW, 'ДНЕВНИК ПОДХОДОВ', 'Отчёт', periodLabel);
+  const pages = [];
+  let { ctx, y } = newReportPage(pages);
+  const colX = { num: PDF_MARGIN, date: PDF_MARGIN+46, title: PDF_MARGIN+170, voice: PDF_MARGIN+430, hand: PDF_MARGIN+500, anx: PDF_MARGIN+565, ritual: PDF_MARGIN+640 };
 
-  let y = 120;
-  y = pdfMetricTiles(doc, pageW, marginX, y, [
-    ['Подходов', s.count],
-    ['Речь по методике', fmtNum(s.voice)],
-    ['Ощущение руки', fmtNum(s.hand)],
-    ['Волнение', fmtNum(s.anxiety)],
-    ['Ритуал', s.ritualPct===null?'—':s.ritualPct+'%'],
-  ]);
+  ctx.fillStyle = '#17212B'; ctx.font = '28px Georgia, serif';
+  ctx.fillText('Дневник подходов', PDF_MARGIN, y); y += 32;
+  ctx.fillStyle = '#8A8A8A'; ctx.font = '15px -apple-system, Helvetica, Arial, sans-serif';
+  ctx.fillText(monthLabel + ' · всего подходов: ' + entries.length, PDF_MARGIN, y); y += 38;
 
-  y += 34;
-  doc.setDrawColor(230,230,230); doc.line(marginX,y,pageW-marginX,y);
-  y += 24;
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(23,33,43);
-  doc.text('Подходы по порядку', marginX, y);
-  y += 20;
+  function drawTableHeader(){
+    ctx.fillStyle = '#17212B'; ctx.font = 'bold 13px -apple-system, Helvetica, Arial, sans-serif';
+    ctx.fillText('№', colX.num, y);
+    ctx.fillText('Дата, время', colX.date, y);
+    ctx.fillText('Тип', colX.title, y);
+    ctx.fillText('Речь', colX.voice, y);
+    ctx.fillText('Рука', colX.hand, y);
+    ctx.fillText('Волн.', colX.anx, y);
+    ctx.fillText('Ритуал', colX.ritual, y);
+    y += 10;
+    ctx.strokeStyle = '#DDDDDD'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PDF_MARGIN,y); ctx.lineTo(PDF_PAGE_W-PDF_MARGIN,y); ctx.stroke();
+    y += 24;
+  }
+  drawTableHeader();
 
-  entries.slice().reverse().forEach(e=>{
-    y = ensureSpace(doc, y, 60, pageH, 50);
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(23,33,43);
-    doc.text(`${dateLabel(e.ts)}, ${timeLabel(e.ts)} — ${e.title || 'Подход'}`, marginX, y);
-    y += 15;
-    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(90,90,90);
-    doc.text(`Речь: ${fmtNum(e.voice)}   Рука: ${fmtNum(e.hand)}   Волнение: ${fmtNum(e.anxiety)}   Ритуал: ${e.ritual===true?'да':e.ritual===false?'нет':'—'}`, marginX, y);
-    y += 15;
+  entries.forEach((e,i)=>{
+    if(y > PDF_PAGE_H - 170){ ({ ctx, y } = newReportPage(pages)); drawTableHeader(); }
+    ctx.fillStyle = '#222'; ctx.font = '13px -apple-system, Helvetica, Arial, sans-serif';
+    ctx.fillText('Подход ' + (i+1), colX.num, y);
+    ctx.fillText(dateLabel(e.ts) + ', ' + timeLabel(e.ts), colX.date, y);
+    ctx.fillText((e.title || '—').slice(0,22), colX.title, y);
+    ctx.fillText(fmtNum(e.voice), colX.voice, y);
+    ctx.fillText(fmtNum(e.hand), colX.hand, y);
+    ctx.fillText(fmtNum(e.anxiety), colX.anx, y);
+    ctx.fillText(e.ritual===true?'да':e.ritual===false?'нет':'—', colX.ritual, y);
+    y += 24;
 
     const detail = [];
     if(e.mindsetBefore) detail.push('Настрой: ' + e.mindsetBefore);
@@ -1186,50 +1076,37 @@ function generateAttemptsPdf(){
     if(e.voiceNote) detail.push('Речь — подробно: ' + e.voiceNote);
     if(e.handNote) detail.push('Рука — подробно: ' + e.handNote);
     if(e.anxietyNote) detail.push('Волнение — подробно: ' + e.anxietyNote);
+    ctx.font = '12px -apple-system, Helvetica, Arial, sans-serif'; ctx.fillStyle = '#666';
     detail.forEach(line=>{
-      const wrapped = doc.splitTextToSize(line, pageW - marginX*2);
-      y = ensureSpace(doc, y, wrapped.length*12 + 4, pageH, 50);
-      doc.setFontSize(9.5); doc.setTextColor(110,110,110);
-      doc.text(wrapped, marginX, y);
-      y += wrapped.length*12 + 4;
+      wrapLines(ctx, line, PDF_PAGE_W - PDF_MARGIN*2 - 24).forEach(wl=>{
+        if(y > PDF_PAGE_H - 90){ ({ ctx, y } = newReportPage(pages)); drawTableHeader(); ctx.font='12px -apple-system, Helvetica, Arial, sans-serif'; ctx.fillStyle='#666'; }
+        ctx.fillText(wl, colX.num + 22, y);
+        y += 16;
+      });
     });
 
     y += 8;
-    doc.setDrawColor(238,238,238); doc.line(marginX, y, pageW-marginX, y);
-    y += 16;
+    ctx.strokeStyle = '#F0F0F0'; ctx.beginPath(); ctx.moveTo(PDF_MARGIN,y); ctx.lineTo(PDF_PAGE_W-PDF_MARGIN,y); ctx.stroke();
+    y += 18;
   });
 
-  doc.save('podhody-' + new Date().toISOString().slice(0,10) + '.pdf');
+  savePdfFromPages(pages, 'podhody-' + new Date().toISOString().slice(0,10) + '.pdf');
 }
 
 function generateJournalPdf(){
-  const entries = entriesForPeriod(state.journalEntries, state.period);
-  if(!entries.length){ showToast('Нет записей за этот период'); return; }
   if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
-  const s = computeJournalStats(entries);
-  const streak = journalStreak();
-  const periodLabel = {day:'за сегодня', week:'за неделю', month:'за месяц'}[state.period];
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:'pt', format:'a4' });
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const marginX = 40;
+  const monthDate = state.progressMonth;
+  const entries = journalEntriesInMonth(monthDate);
+  if(!entries.length){ showToast('В этом месяце нет записей дневника'); return; }
+  const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
 
-  pdfHeaderBand(doc, pageW, 'ДНЕВНИК ДНЯ', 'Отчёт', periodLabel);
+  const pages = [];
+  let { ctx, y } = newReportPage(pages);
 
-  let y = 120;
-  y = pdfMetricTiles(doc, pageW, marginX, y, [
-    ['Дней подряд', streak],
-    ['Записей за период', s.count],
-    ['Средний сон, ч', fmtNum(s.sleepHours)],
-  ]);
-
-  y += 34;
-  doc.setDrawColor(230,230,230); doc.line(marginX,y,pageW-marginX,y);
-  y += 24;
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(23,33,43);
-  doc.text('Записи по дням', marginX, y);
-  y += 20;
+  ctx.fillStyle = '#17212B'; ctx.font = '28px Georgia, serif';
+  ctx.fillText('Дневник дня', PDF_MARGIN, y); y += 32;
+  ctx.fillStyle = '#8A8A8A'; ctx.font = '15px -apple-system, Helvetica, Arial, sans-serif';
+  ctx.fillText(monthLabel + ' · записей: ' + entries.length, PDF_MARGIN, y); y += 40;
 
   const fieldLabels = [
     ['mood','Самочувствие'], ['glad','Радует'], ['worry','Волнует'],
@@ -1238,29 +1115,32 @@ function generateJournalPdf(){
     ['tricks','Уловки'], ['praise','Похвала'], ['intentions','Речевые планы'],
   ];
 
-  entries.slice().reverse().forEach(e=>{
-    y = ensureSpace(doc, y, 40, pageH, 50);
-    doc.setFont('helvetica','bold'); doc.setFontSize(11.5); doc.setTextColor(23,33,43);
-    doc.text(capitalize(weekdayDateLabel(e.ts)), marginX, y);
-    y += 17;
+  entries.forEach(e=>{
+    if(y > PDF_PAGE_H - 140){ ({ ctx, y } = newReportPage(pages)); }
+    ctx.fillStyle = '#17212B'; ctx.font = 'bold 15px -apple-system, Helvetica, Arial, sans-serif';
+    ctx.fillText(capitalize(weekdayDateLabel(e.ts)), PDF_MARGIN, y);
+    y += 22;
 
     fieldLabels.forEach(([id,lbl])=>{
       let val = e[id];
       if(id === 'sleepHours' && val != null) val = fmtNum(val);
       if(val === null || val === undefined || val === '') return;
-      const wrapped = doc.splitTextToSize(`${lbl}: ${val}`, pageW - marginX*2);
-      y = ensureSpace(doc, y, wrapped.length*12 + 3, pageH, 50);
-      doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(90,90,90);
-      doc.text(wrapped, marginX, y);
-      y += wrapped.length*12 + 3;
+      ctx.font = '13px -apple-system, Helvetica, Arial, sans-serif'; ctx.fillStyle = '#444';
+      wrapLines(ctx, `${lbl}: ${val}`, PDF_PAGE_W - PDF_MARGIN*2).forEach(wl=>{
+        if(y > PDF_PAGE_H - 90){ ({ ctx, y } = newReportPage(pages)); }
+        ctx.font = '13px -apple-system, Helvetica, Arial, sans-serif'; ctx.fillStyle = '#444';
+        ctx.fillText(wl, PDF_MARGIN, y);
+        y += 18;
+      });
     });
 
-    y += 8;
-    doc.setDrawColor(238,238,238); doc.line(marginX, y, pageW-marginX, y);
-    y += 16;
+    y += 10;
+    ctx.strokeStyle = '#EEEEEE'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PDF_MARGIN,y); ctx.lineTo(PDF_PAGE_W-PDF_MARGIN,y); ctx.stroke();
+    y += 20;
   });
 
-  doc.save('dnevnik-' + new Date().toISOString().slice(0,10) + '.pdf');
+  savePdfFromPages(pages, 'dnevnik-' + new Date().toISOString().slice(0,10) + '.pdf');
 }
 
 loadAll().then(render);
