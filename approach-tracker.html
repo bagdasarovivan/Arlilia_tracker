@@ -297,6 +297,20 @@ async function sbFetch(url, options){
   }
   return res;
 }
+function translateAuthError(data, fallback){
+  const raw = (data && (data.error_description || data.msg || data.error_code || data.error)) || '';
+  const text = String(raw);
+  const waitMatch = text.match(/after (\d+) seconds?/i);
+  if(waitMatch) return `Слишком много попыток подряд — подождите ${waitMatch[1]} сек. и повторите.`;
+  if(/already registered|user_already_exists/i.test(text)) return 'Этот email уже зарегистрирован — попробуйте войти.';
+  if(/invalid login credentials/i.test(text)) return 'Неверный email или пароль.';
+  if(/email not confirmed/i.test(text)) return 'Email ещё не подтверждён — проверьте почту (или попросите админа отключить подтверждение в Supabase).';
+  if(/password.*at least|should be at least/i.test(text)) return 'Пароль слишком короткий — минимум 6 символов.';
+  if(/invalid.*email|unable to validate email/i.test(text)) return 'Проверьте формат email.';
+  if(/signup.*disabled|signups? not allowed/i.test(text)) return 'Регистрация сейчас отключена в настройках Supabase.';
+  if(/network|failed to fetch/i.test(text)) return 'Нет соединения с сервером.';
+  return text || fallback;
+}
 async function login(email, password){
   state.loginBusy = true; state.loginError = null; state.loginNotice = null; render();
   try{
@@ -307,7 +321,7 @@ async function login(email, password){
     });
     const data = await res.json();
     if(!res.ok){
-      state.loginError = data.error_description || data.msg || 'Неверный email или пароль';
+      state.loginError = translateAuthError(data, 'Неверный email или пароль');
       state.loginBusy = false; render();
       return;
     }
@@ -331,7 +345,7 @@ async function signUp(email, password){
     });
     const data = await res.json();
     if(!res.ok){
-      state.loginError = data.error_description || data.msg || 'Не удалось создать профиль';
+      state.loginError = translateAuthError(data, 'Не удалось создать профиль');
       state.loginBusy = false; render();
       return;
     }
@@ -1207,6 +1221,7 @@ function attachHandlers(){
 }
 
 function doLoginFromForm(){
+  if(state.loginBusy) return;
   const email = (document.getElementById('login-email')||{}).value || '';
   const password = (document.getElementById('login-password')||{}).value || '';
   if(!email.trim() || !password){
@@ -1218,6 +1233,7 @@ function doLoginFromForm(){
 }
 
 function doSignupFromForm(){
+  if(state.loginBusy) return;
   const email = (document.getElementById('login-email')||{}).value || '';
   const password = (document.getElementById('login-password')||{}).value || '';
   const password2 = (document.getElementById('login-password2')||{}).value || '';
