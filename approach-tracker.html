@@ -1657,13 +1657,13 @@ function downloadCanvasFallback(canvas){
 /* ---- Attempts: wide multi-column table, landscape ---- */
 const ATT_COLS = [
   { id:'num',      label:'№',          w:44  },
-  { id:'date',     label:'Дата, время',w:128 },
-  { id:'title',    label:'Тип',        w:110 },
-  { id:'mindset',  label:'Настрой',    w:168 },
-  { id:'reaction', label:'Реакция',    w:168 },
-  { id:'voice',    label:'Речь',       w:60  },
-  { id:'hand',     label:'Рука',       w:60  },
-  { id:'anxiety',  label:'Волнение',   w:78  },
+  { id:'date',     label:'Дата, время',w:124 },
+  { id:'title',    label:'Тип',        w:104 },
+  { id:'mindset',  label:'Настрой',    w:150 },
+  { id:'reaction', label:'Реакция',    w:150 },
+  { id:'voice',    label:'Речь',       w:108, note:'voiceNote'   },
+  { id:'hand',     label:'Рука',       w:108, note:'handNote'    },
+  { id:'anxiety',  label:'Волнение',   w:116, note:'anxietyNote' },
   { id:'ritual',   label:'Ритуал',     w:70  },
 ];
 function attColX(){
@@ -1677,7 +1677,6 @@ function buildAttemptsPages(){
   if(!entries.length) return null;
   const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
   const colX = attColX();
-  const notesStartX = colX.num;
   const tableRight = PDF_L_W - PDF_L_MARGIN;
 
   const pages = [];
@@ -1705,29 +1704,30 @@ function buildAttemptsPages(){
       anxiety: fmtNum(e.anxiety),
       ritual: e.ritual===true?'да':e.ritual===false?'нет':'—',
     };
+    const lineH = 17, noteLineH = 14, noteGap = 6;
     ctx.font = '13px ' + REPORT_FONT;
     const wrapped = {};
-    let maxLines = 1;
+    const noteWrapped = {};
+    let maxColH = 0;
     ATT_COLS.forEach(c=>{
       const lines = wrapLines(ctx, rowVals[c.id], c.w);
       wrapped[c.id] = lines;
-      if(lines.length > maxLines) maxLines = lines.length;
+      let colH = lines.length * lineH;
+      // A score's comment (e.g. "рука — подробно: ...") is printed as small
+      // italic text directly under that same score, in its own column —
+      // not bundled into one block under the whole row.
+      if(c.note && e[c.note]){
+        ctx.font = 'italic 11px ' + REPORT_FONT;
+        const nLines = wrapLines(ctx, e[c.note], c.w);
+        noteWrapped[c.id] = nLines;
+        ctx.font = '13px ' + REPORT_FONT;
+        colH += noteGap + nLines.length * noteLineH;
+      }
+      if(colH > maxColH) maxColH = colH;
     });
-    const lineH = 17;
-    const rowH = Math.max(28, maxLines * lineH + 10);
+    const rowH = Math.max(28, maxColH + 10);
 
-    const notes = [];
-    if(e.voiceNote) notes.push('Речь — подробно: ' + e.voiceNote);
-    if(e.handNote) notes.push('Рука — подробно: ' + e.handNote);
-    if(e.anxietyNote) notes.push('Волнение — подробно: ' + e.anxietyNote);
-    let noteLines = [];
-    if(notes.length){
-      ctx.font = 'italic 12px ' + REPORT_FONT;
-      notes.forEach(n=> wrapLines(ctx, n, tableRight - notesStartX).forEach(l=> noteLines.push(l)));
-    }
-    const noteH = noteLines.length ? noteLines.length * 15 + 10 : 0;
-
-    if(y + rowH + noteH > PDF_L_H - 54){
+    if(y + rowH > PDF_L_H - 54){
       ({ ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H));
       y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Дневник подходов', monthLabel + ' · всего подходов: ' + entries.length);
       drawTableHeader();
@@ -1737,17 +1737,16 @@ function buildAttemptsPages(){
       ctx.fillStyle = RC.stripe;
       ctx.fillRect(PDF_L_MARGIN - 10, y - 14, tableRight - PDF_L_MARGIN + 20, rowH);
     }
-    ctx.fillStyle = RC.text; ctx.font = '13px ' + REPORT_FONT;
     ATT_COLS.forEach(c=>{
+      ctx.fillStyle = RC.text; ctx.font = '13px ' + REPORT_FONT;
       wrapped[c.id].forEach((line, li)=> ctx.fillText(line, colX[c.id], y + li*lineH));
+      if(noteWrapped[c.id]){
+        ctx.fillStyle = RC.muted; ctx.font = 'italic 11px ' + REPORT_FONT;
+        const startY = y + wrapped[c.id].length * lineH + 2;
+        noteWrapped[c.id].forEach((line, li)=> ctx.fillText(line, colX[c.id], startY + li*noteLineH));
+      }
     });
     y += rowH;
-
-    if(noteLines.length){
-      ctx.font = 'italic 12px ' + REPORT_FONT; ctx.fillStyle = RC.muted;
-      noteLines.forEach(l=>{ ctx.fillText(l, notesStartX, y); y += 15; });
-      y += 6;
-    }
 
     ctx.strokeStyle = RC.border; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(PDF_L_MARGIN - 10, y); ctx.lineTo(tableRight + 10, y); ctx.stroke();
