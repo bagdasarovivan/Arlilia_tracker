@@ -116,7 +116,7 @@
   .choice-list{ display:flex; flex-direction:column; gap:10px; }
   .choice-list-btn{ text-align:left; padding:16px 18px; border-radius: var(--radius-sm); border:1px solid var(--border); background: var(--surface); color: var(--text); font-size:15px; }
   .choice-list-btn.selected{ background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight:600; }
-  textarea, input[type=text], input[type=number]{
+  textarea, input[type=text], input[type=number], input[type=email], input[type=password], input[type=date]{
     width:100%; background: var(--surface); border:1px solid var(--border);
     border-radius: var(--radius-sm); color: var(--text); font-size:15px; padding:13px 14px; font-family: var(--sans);
   }
@@ -189,6 +189,10 @@
   .metric-tile .lbl .delta{ display:block; margin-top:3px; font-size:11px; }
   .delta-good{ color: var(--good); }
   .delta-bad{ color: var(--warn); }
+  .report-actions{ margin-top:20px; display:flex; flex-direction:column; gap:10px; }
+  .report-row{ display:flex; gap:8px; align-items:stretch; }
+  .report-row .btn-primary{ flex:1; }
+  .report-row .btn-ghost{ width:auto; flex:0 0 auto; padding-left:14px; padding-right:14px; white-space:nowrap; }
   .delta-flat{ color: var(--text-muted); }
   .chart-card{ margin-bottom: 20px; }
   .chart-card h3{ font-size:15px; margin-bottom: 10px; color: var(--text-muted); font-family: var(--sans); }
@@ -229,11 +233,135 @@
 <script>
 const SUPABASE_URL = 'https://zvstrubroelqaivgtooc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_cnIPiLyx12CBRvx175QrhQ_kKQgW6Eh';
-const SB_HEADERS = {
-  'apikey': SUPABASE_KEY,
-  'Authorization': 'Bearer ' + SUPABASE_KEY,
-  'Content-Type': 'application/json',
-};
+
+/* ---------- auth (Supabase email/password) ---------- */
+const auth = { accessToken: null, refreshToken: null, userId: null, email: null, expiresAt: 0 };
+
+function sbHeaders(extra){
+  return {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + (auth.accessToken || SUPABASE_KEY),
+    'Content-Type': 'application/json',
+    ...(extra || {}),
+  };
+}
+function loadSession(){
+  try{
+    const raw = localStorage.getItem('arlilia_session');
+    if(!raw) return;
+    const s = JSON.parse(raw);
+    auth.accessToken = s.access_token; auth.refreshToken = s.refresh_token;
+    auth.userId = s.user_id; auth.email = s.email; auth.expiresAt = s.expires_at;
+  }catch(e){}
+}
+function setSession(data){
+  auth.accessToken = data.access_token;
+  auth.refreshToken = data.refresh_token;
+  if(data.user){ auth.userId = data.user.id; auth.email = data.user.email; }
+  auth.expiresAt = Date.now() + (data.expires_in || 3600) * 1000;
+  try{
+    localStorage.setItem('arlilia_session', JSON.stringify({
+      access_token: auth.accessToken, refresh_token: auth.refreshToken,
+      user_id: auth.userId, email: auth.email, expires_at: auth.expiresAt,
+    }));
+  }catch(e){}
+}
+function clearSession(){
+  auth.accessToken = null; auth.refreshToken = null; auth.userId = null; auth.email = null; auth.expiresAt = 0;
+  try{ localStorage.removeItem('arlilia_session'); }catch(e){}
+}
+async function refreshSession(){
+  if(!auth.refreshToken) return false;
+  try{
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: auth.refreshToken }),
+    });
+    if(!res.ok) return false;
+    const data = await res.json();
+    setSession(data);
+    return true;
+  }catch(e){ return false; }
+}
+async function sbFetch(url, options){
+  options = options || {};
+  options.headers = sbHeaders(options.headers);
+  let res = await fetch(url, options);
+  if(res.status === 401 && auth.refreshToken){
+    const ok = await refreshSession();
+    if(ok){
+      options.headers = sbHeaders(options.headers);
+      res = await fetch(url, options);
+    }
+  }
+  return res;
+}
+async function login(email, password){
+  state.loginBusy = true; state.loginError = null; state.loginNotice = null; render();
+  try{
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if(!res.ok){
+      state.loginError = data.error_description || data.msg || 'Неверный email или пароль';
+      state.loginBusy = false; render();
+      return;
+    }
+    setSession(data);
+    state.loggedIn = true;
+    state.loginBusy = false;
+    await loadAll();
+    render();
+  }catch(e){
+    state.loginError = 'Нет соединения с сервером';
+    state.loginBusy = false; render();
+  }
+}
+async function signUp(email, password){
+  state.loginBusy = true; state.loginError = null; render();
+  try{
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if(!res.ok){
+      state.loginError = data.error_description || data.msg || 'Не удалось создать профиль';
+      state.loginBusy = false; render();
+      return;
+    }
+    if(data.access_token){
+      // email confirmation disabled on the project — logged in immediately
+      setSession(data);
+      state.loggedIn = true;
+      state.loginBusy = false;
+      await loadAll();
+      render();
+    } else {
+      // confirmation email required before a session can be created
+      state.loginBusy = false;
+      state.authMode = 'login';
+      state.loginError = null;
+      state.loginNotice = 'Профиль создан! Проверьте почту и подтвердите email, затем войдите.';
+      render();
+    }
+  }catch(e){
+    state.loginError = 'Нет соединения с сервером';
+    state.loginBusy = false; render();
+  }
+}
+function logout(){
+  clearSession();
+  state.loggedIn = false;
+  state.loaded = false;
+  state.entries = []; state.journalEntries = [];
+  render();
+}
 
 /* Вопросы к подходу — по мотивам таблицы "речевой поступок" методики саморегуляции */
 const TITLE_OPTIONS = ['Подход на улице', 'Звонок', 'Публичное выступление', 'Другое'];
@@ -273,6 +401,11 @@ const MOOD_ICONS = {'Отлично':'🤩','Хорошо':'😊','Норм':'�
 let state = {
   tab: 'practice',            // practice | journal | progress | settings
   loaded: false,
+  loggedIn: false,
+  loginBusy: false,
+  loginError: null,
+  loginNotice: null,
+  authMode: 'login',          // login | signup
 
   settings: { startDate: null, theme: 'light' },
 
@@ -346,17 +479,18 @@ function journalDraftToRow(e){
 
 async function loadAll(){
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/attempts?select=*&order=created_at.asc`, { headers: SB_HEADERS });
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?select=*&order=created_at.asc`);
+    if(res.status === 401){ return false; }
     const rows = await res.json();
     state.entries = Array.isArray(rows) ? rows.map(rowToAttempt) : [];
   }catch(e){ console.error(e); state.entries = []; }
   try{
-    const res2 = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=*&order=entry_date.asc`, { headers: SB_HEADERS });
+    const res2 = await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=*&order=entry_date.asc`);
     const rows2 = await res2.json();
     state.journalEntries = Array.isArray(rows2) ? rows2.map(rowToJournal) : [];
   }catch(e){ console.error(e); state.journalEntries = []; }
   try{
-    const res3 = await fetch(`${SUPABASE_URL}/rest/v1/app_settings?select=*&id=eq.1`, { headers: SB_HEADERS });
+    const res3 = await sbFetch(`${SUPABASE_URL}/rest/v1/app_settings?select=*&limit=1`);
     const rows3 = await res3.json();
     if(Array.isArray(rows3) && rows3[0]){
       state.settings.startDate = rows3[0].start_date || null;
@@ -368,6 +502,7 @@ async function loadAll(){
   }catch(e){}
   applyTheme();
   state.loaded = true;
+  return true;
 }
 
 function applyTheme(){
@@ -377,10 +512,10 @@ function applyTheme(){
 async function saveStartDate(dateStr){
   state.settings.startDate = dateStr || null;
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/app_settings?on_conflict=id`, {
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/app_settings?on_conflict=user_id`, {
       method: 'POST',
-      headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=representation' },
-      body: JSON.stringify([{ id: 1, start_date: dateStr || null }]),
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify([{ user_id: auth.userId, start_date: dateStr || null }]),
     });
     if(!res.ok){
       const errText = await res.text();
@@ -399,9 +534,9 @@ function setTheme(theme){
 
 async function insertAttempt(answers){
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/attempts`, {
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts`, {
       method: 'POST',
-      headers: { ...SB_HEADERS, 'Prefer': 'return=representation' },
+      headers: { 'Prefer': 'return=representation' },
       body: JSON.stringify(attemptToRow(answers)),
     });
     if(!res.ok){
@@ -425,9 +560,9 @@ async function persistJournal(){
   const draft = state.journalDraft;
   if(!draft || !draft.entryDate) return;
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?on_conflict=entry_date`, {
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?on_conflict=entry_date,user_id`, {
       method: 'POST',
-      headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates,return=representation' },
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
       body: JSON.stringify([journalDraftToRow(draft)]),
     });
     if(!res.ok){
@@ -450,8 +585,8 @@ async function persistJournal(){
 }
 async function deleteJournalEntry(entryDate){
   try{
-    await fetch(`${SUPABASE_URL}/rest/v1/journal_entries?entry_date=eq.${entryDate}`, {
-      method: 'DELETE', headers: SB_HEADERS,
+    await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?entry_date=eq.${entryDate}`, {
+      method: 'DELETE',
     });
   }catch(e){ console.error(e); }
   state.journalEntries = state.journalEntries.filter(j => j.entryDate !== entryDate);
@@ -529,6 +664,11 @@ function daysSinceStart(){
 /* ---------- render root ---------- */
 function render(){
   const app = document.getElementById('app');
+  if(!state.loggedIn){
+    app.innerHTML = renderLogin();
+    attachHandlers();
+    return;
+  }
   if(!state.loaded){ app.innerHTML = ''; return; }
 
   if(state.practiceActive){
@@ -546,6 +686,37 @@ function render(){
     app.innerHTML = `<div class="content">${body}</div>${renderTabbar()}`;
   }
   attachHandlers();
+}
+
+function renderLogin(){
+  const isSignup = state.authMode === 'signup';
+  return `
+    <div style="padding:14vh 20px 24px; max-width:360px; margin:0 auto;">
+      <div class="eyebrow" style="text-align:center;">${isSignup ? 'Регистрация' : 'Вход'}</div>
+      <h1 style="text-align:center; margin-bottom:34px;">Дневник подходов</h1>
+      <div class="choice-row" style="margin-bottom:22px;">
+        <button class="choice-btn ${!isSignup?'selected':''}" data-action="auth-mode-login">Вход</button>
+        <button class="choice-btn ${isSignup?'selected':''}" data-action="auth-mode-signup">Регистрация</button>
+      </div>
+      <div class="field">
+        <div class="field-label">Email</div>
+        <input type="email" id="login-email" placeholder="you@example.com" autocomplete="username">
+      </div>
+      <div class="field">
+        <div class="field-label">Пароль</div>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="${isSignup?'new-password':'current-password'}">
+      </div>
+      ${isSignup ? `
+      <div class="field">
+        <div class="field-label">Повторите пароль</div>
+        <input type="password" id="login-password2" placeholder="••••••••" autocomplete="new-password">
+      </div>` : ''}
+      ${state.loginError ? `<div style="color:var(--warn); font-size:13px; margin:4px 0 14px;">${state.loginError}</div>` : ''}
+      ${state.loginNotice ? `<div style="color:var(--good); font-size:13px; margin:4px 0 14px;">${state.loginNotice}</div>` : ''}
+      ${(!state.loginError && !state.loginNotice) ? '<div style="height:10px"></div>' : ''}
+      <button class="btn btn-primary" data-action="${isSignup?'do-signup':'do-login'}" ${state.loginBusy ? 'disabled' : ''}>${state.loginBusy ? (isSignup?'Создаём…':'Входим…') : (isSignup?'Создать профиль':'Войти')}</button>
+    </div>
+  `;
 }
 
 function renderTabbar(){
@@ -820,9 +991,16 @@ function renderProgress(){
       <div class="metric-tile good"><div class="num">${journalDays.size}</div><div class="lbl">дней с дневником из ${total}</div></div>
       <div class="metric-tile good"><div class="num">${fullDaysCount}</div><div class="lbl">дней выполнено всё</div></div>
     </div>
-    <button class="btn btn-primary" data-action="export-attempts-pdf" style="margin-top:20px;">PDF: список подходов</button>
-    <div style="height:10px"></div>
-    <button class="btn btn-ghost" data-action="export-journal-pdf">PDF: записи дневника</button>
+    <div class="report-actions">
+      <div class="report-row">
+        <button class="btn btn-primary" data-action="export-attempts-pdf">PDF: список подходов</button>
+        <button class="btn btn-ghost" data-action="copy-attempts-image" title="Скопировать картинкой для Telegram">📋 Копировать</button>
+      </div>
+      <div class="report-row">
+        <button class="btn btn-primary" data-action="export-journal-pdf">PDF: записи дневника</button>
+        <button class="btn btn-ghost" data-action="copy-journal-image" title="Скопировать картинкой для Telegram">📋 Копировать</button>
+      </div>
+    </div>
   `;
 }
 
@@ -881,7 +1059,6 @@ function renderSettings(){
 
     <div class="card" style="margin-bottom:16px;">
       <div class="jc-title">Дата начала занятий</div>
-      <div class="autosave-hint" style="margin:0 0 12px;">От этой даты в дневнике будет считаться «День 1, День 2...»</div>
       <input type="date" id="settings-start-date" value="${state.settings.startDate || ''}">
       ${days ? `<div class="autosave-hint" style="margin:10px 0 0;">Сейчас: День ${days}</div>` : ''}
     </div>
@@ -894,8 +1071,10 @@ function renderSettings(){
       </div>
     </div>
 
-    <div class="note-card card">
-      Данные синхронизируются через облако и видны на всех устройствах, где открыт этот трекер.
+    <div class="card" style="margin-bottom:16px;">
+      <div class="jc-title">Аккаунт</div>
+      <div class="autosave-hint" style="margin:0 0 14px;">${auth.email || ''}</div>
+      <button class="btn btn-ghost" data-action="logout">Выйти</button>
     </div>
   `;
 }
@@ -1017,12 +1196,68 @@ function attachHandlers(){
       saveStartDate(e.target.value).then(render);
     });
   }
+  ['login-password','login-password2'].forEach(id=>{
+    const el = app.querySelector('#'+id);
+    if(el){
+      el.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter') doAuthFromForm();
+      });
+    }
+  });
+}
+
+function doLoginFromForm(){
+  const email = (document.getElementById('login-email')||{}).value || '';
+  const password = (document.getElementById('login-password')||{}).value || '';
+  if(!email.trim() || !password){
+    state.loginError = 'Введите email и пароль';
+    render();
+    return;
+  }
+  login(email.trim(), password);
+}
+
+function doSignupFromForm(){
+  const email = (document.getElementById('login-email')||{}).value || '';
+  const password = (document.getElementById('login-password')||{}).value || '';
+  const password2 = (document.getElementById('login-password2')||{}).value || '';
+  if(!email.trim() || !password){
+    state.loginError = 'Введите email и пароль';
+    render();
+    return;
+  }
+  if(password.length < 6){
+    state.loginError = 'Пароль должен быть не короче 6 символов';
+    render();
+    return;
+  }
+  if(password !== password2){
+    state.loginError = 'Пароли не совпадают';
+    render();
+    return;
+  }
+  signUp(email.trim(), password);
+}
+
+function doAuthFromForm(){
+  if(state.authMode === 'signup') doSignupFromForm();
+  else doLoginFromForm();
 }
 
 async function onAction(e){
   const action = e.currentTarget.getAttribute('data-action');
 
-  if(action === 'start-practice'){
+  if(action === 'do-login'){
+    doLoginFromForm(); return;
+  } else if(action === 'do-signup'){
+    doSignupFromForm(); return;
+  } else if(action === 'auth-mode-login'){
+    state.authMode = 'login'; state.loginError = null; state.loginNotice = null; render(); return;
+  } else if(action === 'auth-mode-signup'){
+    state.authMode = 'signup'; state.loginError = null; state.loginNotice = null; render(); return;
+  } else if(action === 'logout'){
+    logout(); return;
+  } else if(action === 'start-practice'){
     state.practiceActive = true; state.qIndex = 0; state.answers = {}; state.noteOpen = {};
     QUESTIONS.forEach(q => { if(q.type==='scale' || q.type==='scale_note') state.answers[q.id] = 5; });
   } else if(action === 'cancel-practice'){
@@ -1089,6 +1324,10 @@ async function onAction(e){
     generateAttemptsPdf(); return;
   } else if(action === 'export-journal-pdf'){
     generateJournalPdf(); return;
+  } else if(action === 'copy-attempts-image'){
+    copyAttemptsImage(); return;
+  } else if(action === 'copy-journal-image'){
+    copyJournalImage(); return;
   } else if(action === 'progress-prev-month'){
     const d = new Date(state.progressMonth); d.setMonth(d.getMonth()-1); state.progressMonth = d;
   } else if(action === 'progress-next-month'){
@@ -1114,20 +1353,33 @@ function showToast(msg){
   }, 2600);
 }
 
-/* ---------- PDF reports ----------
+/* ---------- PDF / image reports ----------
    jsPDF's built-in fonts don't cover Cyrillic, so every page is drawn on an
    off-screen canvas first (the browser's own font renderer handles Cyrillic
-   fine) and then embedded into the PDF as an image. This keeps text crisp
-   and sidesteps font-embedding entirely. */
-const PDF_PAGE_W = 1000, PDF_PAGE_H = 1414, PDF_MARGIN = 60;
+   fine) and then embedded into the PDF as an image (or copied straight to
+   the clipboard as a PNG for pasting into Telegram etc). This keeps text
+   crisp and sidesteps font-embedding entirely. */
+const REPORT_FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
+const REPORT_SERIF = 'Georgia, "Times New Roman", serif';
+const RC = { // report colors — mirrors the app's teal palette
+  bg: '#FFFFFF', band: '#3FA7A0', bandText: '#FFFFFF',
+  text: '#1E3838', muted: '#5C7977', border: '#DCE9E6',
+  stripe: '#EFF6F5', headBg: '#E9F2F0', accent: '#2E8B85',
+  good: '#3E8A61', warn: '#C14F3F'
+};
 
-function newReportPage(pages){
+// Portrait page (journal: Q&A table)
+const PDF_P_W = 1060, PDF_P_H = 1500, PDF_P_MARGIN = 64;
+// Landscape page (attempts: wide multi-column table)
+const PDF_L_W = 1500, PDF_L_H = 1060, PDF_L_MARGIN = 56;
+
+function newReportPage(pages, w, h){
   const canvas = document.createElement('canvas');
-  canvas.width = PDF_PAGE_W; canvas.height = PDF_PAGE_H;
+  canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0,0,PDF_PAGE_W,PDF_PAGE_H);
+  ctx.fillStyle = RC.bg; ctx.fillRect(0,0,w,h);
   pages.push(canvas);
-  return { canvas, ctx, y: 70 };
+  return { canvas, ctx, y: 0, w, h };
 }
 function wrapLines(ctx, text, maxWidth){
   const words = String(text).split(' ');
@@ -1138,11 +1390,21 @@ function wrapLines(ctx, text, maxWidth){
     else line = test;
   });
   if(line) lines.push(line);
-  return lines;
+  return lines.length ? lines : [''];
 }
-function savePdfFromPages(pages, filename){
+function drawReportHeader(ctx, w, margin, title, subtitle){
+  let y = margin + 4;
+  ctx.fillStyle = RC.accent; ctx.font = '32px ' + REPORT_SERIF;
+  ctx.fillText(title, margin, y + 28); y += 44;
+  ctx.fillStyle = RC.muted; ctx.font = '17px ' + REPORT_FONT;
+  ctx.fillText(subtitle, margin, y + 14); y += 32;
+  ctx.strokeStyle = RC.accent; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(margin, y + 14); ctx.lineTo(w - margin, y + 14); ctx.stroke();
+  return y + 40;
+}
+function savePdfFromPages(pages, filename, landscape){
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const doc = new jsPDF({ unit:'pt', format:'a4', orientation: landscape ? 'landscape' : 'portrait' });
   const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
   pages.forEach((pg,i)=>{
     if(i>0) doc.addPage();
@@ -1150,88 +1412,149 @@ function savePdfFromPages(pages, filename){
   });
   doc.save(filename);
 }
+function copyCanvasImage(canvas, extraCount){
+  canvas.toBlob(blob=>{
+    if(!blob){ showToast('Не удалось подготовить изображение'); return; }
+    if(navigator.clipboard && window.ClipboardItem){
+      navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ])
+        .then(()=> showToast(extraCount > 0
+          ? `Скопировано! (ещё ${extraCount} стр. — скачайте PDF, если нужны все)`
+          : 'Скопировано — вставьте в Telegram'))
+        .catch(()=> downloadCanvasFallback(canvas));
+    } else {
+      downloadCanvasFallback(canvas);
+    }
+  }, 'image/png');
+}
+function downloadCanvasFallback(canvas){
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = 'otchet-' + new Date().toISOString().slice(0,10) + '.png';
+  document.body.appendChild(a); a.click(); a.remove();
+  showToast('Браузер не поддерживает копирование — картинка скачана');
+}
 
-function generateAttemptsPdf(){
-  if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
+/* ---- Attempts: wide multi-column table, landscape ---- */
+const ATT_COLS = [
+  { id:'num',      label:'№',          w:44  },
+  { id:'date',     label:'Дата, время',w:128 },
+  { id:'title',    label:'Тип',        w:110 },
+  { id:'mindset',  label:'Настрой',    w:168 },
+  { id:'reaction', label:'Реакция',    w:168 },
+  { id:'voice',    label:'Речь',       w:60  },
+  { id:'hand',     label:'Рука',       w:60  },
+  { id:'anxiety',  label:'Волнение',   w:78  },
+  { id:'ritual',   label:'Ритуал',     w:70  },
+];
+function attColX(){
+  const gap = 16; let x = PDF_L_MARGIN; const map = {};
+  ATT_COLS.forEach(c=>{ map[c.id] = x; x += c.w + gap; });
+  return map;
+}
+function buildAttemptsPages(){
   const monthDate = state.progressMonth;
   const entries = attemptsInMonth(monthDate);
-  if(!entries.length){ showToast('В этом месяце нет записанных подходов'); return; }
+  if(!entries.length) return null;
   const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
+  const colX = attColX();
+  const notesStartX = colX.num;
+  const tableRight = PDF_L_W - PDF_L_MARGIN;
 
   const pages = [];
-  let { ctx, y } = newReportPage(pages);
-  const colX = { num: PDF_MARGIN, date: PDF_MARGIN+46, title: PDF_MARGIN+170, voice: PDF_MARGIN+430, hand: PDF_MARGIN+500, anx: PDF_MARGIN+565, ritual: PDF_MARGIN+640 };
-
-  ctx.fillStyle = '#17212B'; ctx.font = '28px Georgia, serif';
-  ctx.fillText('Дневник подходов', PDF_MARGIN, y); y += 32;
-  ctx.fillStyle = '#8A8A8A'; ctx.font = '15px -apple-system, Helvetica, Arial, sans-serif';
-  ctx.fillText(monthLabel + ' · всего подходов: ' + entries.length, PDF_MARGIN, y); y += 38;
+  let { ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H);
+  y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Дневник подходов', monthLabel + ' · всего подходов: ' + entries.length);
 
   function drawTableHeader(){
-    ctx.fillStyle = '#17212B'; ctx.font = 'bold 13px -apple-system, Helvetica, Arial, sans-serif';
-    ctx.fillText('№', colX.num, y);
-    ctx.fillText('Дата, время', colX.date, y);
-    ctx.fillText('Тип', colX.title, y);
-    ctx.fillText('Речь', colX.voice, y);
-    ctx.fillText('Рука', colX.hand, y);
-    ctx.fillText('Волн.', colX.anx, y);
-    ctx.fillText('Ритуал', colX.ritual, y);
-    y += 10;
-    ctx.strokeStyle = '#DDDDDD'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(PDF_MARGIN,y); ctx.lineTo(PDF_PAGE_W-PDF_MARGIN,y); ctx.stroke();
+    ctx.fillStyle = RC.headBg;
+    ctx.fillRect(PDF_L_MARGIN - 10, y - 20, tableRight - PDF_L_MARGIN + 20, 34);
+    ctx.fillStyle = RC.accent; ctx.font = 'bold 14px ' + REPORT_FONT;
+    ATT_COLS.forEach(c=> ctx.fillText(c.label, colX[c.id], y));
     y += 24;
   }
   drawTableHeader();
 
   entries.forEach((e,i)=>{
-    if(y > PDF_PAGE_H - 170){ ({ ctx, y } = newReportPage(pages)); drawTableHeader(); }
-    ctx.fillStyle = '#222'; ctx.font = '13px -apple-system, Helvetica, Arial, sans-serif';
-    ctx.fillText('Подход ' + (i+1), colX.num, y);
-    ctx.fillText(dateLabel(e.ts) + ', ' + timeLabel(e.ts), colX.date, y);
-    ctx.fillText((e.title || '—').slice(0,22), colX.title, y);
-    ctx.fillText(fmtNum(e.voice), colX.voice, y);
-    ctx.fillText(fmtNum(e.hand), colX.hand, y);
-    ctx.fillText(fmtNum(e.anxiety), colX.anx, y);
-    ctx.fillText(e.ritual===true?'да':e.ritual===false?'нет':'—', colX.ritual, y);
-    y += 24;
-
-    const detail = [];
-    if(e.mindsetBefore) detail.push('Настрой: ' + e.mindsetBefore);
-    if(e.reactionAfter) detail.push('Реакция: ' + e.reactionAfter);
-    if(e.voiceNote) detail.push('Речь — подробно: ' + e.voiceNote);
-    if(e.handNote) detail.push('Рука — подробно: ' + e.handNote);
-    if(e.anxietyNote) detail.push('Волнение — подробно: ' + e.anxietyNote);
-    ctx.font = '12px -apple-system, Helvetica, Arial, sans-serif'; ctx.fillStyle = '#666';
-    detail.forEach(line=>{
-      wrapLines(ctx, line, PDF_PAGE_W - PDF_MARGIN*2 - 24).forEach(wl=>{
-        if(y > PDF_PAGE_H - 90){ ({ ctx, y } = newReportPage(pages)); drawTableHeader(); ctx.font='12px -apple-system, Helvetica, Arial, sans-serif'; ctx.fillStyle='#666'; }
-        ctx.fillText(wl, colX.num + 22, y);
-        y += 16;
-      });
+    const rowVals = {
+      num: 'Подход ' + (i+1),
+      date: dateLabel(e.ts) + ', ' + timeLabel(e.ts),
+      title: e.title || '—',
+      mindset: e.mindsetBefore || '—',
+      reaction: e.reactionAfter || '—',
+      voice: fmtNum(e.voice),
+      hand: fmtNum(e.hand),
+      anxiety: fmtNum(e.anxiety),
+      ritual: e.ritual===true?'да':e.ritual===false?'нет':'—',
+    };
+    ctx.font = '13px ' + REPORT_FONT;
+    const wrapped = {};
+    let maxLines = 1;
+    ATT_COLS.forEach(c=>{
+      const lines = wrapLines(ctx, rowVals[c.id], c.w);
+      wrapped[c.id] = lines;
+      if(lines.length > maxLines) maxLines = lines.length;
     });
+    const lineH = 17;
+    const rowH = Math.max(28, maxLines * lineH + 10);
 
-    y += 8;
-    ctx.strokeStyle = '#F0F0F0'; ctx.beginPath(); ctx.moveTo(PDF_MARGIN,y); ctx.lineTo(PDF_PAGE_W-PDF_MARGIN,y); ctx.stroke();
+    const notes = [];
+    if(e.voiceNote) notes.push('Речь — подробно: ' + e.voiceNote);
+    if(e.handNote) notes.push('Рука — подробно: ' + e.handNote);
+    if(e.anxietyNote) notes.push('Волнение — подробно: ' + e.anxietyNote);
+    let noteLines = [];
+    if(notes.length){
+      ctx.font = 'italic 12px ' + REPORT_FONT;
+      notes.forEach(n=> wrapLines(ctx, n, tableRight - notesStartX).forEach(l=> noteLines.push(l)));
+    }
+    const noteH = noteLines.length ? noteLines.length * 15 + 10 : 0;
+
+    if(y + rowH + noteH > PDF_L_H - 54){
+      ({ ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H));
+      y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Дневник подходов', monthLabel + ' · всего подходов: ' + entries.length);
+      drawTableHeader();
+    }
+
+    if(i % 2 === 1){
+      ctx.fillStyle = RC.stripe;
+      ctx.fillRect(PDF_L_MARGIN - 10, y - 14, tableRight - PDF_L_MARGIN + 20, rowH);
+    }
+    ctx.fillStyle = RC.text; ctx.font = '13px ' + REPORT_FONT;
+    ATT_COLS.forEach(c=>{
+      wrapped[c.id].forEach((line, li)=> ctx.fillText(line, colX[c.id], y + li*lineH));
+    });
+    y += rowH;
+
+    if(noteLines.length){
+      ctx.font = 'italic 12px ' + REPORT_FONT; ctx.fillStyle = RC.muted;
+      noteLines.forEach(l=>{ ctx.fillText(l, notesStartX, y); y += 15; });
+      y += 6;
+    }
+
+    ctx.strokeStyle = RC.border; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PDF_L_MARGIN - 10, y); ctx.lineTo(tableRight + 10, y); ctx.stroke();
     y += 18;
   });
 
-  savePdfFromPages(pages, 'podhody-' + new Date().toISOString().slice(0,10) + '.pdf');
+  return { pages, filename: 'podhody-' + new Date().toISOString().slice(0,10) + '.pdf' };
+}
+function generateAttemptsPdf(){
+  if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
+  const built = buildAttemptsPages();
+  if(!built){ showToast('В этом месяце нет записанных подходов'); return; }
+  savePdfFromPages(built.pages, built.filename, true);
+}
+function copyAttemptsImage(){
+  const built = buildAttemptsPages();
+  if(!built){ showToast('В этом месяце нет записанных подходов'); return; }
+  copyCanvasImage(built.pages[0], built.pages.length - 1);
 }
 
-function generateJournalPdf(){
-  if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
+/* ---- Journal: question → answer table, portrait ---- */
+const JRN_LABEL_W = 260, JRN_GAP = 24;
+function buildJournalPages(){
   const monthDate = state.progressMonth;
   const entries = journalEntriesInMonth(monthDate);
-  if(!entries.length){ showToast('В этом месяце нет записей дневника'); return; }
+  if(!entries.length) return null;
   const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
-
-  const pages = [];
-  let { ctx, y } = newReportPage(pages);
-
-  ctx.fillStyle = '#17212B'; ctx.font = '28px Georgia, serif';
-  ctx.fillText('Дневник дня', PDF_MARGIN, y); y += 32;
-  ctx.fillStyle = '#8A8A8A'; ctx.font = '15px -apple-system, Helvetica, Arial, sans-serif';
-  ctx.fillText(monthLabel + ' · записей: ' + entries.length, PDF_MARGIN, y); y += 40;
 
   const fieldLabels = [
     ['mood','Самочувствие'], ['glad','Радует'], ['worry','Волнует'],
@@ -1239,36 +1562,96 @@ function generateJournalPdf(){
     ['difficulties','Трудная тетрадь'], ['reflections','Вопросы и откровения'],
     ['tricks','Уловки'], ['praise','Похвала'], ['intentions','Речевые планы'],
   ];
+  const valueX = PDF_P_MARGIN + JRN_LABEL_W + JRN_GAP;
+  const valueW = PDF_P_W - PDF_P_MARGIN - valueX;
+  const tableLeft = PDF_P_MARGIN - 10, tableRight = PDF_P_W - PDF_P_MARGIN + 10;
+
+  const pages = [];
+  let { ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H);
+  y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', monthLabel + ' · записей: ' + entries.length);
 
   entries.forEach(e=>{
-    if(y > PDF_PAGE_H - 140){ ({ ctx, y } = newReportPage(pages)); }
-    ctx.fillStyle = '#17212B'; ctx.font = 'bold 15px -apple-system, Helvetica, Arial, sans-serif';
-    ctx.fillText(capitalize(weekdayDateLabel(e.ts)), PDF_MARGIN, y);
-    y += 22;
+    if(y > PDF_P_H - 180){ ({ ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H)); y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', monthLabel + ' · записей: ' + entries.length); }
 
+    // day header band
+    ctx.fillStyle = RC.band;
+    ctx.fillRect(tableLeft, y - 24, tableRight - tableLeft, 36);
+    ctx.fillStyle = RC.bandText; ctx.font = 'bold 16px ' + REPORT_FONT;
+    ctx.fillText(capitalize(weekdayDateLabel(e.ts)), PDF_P_MARGIN, y);
+    y += 30;
+
+    const rows = [];
     fieldLabels.forEach(([id,lbl])=>{
       let val = e[id];
       if(id === 'sleepHours' && val != null) val = fmtNum(val);
       if(val === null || val === undefined || val === '') return;
-      ctx.font = '13px -apple-system, Helvetica, Arial, sans-serif'; ctx.fillStyle = '#444';
-      wrapLines(ctx, `${lbl}: ${val}`, PDF_PAGE_W - PDF_MARGIN*2).forEach(wl=>{
-        if(y > PDF_PAGE_H - 90){ ({ ctx, y } = newReportPage(pages)); }
-        ctx.font = '13px -apple-system, Helvetica, Arial, sans-serif'; ctx.fillStyle = '#444';
-        ctx.fillText(wl, PDF_MARGIN, y);
-        y += 18;
-      });
+      rows.push([lbl, String(val)]);
     });
 
-    y += 10;
-    ctx.strokeStyle = '#EEEEEE'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(PDF_MARGIN,y); ctx.lineTo(PDF_PAGE_W-PDF_MARGIN,y); ctx.stroke();
-    y += 20;
+    rows.forEach((row,ri)=>{
+      const [lbl, val] = row;
+      ctx.font = '14px ' + REPORT_FONT;
+      const valLines = wrapLines(ctx, val, valueW);
+      const rowH = Math.max(26, valLines.length * 19 + 8);
+
+      if(y + rowH > PDF_P_H - 70){
+        ({ ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H));
+        y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', monthLabel + ' · записей: ' + entries.length);
+      }
+
+      if(ri % 2 === 1){
+        ctx.fillStyle = RC.stripe;
+        ctx.fillRect(tableLeft, y - 16, tableRight - tableLeft, rowH);
+      }
+      ctx.fillStyle = RC.accent; ctx.font = 'bold 14px ' + REPORT_FONT;
+      ctx.fillText(lbl, PDF_P_MARGIN, y);
+      ctx.fillStyle = RC.text; ctx.font = '14px ' + REPORT_FONT;
+      valLines.forEach((l,li)=> ctx.fillText(l, valueX, y + li*19));
+      y += rowH;
+    });
+
+    y += 6;
+    ctx.strokeStyle = RC.border; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(tableLeft, y); ctx.lineTo(tableRight, y); ctx.stroke();
+    y += 26;
   });
 
-  savePdfFromPages(pages, 'dnevnik-' + new Date().toISOString().slice(0,10) + '.pdf');
+  return { pages, filename: 'dnevnik-' + new Date().toISOString().slice(0,10) + '.pdf' };
+}
+function generateJournalPdf(){
+  if(!window.jspdf){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
+  const built = buildJournalPages();
+  if(!built){ showToast('В этом месяце нет записей дневника'); return; }
+  savePdfFromPages(built.pages, built.filename, false);
+}
+function copyJournalImage(){
+  const built = buildJournalPages();
+  if(!built){ showToast('В этом месяце нет записей дневника'); return; }
+  copyCanvasImage(built.pages[0], built.pages.length - 1);
 }
 
-loadAll().then(render);
+async function boot(){
+  loadSession();
+  try{
+    const savedTheme = localStorage.getItem('arlilia_theme');
+    if(savedTheme) state.settings.theme = savedTheme;
+  }catch(e){}
+  applyTheme();
+  if(!auth.accessToken){
+    state.loggedIn = false;
+    render();
+    return;
+  }
+  state.loggedIn = true;
+  render();
+  const ok = await loadAll();
+  if(ok === false){
+    clearSession();
+    state.loggedIn = false;
+  }
+  render();
+}
+boot();
 </script>
 </body>
 </html>
