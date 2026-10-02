@@ -36,6 +36,12 @@ create table if not exists journal_entries (
   intentions text
 );
 
+-- Настройки приложения (вкладка "Настройки"), одна строка с id = 1
+create table if not exists app_settings (
+  id int primary key,
+  start_date date
+);
+
 -- RLS сознательно не включаем: приложение личное, ссылка не публикуется,
 -- доступ к таблицам открыт через anon-ключ напрямую.
 
@@ -59,3 +65,6 @@ create table if not exists journal_entries (
 -- alter table journal_entries drop column if exists session_note;
 -- alter table journal_entries drop column if exists contacts_count;
 -- alter table journal_entries drop column if exists relax_in_pause;
+--
+-- create table if not exists app_settings (id int primary key, start_date date);
+-- alter table app_settings disable row level security;
