@@ -99,10 +99,16 @@
   /* ---- Home / Practice tab ---- */
   .home-hero{ margin-top: 6vh; margin-bottom: 28px; }
   .home-hero h1{ font-size: 34px; line-height:1.25; }
-  .stat-row{ display:flex; gap:12px; margin: 18px 0 26px; }
-  .stat-tile{ flex:1; background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; }
-  .stat-tile .num{ font-family: var(--serif); font-size: 30px; }
-  .stat-tile .lbl{ font-size: 14px; color: var(--text-muted); margin-top:2px; }
+  .today-badge-wrap{ display:flex; justify-content:center; margin: 10px 0 30px; }
+  .today-badge{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    width:176px; height:176px; border-radius:50%;
+    background: radial-gradient(circle at 32% 28%, var(--surface) 0%, var(--accent-soft) 72%);
+    border:2px solid var(--accent);
+    box-shadow: 0 8px 24px -10px var(--accent-soft);
+  }
+  .today-badge-num{ font-family: var(--serif); font-size:68px; line-height:1; color: var(--accent); }
+  .today-badge-lbl{ font-size:13px; color: var(--text-muted); margin-top:8px; text-align:center; letter-spacing:.02em; }
 
   /* ---- Practice wizard ---- */
   .progress-dots{ display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin-bottom: 6vh; margin-top: 4px; }
@@ -857,8 +863,11 @@ function renderPracticeHome(){
       <div class="eyebrow">Подходы</div>
       <h1>Как прошёл сегодняшний подход?</h1>
     </div>
-    <div class="stat-row">
-      <div class="stat-tile" style="flex:1;"><div class="num">${todayCount}</div><div class="lbl">подходов сегодня</div></div>
+    <div class="today-badge-wrap">
+      <div class="today-badge">
+        <div class="today-badge-num">${todayCount}</div>
+        <div class="today-badge-lbl">подход${todayCount===1?'':(todayCount>=2&&todayCount<=4?'а':'ов')} сегодня</div>
+      </div>
     </div>
     <button class="btn btn-primary" data-action="start-practice">Записать подход</button>
   `;
