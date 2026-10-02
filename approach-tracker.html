@@ -1610,22 +1610,45 @@ function savePdfFromPages(pages, filename, landscape){
   doc.save(filename);
 }
 function copyCanvasImage(canvas, extraCount){
-  canvas.toBlob(blob=>{
-    if(!blob){ showToast('Не удалось подготовить изображение'); return; }
-    if(navigator.clipboard && window.ClipboardItem){
-      navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ])
-        .then(()=> showToast(extraCount > 0
-          ? `Скопировано! (ещё ${extraCount} стр. — скачайте PDF, если нужны все)`
-          : 'Скопировано — вставьте в Telegram'))
-        .catch(()=> downloadCanvasFallback(canvas));
-    } else {
-      downloadCanvasFallback(canvas);
-    }
-  }, 'image/png');
+  if(!(navigator.clipboard && window.ClipboardItem)){
+    downloadCanvasFallback(canvas);
+    return;
+  }
+  // iOS Safari (and some other mobile browsers) only allow writing to the
+  // clipboard while the call still carries the original tap's "user
+  // activation" — any await/async hop before calling clipboard.write()
+  // and it silently refuses. So the write() call itself must happen
+  // synchronously, right here, even though the PNG isn't ready yet; we
+  // hand it a Promise<Blob> as the MIME value, which both Safari and
+  // Chrome explicitly support resolving after the fact.
+  const blobPromise = new Promise((resolve, reject)=>{
+    canvas.toBlob(blob=>{ blob ? resolve(blob) : reject(new Error('toBlob failed')); }, 'image/png');
+  });
+  navigator.clipboard.write([ new ClipboardItem({ 'image/png': blobPromise }) ])
+    .then(()=> showToast(extraCount > 0
+      ? `Скопировано! (ещё ${extraCount} стр. — скачайте PDF, если нужны все)`
+      : 'Скопировано — вставьте в Telegram'))
+    .catch(()=> downloadCanvasFallback(canvas));
 }
 function downloadCanvasFallback(canvas){
+  const dataUrl = canvas.toDataURL('image/png');
+  // iOS Safari ignores the <a download> attribute entirely and would just
+  // navigate the current tab to the raw image — losing the app's state in
+  // the process. Opening it in a new tab instead is recoverable there: the
+  // person can long-press the image to copy/save it, and the app tab stays
+  // untouched. Browsers that DO support <a download> (desktop/Android
+  // Chrome, Firefox) get a real file download instead.
+  const isLikelyIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if(isLikelyIOS){
+    const win = window.open();
+    if(win){
+      win.document.write(`<title>Дневник подходов</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;"><img src="${dataUrl}" style="max-width:100%;height:auto;" alt="Отчёт"></body>`);
+      showToast('Откройте новую вкладку и удержите картинку, чтобы скопировать или сохранить');
+      return;
+    }
+  }
   const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
+  a.href = dataUrl;
   a.download = 'otchet-' + new Date().toISOString().slice(0,10) + '.png';
   document.body.appendChild(a); a.click(); a.remove();
   showToast('Браузер не поддерживает копирование — картинка скачана');
