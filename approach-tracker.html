@@ -850,6 +850,7 @@ function render(){
     let body = '';
     if(state.tab === 'practice') body = renderPracticeHome();
     else if(state.tab === 'journal') body = renderJournalHome();
+    else if(state.tab === 'exercises') body = renderExercisesHome();
     else if(state.tab === 'progress') body = renderProgress();
     else body = renderSettings();
     app.innerHTML = `<div class="content">${body}</div>${renderTabbar()}`;
@@ -892,6 +893,7 @@ function renderTabbar(){
   const tabs = [
     {id:'practice', ic:'🚶', label:'Подходы'},
     {id:'journal', ic:'📓', label:'Дневник'},
+    {id:'exercises', ic:'🧩', label:'Упражнения'},
     {id:'progress', ic:'📈', label:'Прогресс'},
     {id:'settings', ic:'⚙', label:'Настройки'},
   ];
@@ -991,6 +993,19 @@ function renderPracticeWizard(){
         <button class="btn btn-ghost" data-action="${isFirst ? 'cancel-practice' : 'prev-question'}">${isFirst ? 'Отмена' : 'Назад'}</button>
         <button class="btn btn-primary" data-action="${isLast ? 'save-practice' : 'next-question'}">${isLast ? 'Сохранить' : 'Далее'}</button>
       </div>
+    </div>
+  `;
+}
+
+/* ---------- Exercises tab (placeholder — content to be added later) ---------- */
+function renderExercisesHome(){
+  return `
+    <div class="home-hero" style="margin-top:6vh;">
+      <div class="eyebrow">Упражнения</div>
+      <h1>Раздел в разработке</h1>
+    </div>
+    <div class="card" style="text-align:center; color:var(--text-muted);">
+      Здесь скоро появятся упражнения — наполним раздел в ближайшее время.
     </div>
   `;
 }
