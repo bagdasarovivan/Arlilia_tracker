@@ -1700,15 +1700,15 @@ function downloadCanvasFallback(canvas){
 
 /* ---- Attempts: wide multi-column table, landscape ---- */
 const ATT_COLS = [
-  { id:'num',      label:'№',          w:44  },
-  { id:'date',     label:'Дата, время',w:124 },
-  { id:'title',    label:'Тип',        w:104 },
+  { id:'num',      label:'№',          w:34  },
+  { id:'date',     label:'Дата, время',w:128 },
+  { id:'title',    label:'Тип',        w:108 },
   { id:'mindset',  label:'Настрой',    w:150 },
   { id:'reaction', label:'Реакция',    w:150 },
-  { id:'voice',    label:'Речь',       w:108, note:'voiceNote'   },
-  { id:'hand',     label:'Рука',       w:108, note:'handNote'    },
-  { id:'anxiety',  label:'Волнение',   w:116, note:'anxietyNote' },
-  { id:'ritual',   label:'Ритуал',     w:70  },
+  { id:'voice',    label:'Речь',       w:112, note:'voiceNote'   },
+  { id:'hand',     label:'Рука',       w:112, note:'handNote'    },
+  { id:'anxiety',  label:'Волнение',   w:120, note:'anxietyNote' },
+  { id:'ritual',   label:'Ритуал',     w:76  },
 ];
 function attColX(){
   const gap = 16; let x = PDF_L_MARGIN; const map = {};
@@ -1729,16 +1729,16 @@ function buildAttemptsPages(){
 
   function drawTableHeader(){
     ctx.fillStyle = RC.headBg;
-    ctx.fillRect(PDF_L_MARGIN - 10, y - 20, tableRight - PDF_L_MARGIN + 20, 34);
-    ctx.fillStyle = RC.accent; ctx.font = 'bold 14px ' + REPORT_FONT;
+    ctx.fillRect(PDF_L_MARGIN - 10, y - 22, tableRight - PDF_L_MARGIN + 20, 38);
+    ctx.fillStyle = RC.accent; ctx.font = 'bold 16px ' + REPORT_FONT;
     ATT_COLS.forEach(c=> ctx.fillText(c.label, colX[c.id], y));
-    y += 24;
+    y += 30;
   }
   drawTableHeader();
 
   entries.forEach((e,i)=>{
     const rowVals = {
-      num: 'Подход ' + (i+1),
+      num: String(i+1),
       date: dateLabel(e.ts) + ', ' + timeLabel(e.ts),
       title: e.title || '—',
       mindset: e.mindsetBefore || '—',
@@ -1748,8 +1748,8 @@ function buildAttemptsPages(){
       anxiety: fmtNum(e.anxiety),
       ritual: e.ritual===true?'да':e.ritual===false?'нет':'—',
     };
-    const lineH = 17, noteLineH = 14, noteGap = 6;
-    ctx.font = '13px ' + REPORT_FONT;
+    const lineH = 22, noteLineH = 17, noteGap = 7;
+    ctx.font = '16px ' + REPORT_FONT;
     const wrapped = {};
     const noteWrapped = {};
     let maxColH = 0;
@@ -1761,15 +1761,15 @@ function buildAttemptsPages(){
       // italic text directly under that same score, in its own column —
       // not bundled into one block under the whole row.
       if(c.note && e[c.note]){
-        ctx.font = 'italic 11px ' + REPORT_FONT;
+        ctx.font = 'italic 13px ' + REPORT_FONT;
         const nLines = wrapLines(ctx, e[c.note], c.w);
         noteWrapped[c.id] = nLines;
-        ctx.font = '13px ' + REPORT_FONT;
+        ctx.font = '16px ' + REPORT_FONT;
         colH += noteGap + nLines.length * noteLineH;
       }
       if(colH > maxColH) maxColH = colH;
     });
-    const rowH = Math.max(28, maxColH + 10);
+    const rowH = Math.max(38, maxColH + 16);
 
     if(y + rowH > PDF_L_H - 54){
       ({ ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H));
@@ -1779,14 +1779,14 @@ function buildAttemptsPages(){
 
     if(i % 2 === 1){
       ctx.fillStyle = RC.stripe;
-      ctx.fillRect(PDF_L_MARGIN - 10, y - 14, tableRight - PDF_L_MARGIN + 20, rowH);
+      ctx.fillRect(PDF_L_MARGIN - 10, y - 18, tableRight - PDF_L_MARGIN + 20, rowH);
     }
     ATT_COLS.forEach(c=>{
-      ctx.fillStyle = RC.text; ctx.font = '13px ' + REPORT_FONT;
+      ctx.fillStyle = RC.text; ctx.font = '16px ' + REPORT_FONT;
       wrapped[c.id].forEach((line, li)=> ctx.fillText(line, colX[c.id], y + li*lineH));
       if(noteWrapped[c.id]){
-        ctx.fillStyle = RC.muted; ctx.font = 'italic 11px ' + REPORT_FONT;
-        const startY = y + wrapped[c.id].length * lineH + 2;
+        ctx.fillStyle = RC.muted; ctx.font = 'italic 13px ' + REPORT_FONT;
+        const startY = y + wrapped[c.id].length * lineH + 3;
         noteWrapped[c.id].forEach((line, li)=> ctx.fillText(line, colX[c.id], startY + li*noteLineH));
       }
     });
@@ -1794,7 +1794,7 @@ function buildAttemptsPages(){
 
     ctx.strokeStyle = RC.border; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(PDF_L_MARGIN - 10, y); ctx.lineTo(tableRight + 10, y); ctx.stroke();
-    y += 18;
+    y += 22;
   });
 
   return { pages, filename: 'podhody-' + todayKey() + '.pdf' };
