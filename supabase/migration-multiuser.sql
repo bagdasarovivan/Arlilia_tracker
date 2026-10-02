@@ -24,6 +24,7 @@ alter table app_settings add primary key (user_id);
 
 -- 4) journal_entries — одна запись на дату НА ПОЛЬЗОВАТЕЛЯ (а не одна на дату вообще)
 alter table journal_entries drop constraint if exists journal_entries_entry_date_key;
+alter table journal_entries drop constraint if exists journal_entries_entry_date_user_key;
 alter table journal_entries add constraint journal_entries_entry_date_user_key unique (entry_date, user_id);
 
 -- 5) Включаем RLS — каждый видит и может писать только свои строки
