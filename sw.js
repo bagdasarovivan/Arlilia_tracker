@@ -4,7 +4,7 @@
    calls (Supabase) always go straight to the network — never cached. Bump
    CACHE_NAME whenever the shell itself changes, so clients pick up the
    new version instead of being stuck on a stale cached copy. */
-const CACHE_NAME = 'arlilia-shell-v3';
+const CACHE_NAME = 'arlilia-shell-v4';
 const SHELL_FILES = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
