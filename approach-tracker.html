@@ -473,12 +473,10 @@ async function resetAllData(){
 /* Вопросы к подходу — по мотивам таблицы "речевой поступок" методики саморегуляции */
 const TITLE_OPTIONS = ['Подход на улице', 'Звонок', 'Публичное выступление', 'Другое'];
 const MINDSET_OPTIONS = ['Супер', 'Хорошо', 'Нормально', 'Плохо', 'Другое'];
-const PURPOSE_OPTIONS = ['Решить бытовую задачу', 'Сообщить информацию', 'Обсудить проблему', 'Побудить к действию', 'Доставить удовольствие', 'Выразить эмоции', 'Другое'];
 const REACTION_OPTIONS = ['Спокойно', 'Адекватно', 'Доброжелательно', 'С интересом', 'С восхищением', 'С сочувствием', 'С удивлением', 'С пониманием', 'Безразлично', 'Недоверчиво', 'Тревожно', 'Боязливо', 'Недовольно', 'Раздражённо', 'Неадекватно', 'Другое'];
 
 const QUESTIONS = [
   { id:'title', type:'choice_other', label:'Название речевого поступка', options: TITLE_OPTIONS, hint:'С кем и где был подход' },
-  { id:'purpose', type:'choice_other', label:'Цель подхода', options: PURPOSE_OPTIONS, hint:'Зачем вы это сказали' },
   { id:'mindsetBefore', type:'choice_other', label:'Настрой', options: MINDSET_OPTIONS, hint:'Каким было состояние перед подходом' },
   { id:'reactionAfter', type:'choice_other', label:'Реакция', options: REACTION_OPTIONS, hint:'Реакция этого человека на то, что к нему подошли' },
   { id:'ritual', type:'bool_manual', label:'Соблюдал речевой ритуал?', hint:'Расслабление, мягкое начало, зрительный контакт' },
@@ -623,6 +621,7 @@ let state = {
   exerciseExpanded: {},       // { [exerciseId]: true } — which rows are expanded
 
   progressMonth: (function(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
+  reportDate: todayKey(), // which single day the PDF/copy exports cover
 };
 
 /* ---------- storage (Supabase) ---------- */
@@ -631,7 +630,6 @@ function rowToAttempt(r){
     id: r.id,
     ts: new Date(r.created_at).getTime(),
     title: r.title,
-    purpose: r.purpose,
     mindsetBefore: r.mindset_before, reactionAfter: r.reaction_after,
     ritual: r.ritual,
     voice: r.voice, voiceNote: r.voice_note,
@@ -641,13 +639,11 @@ function rowToAttempt(r){
 }
 function attemptToRow(e){
   const title = e.title === 'other' ? (e.titleCustom || null) : (e.title || null);
-  const purpose = e.purpose === 'other' ? (e.purposeCustom || null) : (e.purpose || null);
   const mindsetBefore = e.mindsetBefore === 'other' ? (e.mindsetBeforeCustom || null) : (e.mindsetBefore || null);
   const reactionAfter = e.reactionAfter === 'other' ? (e.reactionAfterCustom || null) : (e.reactionAfter || null);
   return {
     user_id: auth.userId,
     title,
-    purpose,
     mindset_before: mindsetBefore,
     reaction_after: reactionAfter,
     ritual: typeof e.ritual === 'boolean' ? e.ritual : null,
@@ -868,6 +864,12 @@ function journalEntriesInMonth(monthDate){
     const d = new Date(e.ts);
     return d.getFullYear()===monthDate.getFullYear() && d.getMonth()===monthDate.getMonth();
   }).sort((a,b)=>a.ts-b.ts);
+}
+function attemptsOnDate(dateStr){
+  return state.entries.filter(e=> dateKey(e.ts) === dateStr).sort((a,b)=>a.ts-b.ts);
+}
+function journalEntryOnDate(dateStr){
+  return state.journalEntries.find(e=> dateKey(e.ts) === dateStr && !isJournalEntryEmpty(e)) || null;
 }
 function attemptsCountByDay(monthDate){
   const map = {};
@@ -1402,6 +1404,10 @@ function renderProgress(){
     <div class="jc-title" style="margin-top:22px;">Динамика месяца</div>
     ${renderTrendChart(monthDate)}
 
+    <div class="jc-title" style="margin-top:22px;">Отчёт за день</div>
+    <div class="date-input-wrap" style="margin-bottom:14px;">
+      <input type="date" id="report-date" value="${state.reportDate || todayKey()}">
+    </div>
     <div class="report-actions">
       <div class="report-row">
         <button class="btn btn-primary" data-action="export-attempts-pdf">PDF подходов</button>
@@ -1675,6 +1681,12 @@ function attachHandlers(){
       state.answers[id] = e.target.value;
     });
   });
+  const reportDateEl = app.querySelector('#report-date');
+  if(reportDateEl){
+    reportDateEl.addEventListener('input', (e)=>{
+      state.reportDate = e.target.value || todayKey();
+    });
+  }
   ['login-password','login-password2'].forEach(id=>{
     const el = app.querySelector('#'+id);
     if(el){
@@ -1967,18 +1979,16 @@ function downloadCanvasFallback(canvas){
   showToast('Браузер не поддерживает копирование — картинка скачана');
 }
 
-/* ---- Attempts: wide multi-column table, landscape ---- */
+/* ---- Attempts: wide multi-column table, landscape, one day at a time ---- */
 const ATT_COLS = [
-  { id:'num',      label:'№',          w:34  },
-  { id:'date',     label:'Дата, время',w:116 },
-  { id:'title',    label:'Тип',        w:100 },
-  { id:'purpose',  label:'Цель',       w:120 },
-  { id:'mindset',  label:'Настрой',    w:120 },
-  { id:'reaction', label:'Реакция',    w:120 },
-  { id:'voice',    label:'Речь',       w:100, note:'voiceNote'   },
-  { id:'hand',     label:'Рука',       w:100, note:'handNote'    },
-  { id:'anxiety',  label:'Волнение',   w:110, note:'anxietyNote' },
-  { id:'ritual',   label:'Ритуал',     w:70  },
+  { id:'num',      label:'№',          w:40  },
+  { id:'title',    label:'Тип',        w:170 },
+  { id:'mindset',  label:'Настрой',    w:160 },
+  { id:'reaction', label:'Реакция',    w:230 },
+  { id:'voice',    label:'Речь',       w:170, note:'voiceNote'   },
+  { id:'hand',     label:'Рука',       w:170, note:'handNote'    },
+  { id:'anxiety',  label:'Волнение',   w:180, note:'anxietyNote' },
+  { id:'ritual',   label:'Ритуал',     w:156 },
 ];
 function attColX(){
   const gap = 16; let x = PDF_L_MARGIN; const map = {};
@@ -1986,16 +1996,16 @@ function attColX(){
   return map;
 }
 function buildAttemptsPages(){
-  const monthDate = state.progressMonth;
-  const entries = attemptsInMonth(monthDate);
+  const dateStr = state.reportDate || todayKey();
+  const entries = attemptsOnDate(dateStr);
   if(!entries.length) return null;
-  const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
+  const dayLabel = capitalize(weekdayDateLabel(new Date(dateStr + 'T12:00:00').getTime()));
   const colX = attColX();
   const tableRight = PDF_L_W - PDF_L_MARGIN;
 
   const pages = [];
   let { ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H);
-  y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Дневник подходов', monthLabel + ' · всего подходов: ' + entries.length);
+  y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Дневник подходов', dayLabel + ' · всего подходов: ' + entries.length);
 
   function drawTableHeader(){
     ctx.fillStyle = RC.headBg;
@@ -2009,15 +2019,13 @@ function buildAttemptsPages(){
   entries.forEach((e,i)=>{
     const rowVals = {
       num: String(i+1),
-      date: dateLabel(e.ts) + ', ' + timeLabel(e.ts),
       title: e.title || '—',
-      purpose: e.purpose || '—',
       mindset: e.mindsetBefore || '—',
       reaction: e.reactionAfter || '—',
       voice: fmtNum(e.voice),
       hand: fmtNum(e.hand),
       anxiety: fmtNum(e.anxiety),
-      ritual: e.ritual===true?'да':e.ritual===false?'нет':'—',
+      ritual: e.ritual===true?'Соблюдал':e.ritual===false?'Не соблюдал':'—',
     };
     const lineH = 22, noteLineH = 17, noteGap = 7;
     ctx.font = '16px ' + REPORT_FONT;
@@ -2044,7 +2052,7 @@ function buildAttemptsPages(){
 
     if(y + rowH > PDF_L_H - 54){
       ({ ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H));
-      y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Дневник подходов', monthLabel + ' · всего подходов: ' + entries.length);
+      y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Дневник подходов', dayLabel + ' · всего подходов: ' + entries.length);
       drawTableHeader();
     }
 
@@ -2068,11 +2076,11 @@ function buildAttemptsPages(){
     y += 22;
   });
 
-  return { pages, filename: 'podhody-' + todayKey() + '.pdf' };
+  return { pages, filename: 'podhody-' + dateStr + '.pdf' };
 }
 async function generateAttemptsPdf(){
   const built = buildAttemptsPages();
-  if(!built){ showToast('В этом месяце нет записанных подходов'); return; }
+  if(!built){ showToast('За этот день нет записанных подходов'); return; }
   if(!window.jspdf) showToast('Готовим PDF…');
   const ok = await ensureJsPDF();
   if(!ok){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
@@ -2080,17 +2088,19 @@ async function generateAttemptsPdf(){
 }
 function copyAttemptsImage(){
   const built = buildAttemptsPages();
-  if(!built){ showToast('В этом месяце нет записанных подходов'); return; }
+  if(!built){ showToast('За этот день нет записанных подходов'); return; }
   copyCanvasImage(built.pages[0], built.pages.length - 1);
 }
 
-/* ---- Journal: question → answer table, portrait ---- */
-const JRN_LABEL_W = 260, JRN_GAP = 24;
+/* ---- Journal: one question-and-answer card per field, portrait, one day ----
+   Each field is its own visually separated card — accent label line on top,
+   the answer below in larger text, a tinted background and a coloured left
+   bar — so it reads at a glance which answer belongs to which question
+   (plain alternating table rows made that hard to tell apart). */
 function buildJournalPages(){
-  const monthDate = state.progressMonth;
-  const entries = journalEntriesInMonth(monthDate);
-  if(!entries.length) return null;
-  const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
+  const dateStr = state.reportDate || todayKey();
+  const entry = journalEntryOnDate(dateStr);
+  if(!entry) return null;
 
   const fieldLabels = [
     ['mood','Самочувствие'], ['glad','Радует'], ['worry','Волнует'],
@@ -2098,78 +2108,61 @@ function buildJournalPages(){
     ['difficulties','Трудная тетрадь'], ['questions','Вопросы'], ['reflections','Откровения'],
     ['tricks','Уловки'], ['praise','Похвала'], ['intentions','Речевые планы'],
   ];
-  const valueX = PDF_P_MARGIN + JRN_LABEL_W + JRN_GAP;
-  const valueW = PDF_P_W - PDF_P_MARGIN - valueX;
   const tableLeft = PDF_P_MARGIN - 10, tableRight = PDF_P_W - PDF_P_MARGIN + 10;
+  const textX = PDF_P_MARGIN + 14;
+  const valueW = tableRight - textX - 14;
+
+  const ts = new Date(dateStr + 'T12:00:00').getTime();
+  const dn = dayNumberForTs(ts);
+  const weekdayLabel = capitalize(weekdayDateLabel(ts));
+  const headerSubtitle = dn ? `День ${dn} · ${weekdayLabel}` : weekdayLabel;
 
   const pages = [];
   let { ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H);
-  y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', monthLabel + ' · записей: ' + entries.length);
+  y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', headerSubtitle);
 
-  entries.forEach(e=>{
-    if(y > PDF_P_H - 180){ ({ ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H)); y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', monthLabel + ' · записей: ' + entries.length); }
-
-    // day header band
-    const dn = dayNumberForTs(e.ts);
-    const heading = dn ? `День ${dn}` : capitalize(weekdayDateLabel(e.ts));
-    const subheading = dn ? capitalize(weekdayDateLabel(e.ts)) : '';
-    ctx.fillStyle = RC.band;
-    ctx.fillRect(tableLeft, y - 24, tableRight - tableLeft, subheading ? 50 : 36);
-    ctx.fillStyle = RC.bandText; ctx.font = 'bold 16px ' + REPORT_FONT;
-    ctx.fillText(heading, PDF_P_MARGIN, y);
-    if(subheading){
-      ctx.font = '12px ' + REPORT_FONT;
-      ctx.fillText(subheading, PDF_P_MARGIN, y + 17);
-      y += 14;
+  let idx = 0;
+  fieldLabels.forEach(([id,lbl])=>{
+    let val = entry[id];
+    if(id === 'sleepHours'){
+      if(val != null) val = fmtNum(val);
+      const note = entry.sleepHoursNote;
+      if(val != null && note) val = val + ' — ' + note;
+      else if(note) val = note; // text note only, no number entered
     }
-    y += 30;
+    if(val === null || val === undefined || val === '') return;
 
-    const rows = [];
-    fieldLabels.forEach(([id,lbl])=>{
-      let val = e[id];
-      if(id === 'sleepHours'){
-        if(val != null) val = fmtNum(val);
-        const note = e.sleepHoursNote;
-        if(val != null && note) val = val + ' — ' + note;
-        else if(note) val = note; // text note only, no number entered
-      }
-      if(val === null || val === undefined || val === '') return;
-      rows.push([lbl, String(val)]);
-    });
+    ctx.font = '17px ' + REPORT_FONT;
+    const valLines = wrapLines(ctx, String(val), valueW);
+    const padTop = 16, padBottom = 18, labelH = 24, lineH = 24;
+    const cardH = padTop + labelH + valLines.length * lineH + padBottom;
 
-    rows.forEach((row,ri)=>{
-      const [lbl, val] = row;
-      ctx.font = '14px ' + REPORT_FONT;
-      const valLines = wrapLines(ctx, val, valueW);
-      const rowH = Math.max(26, valLines.length * 19 + 8);
+    if(y + cardH > PDF_P_H - 70){
+      ({ ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H));
+      y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', headerSubtitle);
+    }
 
-      if(y + rowH > PDF_P_H - 70){
-        ({ ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H));
-        y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', monthLabel + ' · записей: ' + entries.length);
-      }
+    ctx.fillStyle = idx % 2 === 1 ? RC.stripe : RC.bg;
+    ctx.fillRect(tableLeft, y, tableRight - tableLeft, cardH);
+    ctx.fillStyle = RC.accent;
+    ctx.fillRect(tableLeft, y, 4, cardH);
 
-      if(ri % 2 === 1){
-        ctx.fillStyle = RC.stripe;
-        ctx.fillRect(tableLeft, y - 16, tableRight - tableLeft, rowH);
-      }
-      ctx.fillStyle = RC.accent; ctx.font = 'bold 14px ' + REPORT_FONT;
-      ctx.fillText(lbl, PDF_P_MARGIN, y);
-      ctx.fillStyle = RC.text; ctx.font = '14px ' + REPORT_FONT;
-      valLines.forEach((l,li)=> ctx.fillText(l, valueX, y + li*19));
-      y += rowH;
-    });
+    let ty = y + padTop + 14;
+    ctx.fillStyle = RC.accent; ctx.font = 'bold 15px ' + REPORT_FONT;
+    ctx.fillText(lbl.toUpperCase(), textX, ty);
+    ty += labelH;
+    ctx.fillStyle = RC.text; ctx.font = '17px ' + REPORT_FONT;
+    valLines.forEach((l,li)=> ctx.fillText(l, textX, ty + li*lineH));
 
-    y += 6;
-    ctx.strokeStyle = RC.border; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(tableLeft, y); ctx.lineTo(tableRight, y); ctx.stroke();
-    y += 26;
+    y += cardH + 10;
+    idx++;
   });
 
-  return { pages, filename: 'dnevnik-' + todayKey() + '.pdf' };
+  return { pages, filename: 'dnevnik-' + dateStr + '.pdf' };
 }
 async function generateJournalPdf(){
   const built = buildJournalPages();
-  if(!built){ showToast('В этом месяце нет записей дневника'); return; }
+  if(!built){ showToast('За этот день нет записи дневника'); return; }
   if(!window.jspdf) showToast('Готовим PDF…');
   const ok = await ensureJsPDF();
   if(!ok){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
@@ -2177,7 +2170,7 @@ async function generateJournalPdf(){
 }
 function copyJournalImage(){
   const built = buildJournalPages();
-  if(!built){ showToast('В этом месяце нет записей дневника'); return; }
+  if(!built){ showToast('За этот день нет записи дневника'); return; }
   copyCanvasImage(built.pages[0], built.pages.length - 1);
 }
 
