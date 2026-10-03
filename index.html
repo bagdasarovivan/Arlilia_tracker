@@ -93,7 +93,18 @@
     display:inline-flex; align-items:center; gap:4px;
     background: var(--accent-soft); color: var(--accent); font-weight:600;
     border-radius:999px; padding:6px 12px; font-size:14px; font-family: var(--sans);
+    border:none; cursor:pointer; -webkit-tap-highlight-color: transparent;
   }
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:50;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .modal-card{
+    background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+    padding:22px; max-width:360px; width:100%;
+  }
+  .modal-title{ font-family: var(--serif); font-size:20px; margin-bottom:10px; }
+  .modal-text{ font-size:15px; color: var(--text-muted); line-height:1.5; }
   .gear-btn{
     width:36px; height:36px; border-radius:50%; border:1px solid var(--border);
     background: var(--surface); color: var(--text-muted); font-size:17px;
@@ -242,10 +253,6 @@
   .metric-tile .lbl{ font-size:14px; color: var(--text-muted); margin-top:4px; }
   .metric-tile.good .num{ color: var(--good); }
   .metric-tile .lbl .delta{ display:block; margin-top:3px; font-size:11px; }
-  .streak-card{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:18px; margin-bottom:22px; text-align:center; }
-  .streak-card .streak-num{ font-family: var(--serif); font-size:38px; color: var(--accent); line-height:1; }
-  .streak-card .streak-lbl{ font-size:13px; color: var(--text-muted); margin-top:6px; }
-  .streak-card .streak-next{ font-size:12px; color: var(--text-muted); margin-top:10px; }
   .delta-good{ color: var(--good); }
   .delta-bad{ color: var(--warn); }
   .trend-wrap{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:14px 12px 10px; margin-top:16px; }
@@ -658,6 +665,7 @@ let state = {
   progressMonth: (function(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
   reportDate: todayKey(), // which single day the PDF/copy exports cover
   lastTab: 'practice', // which bottom-nav tab to return to when leaving Настройки
+  streakInfoOpen: false,
 };
 
 /* ---------- storage (Supabase) ---------- */
@@ -1082,8 +1090,21 @@ function renderAppBar(){
     <div class="app-bar">
       <div class="app-bar-brand"></div>
       <div class="app-bar-right">
-        ${streak ? `<div class="streak-pill">🔥 ${streak}</div>` : ''}
+        ${streak ? `<button class="streak-pill" data-action="toggle-streak-info">🔥 ${streak}</button>` : ''}
         <button class="gear-btn ${state.tab==='settings'?'active':''}" data-action="toggle-settings" aria-label="Настройки">⚙</button>
+      </div>
+    </div>
+    ${state.streakInfoOpen ? renderStreakInfo() : ''}
+  `;
+}
+
+function renderStreakInfo(){
+  return `
+    <div class="modal-backdrop" data-action="close-streak-info">
+      <div class="modal-card">
+        <div class="modal-title">🔥 Серия дней</div>
+        <div class="modal-text">Это количество дней подряд, когда выполнены оба задания за день — и подход, и дневник. Если полностью пропустить день, серия сбрасывается.</div>
+        <button class="btn btn-primary" data-action="close-streak-info" style="margin-top:18px;">Понятно</button>
       </div>
     </div>
   `;
@@ -1469,18 +1490,10 @@ function renderJournalWizardStep(){
 function renderProgress(){
   const monthDate = state.progressMonth;
   const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
-  const streak = currentStreak();
-  const nextM = nextStreakMilestone(streak);
 
   return `
     <div class="eyebrow">Прогресс</div>
     <h2 style="font-size:24px; margin-bottom:18px;">Календарь</h2>
-
-    <div class="streak-card">
-      <div class="streak-num">🔥 ${streak}</div>
-      <div class="streak-lbl">${streak ? `серия: ${streak} ${ruDays(streak)} подряд` : 'серии пока нет — отметьте подход и дневник в один день'}</div>
-      ${streak ? `<div class="streak-next">${nextM ? `До серии в ${nextM} ${ruDays(nextM)} — ещё ${nextM - streak} ${ruDays(nextM - streak)}` : 'Все уровни пройдены — настоящий рекорд!'}</div>` : ''}
-    </div>
 
     <div class="metric-grid">
       <div class="metric-tile"><div class="num">${totalAttemptsCount()}</div><div class="lbl">подходов всего</div></div>
@@ -1656,6 +1669,8 @@ function renderSettings(){
 function attachHandlers(){
   const app = document.getElementById('app');
   app.querySelectorAll('[data-action]').forEach(el=> el.addEventListener('click', onAction));
+  const streakModalCard = app.querySelector('.modal-card');
+  if(streakModalCard) streakModalCard.addEventListener('click', e=> e.stopPropagation());
   app.querySelectorAll('[data-tab]').forEach(el=> el.addEventListener('click', e=>{
     const next = e.currentTarget.getAttribute('data-tab');
     state.tab = next;
@@ -1837,7 +1852,11 @@ function doAuthFromForm(){
 async function onAction(e){
   const action = e.currentTarget.getAttribute('data-action');
 
-  if(action === 'toggle-settings'){
+  if(action === 'toggle-streak-info'){
+    state.streakInfoOpen = true; render(); return;
+  } else if(action === 'close-streak-info'){
+    state.streakInfoOpen = false; render(); return;
+  } else if(action === 'toggle-settings'){
     if(state.tab === 'settings'){
       state.tab = state.lastTab || 'practice';
     } else {
