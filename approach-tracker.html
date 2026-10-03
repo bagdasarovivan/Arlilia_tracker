@@ -473,13 +473,16 @@ async function resetAllData(){
 /* Вопросы к подходу — по мотивам таблицы "речевой поступок" методики саморегуляции */
 const TITLE_OPTIONS = ['Подход на улице', 'Звонок', 'Публичное выступление', 'Другое'];
 const MINDSET_OPTIONS = ['Супер', 'Хорошо', 'Нормально', 'Плохо', 'Другое'];
+const PURPOSE_OPTIONS = ['Решить бытовую задачу', 'Сообщить информацию', 'Обсудить проблему', 'Побудить к действию', 'Доставить удовольствие', 'Выразить эмоции', 'Другое'];
+const REACTION_OPTIONS = ['Спокойно', 'Адекватно', 'Доброжелательно', 'С интересом', 'С восхищением', 'С сочувствием', 'С удивлением', 'С пониманием', 'Безразлично', 'Недоверчиво', 'Тревожно', 'Боязливо', 'Недовольно', 'Раздражённо', 'Неадекватно', 'Другое'];
 
 const QUESTIONS = [
   { id:'title', type:'choice_other', label:'Название речевого поступка', options: TITLE_OPTIONS, hint:'С кем и где был подход' },
+  { id:'purpose', type:'choice_other', label:'Цель подхода', options: PURPOSE_OPTIONS, hint:'Зачем вы это сказали' },
   { id:'mindsetBefore', type:'choice_other', label:'Настрой', options: MINDSET_OPTIONS, hint:'Каким было состояние перед подходом' },
-  { id:'reactionAfter', type:'text', label:'Реакция' },
+  { id:'reactionAfter', type:'choice_other', label:'Реакция', options: REACTION_OPTIONS, hint:'Реакция этого человека на то, что к нему подошли' },
   { id:'ritual', type:'bool_manual', label:'Соблюдал речевой ритуал?', hint:'Расслабление, мягкое начало, зрительный контакт' },
-  { id:'voice', type:'scale_note', label:'Речь по методике', lowLabel:'сбивался', highLabel:'чисто', hint:'Темп, дыхание, слитность речи' },
+  { id:'voice', type:'scale_note', label:'Речь по методике', lowLabel:'сбивался', highLabel:'чисто', hint:'Темп, дыхание, слитность речи. Хорошо: свободный, чистый, звонкий. Срыв: слабый, гнусавый, сдавленный' },
   { id:'hand', type:'scale_note', label:'Ощущение руки', lowLabel:'напряжена, скованно', highLabel:'свободно, естественно', hint:'Насколько чувствовал руку во время общения' },
   { id:'anxiety', type:'scale_note', label:'Волнение', lowLabel:'спокоен', highLabel:'максимум', hint:'Было ли волнение' },
 ];
@@ -628,6 +631,7 @@ function rowToAttempt(r){
     id: r.id,
     ts: new Date(r.created_at).getTime(),
     title: r.title,
+    purpose: r.purpose,
     mindsetBefore: r.mindset_before, reactionAfter: r.reaction_after,
     ritual: r.ritual,
     voice: r.voice, voiceNote: r.voice_note,
@@ -637,12 +641,15 @@ function rowToAttempt(r){
 }
 function attemptToRow(e){
   const title = e.title === 'other' ? (e.titleCustom || null) : (e.title || null);
+  const purpose = e.purpose === 'other' ? (e.purposeCustom || null) : (e.purpose || null);
   const mindsetBefore = e.mindsetBefore === 'other' ? (e.mindsetBeforeCustom || null) : (e.mindsetBefore || null);
+  const reactionAfter = e.reactionAfter === 'other' ? (e.reactionAfterCustom || null) : (e.reactionAfter || null);
   return {
     user_id: auth.userId,
     title,
+    purpose,
     mindset_before: mindsetBefore,
-    reaction_after: e.reactionAfter || null,
+    reaction_after: reactionAfter,
     ritual: typeof e.ritual === 'boolean' ? e.ritual : null,
     voice: e.voice ?? null, voice_note: e.voiceNote || null,
     hand: e.hand ?? null, hand_note: e.handNote || null,
@@ -1202,10 +1209,12 @@ function renderJournalHome(){
 
   const todayEntry = findTodayJournal();
   const days = daysSinceStart();
+  const consciousDays = allTimeFullDaysCount();
   return `
     <div class="home-hero" style="margin-top:6vh;">
       <div class="eyebrow">Дневник дня</div>
-      ${days ? `<div style="font-family:var(--serif); font-size:28px; color:var(--accent); margin:4px 0 10px;">День ${days}</div>` : ''}
+      ${days ? `<div style="font-family:var(--serif); font-size:28px; color:var(--accent); margin:4px 0 2px;">День ${days}</div>` : ''}
+      ${consciousDays ? `<div style="font-size:13px; color:var(--text-muted); margin:0 0 10px;">Дней осознанных занятий: ${consciousDays}</div>` : ''}
       <h1>${todayEntry ? 'Сегодняшняя запись уже есть' : 'Как прошёл день?'}</h1>
     </div>
     <button class="btn btn-primary" data-action="new-journal">${todayEntry ? 'Изменить сегодняшнюю запись' : 'Написать новый дневник'}</button>
@@ -1495,6 +1504,7 @@ function renderTrendChart(monthDate){
 /* ---------- Settings tab ---------- */
 function renderSettings(){
   const days = daysSinceStart();
+  const consciousDays = allTimeFullDaysCount();
   return `
     <div class="eyebrow">Настройки</div>
     <h2 style="font-size:24px; margin-bottom:18px;">Параметры</h2>
@@ -1506,6 +1516,7 @@ function renderSettings(){
       </div>
       <button class="btn btn-primary" style="margin-top:12px;" data-action="confirm-start-date" ${state.startDateSaving ? 'disabled' : ''}>${state.startDateSaving ? 'Сохраняем…' : 'Подтвердить дату'}</button>
       ${days ? `<div class="autosave-hint" style="margin:10px 0 0;">Сейчас: День ${days}</div>` : ''}
+      ${consciousDays ? `<div class="autosave-hint" style="margin:4px 0 0;">Дней осознанных занятий: ${consciousDays}</div>` : ''}
     </div>
 
     <div class="card" style="margin-bottom:16px;">
@@ -1949,14 +1960,15 @@ function downloadCanvasFallback(canvas){
 /* ---- Attempts: wide multi-column table, landscape ---- */
 const ATT_COLS = [
   { id:'num',      label:'№',          w:34  },
-  { id:'date',     label:'Дата, время',w:128 },
-  { id:'title',    label:'Тип',        w:108 },
-  { id:'mindset',  label:'Настрой',    w:150 },
-  { id:'reaction', label:'Реакция',    w:150 },
-  { id:'voice',    label:'Речь',       w:112, note:'voiceNote'   },
-  { id:'hand',     label:'Рука',       w:112, note:'handNote'    },
-  { id:'anxiety',  label:'Волнение',   w:120, note:'anxietyNote' },
-  { id:'ritual',   label:'Ритуал',     w:76  },
+  { id:'date',     label:'Дата, время',w:116 },
+  { id:'title',    label:'Тип',        w:100 },
+  { id:'purpose',  label:'Цель',       w:120 },
+  { id:'mindset',  label:'Настрой',    w:120 },
+  { id:'reaction', label:'Реакция',    w:120 },
+  { id:'voice',    label:'Речь',       w:100, note:'voiceNote'   },
+  { id:'hand',     label:'Рука',       w:100, note:'handNote'    },
+  { id:'anxiety',  label:'Волнение',   w:110, note:'anxietyNote' },
+  { id:'ritual',   label:'Ритуал',     w:70  },
 ];
 function attColX(){
   const gap = 16; let x = PDF_L_MARGIN; const map = {};
@@ -1989,6 +2001,7 @@ function buildAttemptsPages(){
       num: String(i+1),
       date: dateLabel(e.ts) + ', ' + timeLabel(e.ts),
       title: e.title || '—',
+      purpose: e.purpose || '—',
       mindset: e.mindsetBefore || '—',
       reaction: e.reactionAfter || '—',
       voice: fmtNum(e.voice),
