@@ -383,30 +383,48 @@ function clearSession(){
   auth.accessToken = null; auth.refreshToken = null; auth.userId = null; auth.email = null; auth.expiresAt = 0;
   try{ localStorage.removeItem('arlilia_session'); }catch(e){}
 }
+// Returns 'ok' (refreshed), 'invalid' (Supabase explicitly rejected the
+// refresh token — it's genuinely expired/revoked, session really is gone),
+// or 'network' (couldn't even reach the server — a connectivity blip, not
+// a reason to log anyone out).
 async function refreshSession(){
-  if(!auth.refreshToken) return false;
+  if(!auth.refreshToken) return 'invalid';
   try{
     const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
       method: 'POST',
       headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: auth.refreshToken }),
     });
-    if(!res.ok) return false;
-    const data = await res.json();
-    setSession(data);
-    return true;
-  }catch(e){ return false; }
+    if(res.ok){
+      const data = await res.json();
+      setSession(data);
+      return 'ok';
+    }
+    return (res.status === 400 || res.status === 401) ? 'invalid' : 'network';
+  }catch(e){ return 'network'; }
+}
+// Proactively renews the access token a few minutes before it expires, so
+// the app rarely has to rely on the reactive 401-then-refresh path below —
+// fewer round trips at exactly the moment the person wants to see data.
+async function ensureFreshToken(){
+  if(!auth.accessToken || !auth.refreshToken) return;
+  if(auth.expiresAt - Date.now() > 5 * 60 * 1000) return;
+  await refreshSession();
 }
 async function sbFetch(url, options){
   options = options || {};
   options.headers = sbHeaders(options.headers);
   let res = await fetch(url, options);
   if(res.status === 401 && auth.refreshToken){
-    const ok = await refreshSession();
-    if(ok){
+    const status = await refreshSession();
+    if(status === 'ok'){
       options.headers = sbHeaders(options.headers);
       res = await fetch(url, options);
+    } else if(status === 'invalid'){
+      auth.sessionInvalid = true;
     }
+    // status === 'network': leave the original 401 as-is and keep the
+    // session — a dropped connection isn't proof the login expired.
   }
   return res;
 }
@@ -731,17 +749,23 @@ function journalDraftToRow(e){
 }
 
 async function loadAll(){
+  auth.sessionInvalid = false;
+  state.loadOffline = false;
+  await ensureFreshToken();
   try{
     const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?select=*&order=created_at.asc`);
-    if(res.status === 401){ return false; }
+    if(res.status === 401){
+      if(auth.sessionInvalid) return false; // Supabase really did reject the session
+      state.loadOffline = true; return true; // just a connectivity blip — stay logged in
+    }
     const rows = await res.json();
     state.entries = Array.isArray(rows) ? rows.map(rowToAttempt) : [];
-  }catch(e){ console.error(e); state.entries = []; }
+  }catch(e){ console.error(e); state.loadOffline = true; }
   try{
     const res2 = await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=*&order=entry_date.asc`);
     const rows2 = await res2.json();
     state.journalEntries = Array.isArray(rows2) ? rows2.map(rowToJournal) : [];
-  }catch(e){ console.error(e); state.journalEntries = []; }
+  }catch(e){ console.error(e); }
   try{
     const res3 = await sbFetch(`${SUPABASE_URL}/rest/v1/app_settings?select=*&limit=1`);
     const rows3 = await res3.json();
@@ -2388,6 +2412,8 @@ async function boot(){
   if(ok === false){
     clearSession();
     state.loggedIn = false;
+  } else if(state.loadOffline){
+    showToast('Нет соединения — показаны сохранённые данные');
   }
   render();
 }
