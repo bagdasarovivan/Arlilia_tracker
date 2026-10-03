@@ -657,6 +657,7 @@ let state = {
 
   progressMonth: (function(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
   reportDate: todayKey(), // which single day the PDF/copy exports cover
+  lastTab: 'practice', // which bottom-nav tab to return to when leaving Настройки
 };
 
 /* ---------- storage (Supabase) ---------- */
@@ -1079,10 +1080,10 @@ function renderAppBar(){
   const streak = currentStreak();
   return `
     <div class="app-bar">
-      <div class="app-bar-brand">🎙️ Arlilia</div>
+      <div class="app-bar-brand"></div>
       <div class="app-bar-right">
         ${streak ? `<div class="streak-pill">🔥 ${streak}</div>` : ''}
-        <button class="gear-btn ${state.tab==='settings'?'active':''}" data-tab="settings" aria-label="Настройки">⚙</button>
+        <button class="gear-btn ${state.tab==='settings'?'active':''}" data-action="toggle-settings" aria-label="Настройки">⚙</button>
       </div>
     </div>
   `;
@@ -1656,7 +1657,10 @@ function attachHandlers(){
   const app = document.getElementById('app');
   app.querySelectorAll('[data-action]').forEach(el=> el.addEventListener('click', onAction));
   app.querySelectorAll('[data-tab]').forEach(el=> el.addEventListener('click', e=>{
-    state.tab = e.currentTarget.getAttribute('data-tab'); render();
+    const next = e.currentTarget.getAttribute('data-tab');
+    state.tab = next;
+    if(next !== 'settings') state.lastTab = next;
+    render();
   }));
   app.querySelectorAll('.scale-slider').forEach(el=>{
     el.addEventListener('input', (e)=>{
@@ -1833,7 +1837,16 @@ function doAuthFromForm(){
 async function onAction(e){
   const action = e.currentTarget.getAttribute('data-action');
 
-  if(action === 'confirm-start-date'){
+  if(action === 'toggle-settings'){
+    if(state.tab === 'settings'){
+      state.tab = state.lastTab || 'practice';
+    } else {
+      state.lastTab = state.tab;
+      state.tab = 'settings';
+    }
+    render();
+    return;
+  } else if(action === 'confirm-start-date'){
     const input = document.getElementById('settings-start-date');
     const val = input ? input.value : '';
     state.startDateSaving = true; render();
