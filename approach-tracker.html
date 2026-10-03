@@ -456,11 +456,11 @@ const MINDSET_OPTIONS = ['Супер', 'Хорошо', 'Нормально', 'П
 const QUESTIONS = [
   { id:'title', type:'choice_other', label:'Название речевого поступка', options: TITLE_OPTIONS, hint:'С кем и где был подход' },
   { id:'mindsetBefore', type:'choice_other', label:'Настрой', options: MINDSET_OPTIONS, hint:'Каким было состояние перед подходом' },
-  { id:'reactionAfter', type:'text', label:'Реакция', hint:'Ощущение и реакция после подхода' },
-  { id:'ritual', type:'bool_manual', label:'Соблюдал речевой ритуал?', hint:'Расслабление, спокойный старт, зрительный контакт' },
+  { id:'reactionAfter', type:'text', label:'Реакция' },
+  { id:'ritual', type:'bool_manual', label:'Соблюдал речевой ритуал?', hint:'Расслабление, мягкое начало, зрительный контакт' },
   { id:'voice', type:'scale_note', label:'Речь по методике', lowLabel:'сбивался', highLabel:'чисто', hint:'Темп, дыхание, слитность речи' },
-  { id:'hand', type:'scale_note', label:'Ощущение руки', lowLabel:'напряжена, скованно', highLabel:'свободно, естественно', hint:'Насколько легко и свободно ощущалась рука' },
-  { id:'anxiety', type:'scale_note', label:'Волнение', lowLabel:'спокоен', highLabel:'максимум' },
+  { id:'hand', type:'scale_note', label:'Ощущение руки', lowLabel:'напряжена, скованно', highLabel:'свободно, естественно', hint:'Насколько чувствовал руку во время общения' },
+  { id:'anxiety', type:'scale_note', label:'Волнение', lowLabel:'спокоен', highLabel:'максимум', hint:'Было ли волнение' },
 ];
 
 const JOURNAL_STEPS = [
