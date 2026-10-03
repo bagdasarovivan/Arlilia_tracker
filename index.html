@@ -249,6 +249,20 @@
   .bool-chip.selected-yes{ background: var(--good-soft); border-color: var(--good); color: var(--good); font-weight:600; }
   .bool-chip.selected-no{ background: var(--warn-soft); border-color: var(--warn); color: var(--warn); font-weight:600; }
 
+  /* ---- Onboarding hint (set a start date) ---- */
+  .hint-card{
+    display:flex; align-items:center; gap:12px;
+    background: var(--accent-soft); border:1px solid var(--accent);
+    border-radius: var(--radius-sm); padding:14px 16px; margin-bottom:18px;
+  }
+  .hint-card-icon{ font-size:22px; flex:none; }
+  .hint-card-text{ flex:1; font-size:14px; line-height:1.4; color: var(--text); }
+  .hint-card-btn{
+    flex:none; background: var(--accent); color: var(--accent-text);
+    border:none; border-radius:999px; padding:9px 16px; font-size:13px;
+    font-weight:600; font-family: var(--sans); white-space:nowrap;
+  }
+
   /* ---- Progress ---- */
   .metric-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom: 22px; }
   .metric-tile{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:16px; }
@@ -1122,6 +1136,11 @@ function render(){
     app.innerHTML = `${renderAppBar()}<div class="content">${body}</div>${renderTabbar()}`;
   }
   attachHandlers();
+  if(state.focusStartDate){
+    state.focusStartDate = false;
+    const el = document.getElementById('settings-start-date');
+    if(el){ el.focus(); el.scrollIntoView({ block:'center', behavior:'smooth' }); }
+  }
 }
 
 function renderAppBar(){
@@ -1373,6 +1392,12 @@ function renderJournalHome(){
       ${streak ? `<div style="font-size:13px; color:var(--text-muted); margin:0 0 10px;">🔥 Серия: ${streak} ${ruDays(streak)} подряд</div>` : ''}
       <h1>${todayEntry ? 'Сегодняшняя запись уже есть' : 'Как прошёл день?'}</h1>
     </div>
+    ${!state.settings.startDate ? `
+    <div class="hint-card">
+      <div class="hint-card-icon">📅</div>
+      <div class="hint-card-text">Укажите дату начала занятий, чтобы здесь считались дни</div>
+      <button class="hint-card-btn" data-action="goto-start-date">Указать</button>
+    </div>` : ''}
     <button class="btn btn-primary" data-action="new-journal">${todayEntry ? 'Изменить сегодняшнюю запись' : 'Написать новый дневник'}</button>
     <div style="height:12px"></div>
     <button class="btn btn-ghost" data-action="show-journal-history">Посмотреть старые дневники</button>
@@ -1544,6 +1569,13 @@ function renderProgress(){
   return `
     <div class="eyebrow">Прогресс</div>
     <h2 style="font-size:24px; margin-bottom:18px;">Календарь</h2>
+
+    ${!state.settings.startDate ? `
+    <div class="hint-card">
+      <div class="hint-card-icon">📅</div>
+      <div class="hint-card-text">Укажите дату начала занятий — так в календаре и дневнике будет видно, какой сейчас день по счёту, и пропущенные дни станут заметны</div>
+      <button class="hint-card-btn" data-action="goto-start-date">Указать</button>
+    </div>` : ''}
 
     <div class="metric-grid">
       <div class="metric-tile"><div class="num">${totalAttemptsCount()}</div><div class="lbl">подходов всего</div></div>
@@ -1913,6 +1945,12 @@ async function onAction(e){
       state.lastTab = state.tab;
       state.tab = 'settings';
     }
+    render();
+    return;
+  } else if(action === 'goto-start-date'){
+    if(state.tab !== 'settings') state.lastTab = state.tab;
+    state.tab = 'settings';
+    state.focusStartDate = true;
     render();
     return;
   } else if(action === 'confirm-start-date'){
