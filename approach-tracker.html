@@ -2090,6 +2090,16 @@ function wrapLines(ctx, text, maxWidth){
   const words = String(text).split(' ');
   const lines = []; let line = '';
   words.forEach(w=>{
+    // A single "word" with no spaces to break on — a long URL, or just a
+    // run of the same character — would otherwise sail straight past the
+    // column/page edge instead of wrapping. Hard-break it to fit.
+    while(ctx.measureText(w).width > maxWidth){
+      let i = 1;
+      while(i < w.length && ctx.measureText(w.slice(0, i + 1)).width <= maxWidth) i++;
+      if(line){ lines.push(line); line = ''; }
+      lines.push(w.slice(0, i));
+      w = w.slice(i);
+    }
     const test = line ? line + ' ' + w : w;
     if(ctx.measureText(test).width > maxWidth && line){ lines.push(line); line = w; }
     else line = test;
