@@ -2081,9 +2081,25 @@ function buildAttemptsPages(){
   });
   const summaryLine = typeCounts.map(([t,n])=> `${t} — ${n}`).join('   ·   ');
 
+  // "Речь: 0 — сбивался, 10 — чисто" etc — explains what the 0–10 scores
+  // in the Речь/Рука/Волнение columns mean, pulled straight from the same
+  // lowLabel/highLabel shown in the practice wizard so it can't drift out
+  // of sync with the actual questions.
+  const scaleLegend = ['voice','hand','anxiety'].map(id=>{
+    const q = QUESTIONS.find(qq=>qq.id===id);
+    return q ? `${q.label}: 0 — ${q.lowLabel}, 10 — ${q.highLabel}` : null;
+  }).filter(Boolean).join('   ·   ');
+
   const pages = [];
   let { ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H);
   y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Таблица осознанности', dayLabel + ' · всего подходов: ' + entries.length);
+
+  if(scaleLegend){
+    ctx.fillStyle = RC.muted; ctx.font = 'italic 13px ' + REPORT_FONT;
+    const legendLines = wrapLines(ctx, scaleLegend, tableRight - PDF_L_MARGIN);
+    legendLines.forEach((l,li)=> ctx.fillText(l, PDF_L_MARGIN, y + li*18));
+    y += legendLines.length * 18 + 10;
+  }
 
   if(summaryLine){
     ctx.fillStyle = RC.muted; ctx.font = '15px ' + REPORT_FONT;
