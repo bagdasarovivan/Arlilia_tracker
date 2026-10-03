@@ -2002,6 +2002,21 @@ function savePdfFromPages(pages, filename, landscape){
   });
   doc.save(filename);
 }
+// Stacks every report page into one tall canvas so "Копировать" always
+// carries the whole day, not just page 1 — a day with enough attempts (or
+// a long journal entry) to spill onto a second PDF page used to get
+// silently cut off when only the first page's canvas was copied.
+function mergeCanvasesVertically(pages){
+  if(pages.length === 1) return pages[0];
+  const width = pages[0].width;
+  const totalHeight = pages.reduce((sum,p)=> sum + p.height, 0);
+  const merged = document.createElement('canvas');
+  merged.width = width; merged.height = totalHeight;
+  const ctx = merged.getContext('2d');
+  let y = 0;
+  pages.forEach(p=>{ ctx.drawImage(p, 0, y); y += p.height; });
+  return merged;
+}
 function copyCanvasImage(canvas, extraCount){
   if(!(navigator.clipboard && window.ClipboardItem)){
     downloadCanvasFallback(canvas);
@@ -2190,7 +2205,7 @@ async function generateAttemptsPdf(){
 function copyAttemptsImage(){
   const built = buildAttemptsPages();
   if(!built){ showToast('За этот день нет записанных подходов'); return; }
-  copyCanvasImage(built.pages[0], built.pages.length - 1);
+  copyCanvasImage(mergeCanvasesVertically(built.pages), 0);
 }
 
 /* ---- Journal: one question-and-answer card per field, portrait, one day ----
@@ -2272,7 +2287,7 @@ async function generateJournalPdf(){
 function copyJournalImage(){
   const built = buildJournalPages();
   if(!built){ showToast('За этот день нет записи дневника'); return; }
-  copyCanvasImage(built.pages[0], built.pages.length - 1);
+  copyCanvasImage(mergeCanvasesVertically(built.pages), 0);
 }
 
 async function boot(){
