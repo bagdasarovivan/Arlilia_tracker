@@ -327,6 +327,19 @@
 const SUPABASE_URL = 'https://zvstrubroelqaivgtooc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_cnIPiLyx12CBRvx175QrhQ_kKQgW6Eh';
 
+// Everything the person types (journal text, custom answers, notes) ends up
+// back in the page via innerHTML — this neutralizes it as plain text before
+// it's inserted, so typed-in HTML/script can never run (stored XSS).
+function esc(str){
+  if(str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /* ---------- lazy-load jsPDF ----------
    Only the two "скачать PDF" buttons actually need jsPDF — "копировать
    картинкой" works off plain canvas and never touches it. Loading the
@@ -1233,7 +1246,7 @@ function renderPracticeWizard(){
       <div class="scale-ends"><span>0 · ${q.lowLabel}</span><span>${q.highLabel} · 10</span></div>
       ${q.type === 'scale_note' ? `
         <button type="button" class="btn-ghost" data-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen ? 'Скрыть описание' : '+ Добавить описание'}</button>
-        ${noteOpen ? `<textarea id="note-${q.id}" placeholder="Подробности, если нужно..." style="margin-top:10px;">${noteVal}</textarea>` : ''}
+        ${noteOpen ? `<textarea id="note-${q.id}" placeholder="Подробности, если нужно..." style="margin-top:10px;">${esc(noteVal)}</textarea>` : ''}
       ` : ''}
     `;
   } else if(q.type === 'bool' || q.type === 'bool_manual'){
@@ -1248,7 +1261,7 @@ function renderPracticeWizard(){
         <button class="choice-btn ${val===false?'selected':''}" data-bool-id="${q.id}" data-bool-val="false" data-manual="${manual}">Нет</button>
       </div>
       <button type="button" class="btn-ghost" data-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen2 ? 'Скрыть описание' : '+ Добавить описание'}</button>
-      ${noteOpen2 ? `<textarea id="note-${q.id}" placeholder="Подробности, если нужно..." style="margin-top:10px;">${noteVal2}</textarea>` : ''}
+      ${noteOpen2 ? `<textarea id="note-${q.id}" placeholder="Подробности, если нужно..." style="margin-top:10px;">${esc(noteVal2)}</textarea>` : ''}
     `;
   } else if(q.type === 'choice_other'){
     const val = state.answers[q.id];
@@ -1258,7 +1271,7 @@ function renderPracticeWizard(){
       const selected = val === optId;
       return `<button class="choice-list-btn ${selected?'selected':''}" data-choice-id="${q.id}" data-choice-val="${optId.replace(/"/g,'&quot;')}">${opt}</button>`;
     }).join('')}
-    ${val === 'other' ? `<input type="text" id="text-${q.id}Custom" value="${customVal.replace(/"/g,'&quot;')}" placeholder="Напишите свой вариант" style="margin-top:10px;">` : ''}
+    ${val === 'other' ? `<input type="text" id="text-${q.id}Custom" value="${esc(customVal)}" placeholder="Напишите свой вариант" style="margin-top:10px;">` : ''}
     </div>`;
   } else if(q.type === 'choice'){
     const val = state.answers[q.id];
@@ -1267,7 +1280,7 @@ function renderPracticeWizard(){
     `).join('')}</div>`;
   } else if(q.type === 'text'){
     const val = state.answers[q.id] || '';
-    control = `<textarea id="text-${q.id}" placeholder="Коротко, по сути...">${val}</textarea>`;
+    control = `<textarea id="text-${q.id}" placeholder="Коротко, по сути...">${esc(val)}</textarea>`;
   }
 
   const isFirst = state.qIndex === 0;
@@ -1426,21 +1439,23 @@ function renderJournalRead(entry){
       ${dn ? `<div style="text-align:center; color:var(--text-muted); font-size:13px; text-transform:capitalize; margin:-6px 0 4px;">${weekdayDateLabel(entry.ts)}</div>` : ''}
       <div class="read-hero">
         <div class="read-hero-emoji">🌇</div>
-        <div class="read-hero-mood">${moodIcon} ${moodVal || ''}</div>
+        <div class="read-hero-mood">${moodIcon} ${esc(moodVal)}</div>
       </div>
       ${rowsHtml || '<div class="empty">Запись пуста</div>'}
     </div>
   `;
 }
 function readRow(icon, big, text, label){
+  // icon/label come from our own fixed lookup tables; big/text are the
+  // person's own saved values, so those are the ones that need escaping.
   return `
     <div class="read-row">
       <div class="read-icon">${icon}</div>
       <div class="read-body">
-        ${label ? `<div class="read-label">${label}</div>` : ''}
+        ${label ? `<div class="read-label">${esc(label)}</div>` : ''}
         ${big !== null && big !== undefined
-          ? `<div class="read-big">${big}</div><div class="read-sub">${text}</div>`
-          : `<div class="read-text">${text}</div>`}
+          ? `<div class="read-big">${esc(big)}</div><div class="read-sub">${esc(text)}</div>`
+          : `<div class="read-text">${esc(text)}</div>`}
       </div>
     </div>
   `;
@@ -1478,7 +1493,7 @@ function renderJournalWizardStep(){
       const selected = selId === optId;
       return `<button class="choice-list-btn ${selected?'selected':''}" data-jw-choice="${q.id}" data-jw-val="${optId.replace(/"/g,'&quot;')}">${opt}</button>`;
     }).join('')}
-    ${selId === 'other' ? `<input type="text" id="jw-text-${q.id}Custom" value="${String(customVal).replace(/"/g,'&quot;')}" placeholder="Напишите свой вариант" style="margin-top:10px;">` : ''}
+    ${selId === 'other' ? `<input type="text" id="jw-text-${q.id}Custom" value="${esc(customVal)}" placeholder="Напишите свой вариант" style="margin-top:10px;">` : ''}
     </div>`;
   } else if(q.type === 'bool'){
     control = `
@@ -1495,12 +1510,12 @@ function renderJournalWizardStep(){
     control = `
       <input type="number" inputmode="decimal" id="jw-number-${q.id}" value="${val ?? ''}" style="text-align:center; font-size:30px; padding:16px; font-family:Georgia,serif;">
       <button type="button" class="btn-ghost" data-jw-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen ? 'Скрыть текст' : '+ Написать словами'}</button>
-      ${noteOpen ? `<textarea id="jw-text-${noteKey}" placeholder="Можно написать словами, а не только цифрой..." style="margin-top:10px;">${noteVal}</textarea>` : ''}
+      ${noteOpen ? `<textarea id="jw-text-${noteKey}" placeholder="Можно написать словами, а не только цифрой..." style="margin-top:10px;">${esc(noteVal)}</textarea>` : ''}
     `;
   } else if(q.type === 'text'){
-    control = `<input type="text" id="jw-text-${q.id}" value="${val ? String(val).replace(/"/g,'&quot;') : ''}" placeholder="Коротко, по сути...">`;
+    control = `<input type="text" id="jw-text-${q.id}" value="${esc(val)}" placeholder="Коротко, по сути...">`;
   } else if(q.type === 'textarea'){
-    control = `<textarea id="jw-text-${q.id}" placeholder="Коротко, по сути...">${val || ''}</textarea>`;
+    control = `<textarea id="jw-text-${q.id}" placeholder="Коротко, по сути...">${esc(val)}</textarea>`;
   }
 
   const isFirst = idx === 0;
@@ -1681,7 +1696,7 @@ function renderSettings(){
 
     <div class="card" style="margin-bottom:16px;">
       <div class="jc-title">Аккаунт</div>
-      <div class="autosave-hint" style="margin:0 0 14px;">${auth.email || ''}</div>
+      <div class="autosave-hint" style="margin:0 0 14px;">${esc(auth.email)}</div>
       <button class="btn btn-ghost" data-action="logout">Выйти</button>
     </div>
 
