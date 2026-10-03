@@ -1896,6 +1896,14 @@ const RC = { // report colors — mirrors the app's teal palette
   good: '#3E8A61', warn: '#C14F3F'
 };
 
+// "2026-10-03" -> "03.10.2026" — for PDF filenames.
+function ruFileDate(dateStr){
+  const d = new Date(dateStr + 'T12:00:00');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  return `${dd}.${mm}.${d.getFullYear()}`;
+}
+
 // Portrait page (journal: Q&A table)
 const PDF_P_W = 1060, PDF_P_H = 1500, PDF_P_MARGIN = 64;
 // Landscape page (attempts: wide multi-column table)
@@ -2099,7 +2107,7 @@ function buildAttemptsPages(){
     y += 22;
   });
 
-  return { pages, filename: 'podhody-' + dateStr + '.pdf' };
+  return { pages, filename: 'Подходы ' + ruFileDate(dateStr) + '.pdf' };
 }
 async function generateAttemptsPdf(){
   const built = buildAttemptsPages();
@@ -2181,7 +2189,7 @@ function buildJournalPages(){
     idx++;
   });
 
-  return { pages, filename: 'dnevnik-' + dateStr + '.pdf' };
+  return { pages, filename: 'Дневник ' + ruFileDate(dateStr) + '.pdf' };
 }
 async function generateJournalPdf(){
   const built = buildJournalPages();
