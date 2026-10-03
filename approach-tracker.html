@@ -2127,45 +2127,44 @@ function savePdfFromPages(pages, filename, landscape){
   });
   doc.save(filename);
 }
-// Stacks every report page into one tall image so "Копировать" always
-// carries the whole day, not just page 1 — a day with enough attempts (or
-// a long journal entry) to spill onto a second PDF page used to get
-// silently cut off when only the first page's canvas was copied.
-// Each source page is a fixed-size A4-shaped canvas (for real pagination
-// in the PDF), but most pages only use the top portion of it — stacking
-// them as-is left a huge blank void wherever a page's unused bottom
-// margin ended up. `bottoms[i]` is how far page i's content actually
-// reaches, so each page is cropped to that before stacking, with a
-// dashed rule between pages marking where one page ended and the next
-// began (so it still reads as separate pages, not one continuous sheet).
-function mergeCanvasesVertically(pages, bottoms){
-  if(pages.length === 1 && !(bottoms && bottoms[0] < pages[0].height - 40)) return pages[0];
-  const width = pages[0].width;
-  const pad = 24;
-  const heights = pages.map((p,i)=> Math.min(p.height, Math.ceil((bottoms && bottoms[i] ? bottoms[i] : p.height) + pad)));
-  const dividerGap = 34;
-  const totalHeight = heights.reduce((sum,h)=> sum + h, 0) + dividerGap * (pages.length - 1);
-  const merged = document.createElement('canvas');
-  merged.width = width; merged.height = totalHeight;
-  const ctx = merged.getContext('2d');
-  ctx.fillStyle = RC.bg; ctx.fillRect(0, 0, width, totalHeight);
-  let y = 0;
-  pages.forEach((p, i)=>{
-    const h = heights[i];
-    ctx.drawImage(p, 0, 0, width, h, 0, y, width, h);
-    y += h;
-    if(i < pages.length - 1){
-      const dy = y + dividerGap / 2;
-      ctx.strokeStyle = RC.border; ctx.lineWidth = 1.5;
-      ctx.setLineDash([7, 7]);
-      ctx.beginPath(); ctx.moveTo(40, dy); ctx.lineTo(width - 40, dy); ctx.stroke();
-      ctx.setLineDash([]);
-      y += dividerGap;
-    }
-  });
-  return merged;
+// Crops a page canvas down to where its content actually ends (bottom),
+// instead of keeping its full fixed A4-shaped height — most pages only
+// use the top portion of it.
+function cropPageCanvas(canvas, bottom){
+  if(bottom == null || bottom >= canvas.height - 10) return canvas;
+  const h = Math.min(canvas.height, Math.ceil(bottom + 24));
+  const cropped = document.createElement('canvas');
+  cropped.width = canvas.width; cropped.height = h;
+  cropped.getContext('2d').drawImage(canvas, 0, 0, canvas.width, h, 0, 0, canvas.width, h);
+  return cropped;
 }
-function copyCanvasImage(canvas, extraCount){
+// The system clipboard only ever carries one picture, so stitching every
+// PDF page into a single ever-taller image (worse the more the person
+// writes) isn't the right trade-off. Instead: copy page 1, cropped to a
+// normal-looking standalone image, and — since that's really all the
+// clipboard can hold — save any further pages as their own separate PNG
+// files right alongside it, so nothing is silently lost.
+function copyReportPages(pages, bottoms, baseName){
+  const cropped = pages.map((p, i)=> cropPageCanvas(p, bottoms && bottoms[i]));
+  const isLikelyIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let message;
+  if(cropped.length <= 1){
+    message = 'Скопировано в буфер обмена';
+  } else if(isLikelyIOS){
+    // Safari on iOS won't let us silently save extra files here.
+    message = `Скопирована страница 1 из ${cropped.length} — для остальных скачайте PDF`;
+  } else {
+    cropped.slice(1).forEach((c, i)=>{
+      const a = document.createElement('a');
+      a.href = c.toDataURL('image/png');
+      a.download = `${baseName} — стр.${i + 2}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+    });
+    message = `Скопирована страница 1 из ${cropped.length} — остальные сохранены отдельными файлами`;
+  }
+  copyCanvasImage(cropped[0], message);
+}
+function copyCanvasImage(canvas, successMessage){
   if(!(navigator.clipboard && window.ClipboardItem)){
     downloadCanvasFallback(canvas);
     return;
@@ -2181,9 +2180,7 @@ function copyCanvasImage(canvas, extraCount){
     canvas.toBlob(blob=>{ blob ? resolve(blob) : reject(new Error('toBlob failed')); }, 'image/png');
   });
   navigator.clipboard.write([ new ClipboardItem({ 'image/png': blobPromise }) ])
-    .then(()=> showToast(extraCount > 0
-      ? `Скопировано! (ещё ${extraCount} стр. — скачайте PDF, если нужны все)`
-      : 'Скопировано в буфер обмена'))
+    .then(()=> showToast(successMessage || 'Скопировано в буфер обмена'))
     .catch(()=> downloadCanvasFallback(canvas));
 }
 function downloadCanvasFallback(canvas){
@@ -2360,7 +2357,7 @@ async function generateAttemptsPdf(){
 function copyAttemptsImage(){
   const built = buildAttemptsPages();
   if(!built){ showToast('За этот день нет записанных подходов'); return; }
-  copyCanvasImage(mergeCanvasesVertically(built.pages, built.pageBottoms), 0);
+  copyReportPages(built.pages, built.pageBottoms, built.filename.replace(/\.pdf$/, ''));
 }
 
 /* ---- Journal: one question-and-answer card per field, portrait, one day ----
@@ -2446,7 +2443,7 @@ async function generateJournalPdf(){
 function copyJournalImage(){
   const built = buildJournalPages();
   if(!built){ showToast('За этот день нет записи дневника'); return; }
-  copyCanvasImage(mergeCanvasesVertically(built.pages, built.pageBottoms), 0);
+  copyReportPages(built.pages, built.pageBottoms, built.filename.replace(/\.pdf$/, ''));
 }
 
 async function boot(){
