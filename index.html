@@ -80,6 +80,27 @@
   }
   .content{ flex:1; padding-bottom: 24px; }
 
+  /* ---- Top app bar ---- */
+  .app-bar{
+    position: sticky; top:0; left:0; right:0; z-index:5;
+    display:flex; align-items:center; justify-content:space-between;
+    background: var(--surface); border-bottom:1px solid var(--border);
+    padding: 14px 20px; margin: -26px -20px 18px;
+  }
+  .app-bar-brand{ display:flex; align-items:center; gap:7px; font-family: var(--serif); font-size:18px; color: var(--text); }
+  .app-bar-right{ display:flex; align-items:center; gap:8px; }
+  .streak-pill{
+    display:inline-flex; align-items:center; gap:4px;
+    background: var(--accent-soft); color: var(--accent); font-weight:600;
+    border-radius:999px; padding:6px 12px; font-size:14px; font-family: var(--sans);
+  }
+  .gear-btn{
+    width:36px; height:36px; border-radius:50%; border:1px solid var(--border);
+    background: var(--surface); color: var(--text-muted); font-size:17px;
+    display:flex; align-items:center; justify-content:center; padding:0; flex:none;
+  }
+  .gear-btn.active{ color: var(--accent); border-color: var(--accent); }
+
   /* ---- Bottom nav ---- */
   .tabbar{
     position: sticky; bottom:0; left:0; right:0;
@@ -1049,9 +1070,22 @@ function render(){
     else if(state.tab === 'exercises') body = state.exerciseCategory ? renderExerciseCategory(state.exerciseCategory) : renderExercisesHome();
     else if(state.tab === 'progress') body = renderProgress();
     else body = renderSettings();
-    app.innerHTML = `<div class="content">${body}</div>${renderTabbar()}`;
+    app.innerHTML = `${renderAppBar()}<div class="content">${body}</div>${renderTabbar()}`;
   }
   attachHandlers();
+}
+
+function renderAppBar(){
+  const streak = currentStreak();
+  return `
+    <div class="app-bar">
+      <div class="app-bar-brand">🎙️ Arlilia</div>
+      <div class="app-bar-right">
+        ${streak ? `<div class="streak-pill">🔥 ${streak}</div>` : ''}
+        <button class="gear-btn ${state.tab==='settings'?'active':''}" data-tab="settings" aria-label="Настройки">⚙</button>
+      </div>
+    </div>
+  `;
 }
 
 function renderLogin(){
@@ -1091,7 +1125,6 @@ function renderTabbar(){
     {id:'journal', ic:'📓', label:'Дневник'},
     {id:'exercises', ic:'📋', label:'Упражнения'},
     {id:'progress', ic:'📈', label:'Прогресс'},
-    {id:'settings', ic:'⚙', label:'Настройки'},
   ];
   return `<div class="tabbar">
     ${tabs.map(t=>`
@@ -2167,8 +2200,10 @@ function buildAttemptsPages(){
     const rowH = Math.max(38, maxColH + 16);
 
     if(y + rowH > PDF_L_H - 54){
+      // Continuation page: just keep the table going — no repeated title/
+      // date/legend, only the column header row so columns stay labelled.
       ({ ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H));
-      y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Таблица осознанности', dayLabel + ' · всего подходов: ' + entries.length);
+      y = PDF_L_MARGIN + 28;
       drawTableHeader();
     }
 
@@ -2254,8 +2289,9 @@ function buildJournalPages(){
     const cardH = padTop + labelH + valLines.length * lineH + padBottom;
 
     if(y + cardH > PDF_P_H - 70){
+      // Continuation page: just keep the cards going, no repeated title/date.
       ({ ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H));
-      y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', headerSubtitle);
+      y = PDF_P_MARGIN + 24;
     }
 
     ctx.fillStyle = idx % 2 === 1 ? RC.stripe : RC.bg;
