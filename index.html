@@ -260,7 +260,7 @@
   .cal-arrow{ position:absolute; top:3px; right:4px; font-size:10px; line-height:1; }
   .cal-arrow.up{ color: var(--good); }
   .cal-arrow.down{ color: var(--warn); }
-  .cal-legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; font-size:12px; color: var(--text-muted); align-items:center; }
+  .cal-legend{ display:flex; flex-wrap:wrap; justify-content:center; gap:14px 18px; margin-top:14px; font-size:12px; color: var(--text-muted); align-items:center; text-align:center; width:100%; }
   .cal-legend span{ display:inline-flex; align-items:center; gap:5px; }
 
   /* ---- Exercises ---- */
@@ -1481,6 +1481,7 @@ function renderCalendar(monthDate){
     <div class="cal-legend">
       <span>📓 дневник</span>
       <span>🚶 подход</span>
+      <span>×N — подходов за день</span>
       <span style="color:var(--good);">↑ день выполнен</span>
       <span style="color:var(--warn);">↓ день пропущен</span>
     </div>
