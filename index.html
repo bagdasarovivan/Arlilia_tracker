@@ -2029,7 +2029,7 @@ function buildAttemptsPages(){
 
   const pages = [];
   let { ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H);
-  y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Подходы', dayLabel + ' · всего подходов: ' + entries.length);
+  y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Таблица осознанности', dayLabel + ' · всего подходов: ' + entries.length);
 
   if(summaryLine){
     ctx.fillStyle = RC.muted; ctx.font = '15px ' + REPORT_FONT;
@@ -2083,7 +2083,7 @@ function buildAttemptsPages(){
 
     if(y + rowH > PDF_L_H - 54){
       ({ ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H));
-      y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Подходы', dayLabel + ' · всего подходов: ' + entries.length);
+      y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Таблица осознанности', dayLabel + ' · всего подходов: ' + entries.length);
       drawTableHeader();
     }
 
@@ -2107,7 +2107,7 @@ function buildAttemptsPages(){
     y += 22;
   });
 
-  return { pages, filename: 'Подходы ' + ruFileDate(dateStr) + '.pdf' };
+  return { pages, filename: 'Таблица осознанности ' + ruFileDate(dateStr) + '.pdf' };
 }
 async function generateAttemptsPdf(){
   const built = buildAttemptsPages();
