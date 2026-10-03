@@ -496,6 +496,7 @@ let state = {
 
   confirmReset: false,
   resetBusy: false,
+  startDateSaving: false,
 
   settings: { startDate: null, theme: 'light' },
 
@@ -797,6 +798,29 @@ function allTimeFullDaysCount(){
   return n;
 }
 
+/* ---------- running total (+1 complete / -1 missed) from the start date up
+   to, but not including, a given moment — used so the month trend chart
+   carries its balance over from previous months instead of resetting to 0
+   on the 1st of every month. ---------- */
+function cumulativeBefore(dateTs){
+  if(!state.settings.startDate) return 0;
+  const start = new Date(state.settings.startDate + 'T00:00:00');
+  start.setHours(0,0,0,0);
+  const end = new Date(dateTs);
+  end.setHours(0,0,0,0);
+  if(end <= start) return 0;
+  const attemptSet = allTimeAttemptDayKeys();
+  const journalSet = allTimeJournalDayKeys();
+  let cum = 0;
+  const cur = new Date(start);
+  while(cur < end){
+    const k = dateKey(cur.getTime());
+    cum += (attemptSet.has(k) && journalSet.has(k)) ? 1 : -1;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return cum;
+}
+
 /* ---------- month trend (up/down "stock chart" of completed days) ---------- */
 function buildMonthTrend(monthDate){
   const total = daysInMonth(monthDate);
@@ -820,8 +844,13 @@ function buildMonthTrend(monthDate){
     }
   }
 
-  const points = [{ day: firstDay - 1, val: 0, complete: null }];
-  let cum = 0;
+  // Carry the running total over from every earlier day since the start
+  // date (including previous months) instead of starting each month back
+  // at 0 — the graph is one continuous streak, viewed a month at a time.
+  const baseline = cumulativeBefore(new Date(monthDate.getFullYear(), monthDate.getMonth(), firstDay).getTime());
+
+  const points = [{ day: firstDay - 1, val: baseline, complete: null }];
+  let cum = baseline;
   for(let day=firstDay; day<=lastDay; day++){
     const complete = (attemptsByDay[day]||0) > 0 && journalDays.has(day);
     cum += complete ? 1 : -1;
@@ -1294,6 +1323,7 @@ function renderSettings(){
       <div class="date-input-wrap">
         <input type="date" id="settings-start-date" value="${state.settings.startDate || ''}">
       </div>
+      <button class="btn btn-primary" style="margin-top:12px;" data-action="confirm-start-date" ${state.startDateSaving ? 'disabled' : ''}>${state.startDateSaving ? 'Сохраняем…' : 'Подтвердить дату'}</button>
       ${days ? `<div class="autosave-hint" style="margin:10px 0 0;">Сейчас: День ${days}</div>` : ''}
     </div>
 
@@ -1438,12 +1468,6 @@ function attachHandlers(){
       state.answers[id] = e.target.value;
     });
   });
-  const startDateInput = app.querySelector('#settings-start-date');
-  if(startDateInput){
-    startDateInput.addEventListener('change', (e)=>{
-      saveStartDate(e.target.value).then(render);
-    });
-  }
   ['login-password','login-password2'].forEach(id=>{
     const el = app.querySelector('#'+id);
     if(el){
@@ -1497,7 +1521,16 @@ function doAuthFromForm(){
 async function onAction(e){
   const action = e.currentTarget.getAttribute('data-action');
 
-  if(action === 'do-login'){
+  if(action === 'confirm-start-date'){
+    const input = document.getElementById('settings-start-date');
+    const val = input ? input.value : '';
+    state.startDateSaving = true; render();
+    await saveStartDate(val || null);
+    state.startDateSaving = false;
+    showToast(val ? 'Дата начала сохранена' : 'Дата начала очищена');
+    render();
+    return;
+  } else if(action === 'do-login'){
     doLoginFromForm(); return;
   } else if(action === 'do-signup'){
     doSignupFromForm(); return;
