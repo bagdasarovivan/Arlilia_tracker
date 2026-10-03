@@ -2127,19 +2127,42 @@ function savePdfFromPages(pages, filename, landscape){
   });
   doc.save(filename);
 }
-// Stacks every report page into one tall canvas so "Копировать" always
+// Stacks every report page into one tall image so "Копировать" always
 // carries the whole day, not just page 1 — a day with enough attempts (or
 // a long journal entry) to spill onto a second PDF page used to get
 // silently cut off when only the first page's canvas was copied.
-function mergeCanvasesVertically(pages){
-  if(pages.length === 1) return pages[0];
+// Each source page is a fixed-size A4-shaped canvas (for real pagination
+// in the PDF), but most pages only use the top portion of it — stacking
+// them as-is left a huge blank void wherever a page's unused bottom
+// margin ended up. `bottoms[i]` is how far page i's content actually
+// reaches, so each page is cropped to that before stacking, with a
+// dashed rule between pages marking where one page ended and the next
+// began (so it still reads as separate pages, not one continuous sheet).
+function mergeCanvasesVertically(pages, bottoms){
+  if(pages.length === 1 && !(bottoms && bottoms[0] < pages[0].height - 40)) return pages[0];
   const width = pages[0].width;
-  const totalHeight = pages.reduce((sum,p)=> sum + p.height, 0);
+  const pad = 24;
+  const heights = pages.map((p,i)=> Math.min(p.height, Math.ceil((bottoms && bottoms[i] ? bottoms[i] : p.height) + pad)));
+  const dividerGap = 34;
+  const totalHeight = heights.reduce((sum,h)=> sum + h, 0) + dividerGap * (pages.length - 1);
   const merged = document.createElement('canvas');
   merged.width = width; merged.height = totalHeight;
   const ctx = merged.getContext('2d');
+  ctx.fillStyle = RC.bg; ctx.fillRect(0, 0, width, totalHeight);
   let y = 0;
-  pages.forEach(p=>{ ctx.drawImage(p, 0, y); y += p.height; });
+  pages.forEach((p, i)=>{
+    const h = heights[i];
+    ctx.drawImage(p, 0, 0, width, h, 0, y, width, h);
+    y += h;
+    if(i < pages.length - 1){
+      const dy = y + dividerGap / 2;
+      ctx.strokeStyle = RC.border; ctx.lineWidth = 1.5;
+      ctx.setLineDash([7, 7]);
+      ctx.beginPath(); ctx.moveTo(40, dy); ctx.lineTo(width - 40, dy); ctx.stroke();
+      ctx.setLineDash([]);
+      y += dividerGap;
+    }
+  });
   return merged;
 }
 function copyCanvasImage(canvas, extraCount){
@@ -2231,6 +2254,9 @@ function buildAttemptsPages(){
   }).filter(Boolean).join('   ·   ');
 
   const pages = [];
+  const pageBottoms = []; // actual content height reached on each page — lets
+                           // the clipboard-copy merge crop away each page's
+                           // unused bottom margin instead of stacking dead space.
   let { ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H);
   y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Таблица осознанности', dayLabel + ' · всего подходов: ' + entries.length);
 
@@ -2294,6 +2320,7 @@ function buildAttemptsPages(){
     if(y + rowH > PDF_L_H - 54){
       // Continuation page: just keep the table going — no repeated title/
       // date/legend, only the column header row so columns stay labelled.
+      pageBottoms.push(y + 10); // outgoing page's actual content ends here
       ({ ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H));
       y = PDF_L_MARGIN + 28;
       drawTableHeader();
@@ -2318,8 +2345,9 @@ function buildAttemptsPages(){
     ctx.beginPath(); ctx.moveTo(PDF_L_MARGIN - 10, y); ctx.lineTo(tableRight + 10, y); ctx.stroke();
     y += 22;
   });
+  pageBottoms.push(y + 10);
 
-  return { pages, filename: 'Таблица осознанности ' + ruFileDate(dateStr) + '.pdf' };
+  return { pages, pageBottoms, filename: 'Таблица осознанности ' + ruFileDate(dateStr) + '.pdf' };
 }
 async function generateAttemptsPdf(){
   const built = buildAttemptsPages();
@@ -2332,7 +2360,7 @@ async function generateAttemptsPdf(){
 function copyAttemptsImage(){
   const built = buildAttemptsPages();
   if(!built){ showToast('За этот день нет записанных подходов'); return; }
-  copyCanvasImage(mergeCanvasesVertically(built.pages), 0);
+  copyCanvasImage(mergeCanvasesVertically(built.pages, built.pageBottoms), 0);
 }
 
 /* ---- Journal: one question-and-answer card per field, portrait, one day ----
@@ -2361,6 +2389,7 @@ function buildJournalPages(){
   const headerSubtitle = dn ? `День ${dn} · ${weekdayLabel}` : weekdayLabel;
 
   const pages = [];
+  const pageBottoms = []; // see buildAttemptsPages — same purpose
   let { ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H);
   y = drawReportHeader(ctx, PDF_P_W, PDF_P_MARGIN, 'Дневник дня', headerSubtitle);
 
@@ -2382,6 +2411,7 @@ function buildJournalPages(){
 
     if(y + cardH > PDF_P_H - 70){
       // Continuation page: just keep the cards going, no repeated title/date.
+      pageBottoms.push(y);
       ({ ctx, y } = newReportPage(pages, PDF_P_W, PDF_P_H));
       y = PDF_P_MARGIN + 24;
     }
@@ -2401,8 +2431,9 @@ function buildJournalPages(){
     y += cardH + 10;
     idx++;
   });
+  pageBottoms.push(y);
 
-  return { pages, filename: 'Дневник ' + ruFileDate(dateStr) + '.pdf' };
+  return { pages, pageBottoms, filename: 'Дневник ' + ruFileDate(dateStr) + '.pdf' };
 }
 async function generateJournalPdf(){
   const built = buildJournalPages();
@@ -2415,7 +2446,7 @@ async function generateJournalPdf(){
 function copyJournalImage(){
   const built = buildJournalPages();
   if(!built){ showToast('За этот день нет записи дневника'); return; }
-  copyCanvasImage(mergeCanvasesVertically(built.pages), 0);
+  copyCanvasImage(mergeCanvasesVertically(built.pages, built.pageBottoms), 0);
 }
 
 async function boot(){
