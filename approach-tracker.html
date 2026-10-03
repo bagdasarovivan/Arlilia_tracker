@@ -631,7 +631,7 @@ function rowToAttempt(r){
     ts: new Date(r.created_at).getTime(),
     title: r.title,
     mindsetBefore: r.mindset_before, reactionAfter: r.reaction_after,
-    ritual: r.ritual,
+    ritual: r.ritual, ritualNote: r.ritual_note,
     voice: r.voice, voiceNote: r.voice_note,
     hand: r.hand, handNote: r.hand_note,
     anxiety: r.anxiety, anxietyNote: r.anxiety_note,
@@ -647,6 +647,7 @@ function attemptToRow(e){
     mindset_before: mindsetBefore,
     reaction_after: reactionAfter,
     ritual: typeof e.ritual === 'boolean' ? e.ritual : null,
+    ritual_note: e.ritualNote || null,
     voice: e.voice ?? null, voice_note: e.voiceNote || null,
     hand: e.hand ?? null, hand_note: e.handNote || null,
     anxiety: e.anxiety ?? null, anxiety_note: e.anxietyNote || null,
@@ -1104,11 +1105,16 @@ function renderPracticeWizard(){
   } else if(q.type === 'bool' || q.type === 'bool_manual'){
     const val = state.answers[q.id];
     const manual = q.type === 'bool_manual' ? '1' : '0';
+    const noteKey = q.id + 'Note';
+    const noteVal2 = state.answers[noteKey] || '';
+    const noteOpen2 = (state.noteOpen && state.noteOpen[q.id]) || !!noteVal2;
     control = `
       <div class="choice-row">
         <button class="choice-btn ${val===true?'selected':''}" data-bool-id="${q.id}" data-bool-val="true" data-manual="${manual}">Да</button>
         <button class="choice-btn ${val===false?'selected':''}" data-bool-id="${q.id}" data-bool-val="false" data-manual="${manual}">Нет</button>
       </div>
+      <button type="button" class="btn-ghost" data-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen2 ? 'Скрыть описание' : '+ Добавить описание'}</button>
+      ${noteOpen2 ? `<textarea id="note-${q.id}" placeholder="Подробности, если нужно..." style="margin-top:10px;">${noteVal2}</textarea>` : ''}
     `;
   } else if(q.type === 'choice_other'){
     const val = state.answers[q.id];
@@ -1988,7 +1994,7 @@ const ATT_COLS = [
   { id:'voice',    label:'Речь',       w:170, note:'voiceNote'   },
   { id:'hand',     label:'Рука',       w:170, note:'handNote'    },
   { id:'anxiety',  label:'Волнение',   w:180, note:'anxietyNote' },
-  { id:'ritual',   label:'Ритуал',     w:156 },
+  { id:'ritual',   label:'Ритуал',     w:156, note:'ritualNote' },
 ];
 function attColX(){
   const gap = 16; let x = PDF_L_MARGIN; const map = {};
