@@ -221,6 +221,10 @@
   .metric-tile .lbl{ font-size:14px; color: var(--text-muted); margin-top:4px; }
   .metric-tile.good .num{ color: var(--good); }
   .metric-tile .lbl .delta{ display:block; margin-top:3px; font-size:11px; }
+  .streak-card{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:18px; margin-bottom:22px; text-align:center; }
+  .streak-card .streak-num{ font-family: var(--serif); font-size:38px; color: var(--accent); line-height:1; }
+  .streak-card .streak-lbl{ font-size:13px; color: var(--text-muted); margin-top:6px; }
+  .streak-card .streak-next{ font-size:12px; color: var(--text-muted); margin-top:10px; }
   .delta-good{ color: var(--good); }
   .delta-bad{ color: var(--warn); }
   .trend-wrap{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:14px 12px 10px; margin-top:16px; }
@@ -932,6 +936,35 @@ function allTimeFullDaysCount(){
   return n;
 }
 
+/* ---------- current streak (consecutive complete days, i.e. a day with
+   both an attempt and a journal entry) and milestone levels — a day still
+   in progress (today) doesn't break the streak, only a day that's fully
+   over and was missed does. ---------- */
+function currentStreak(){
+  const attemptSet = allTimeAttemptDayKeys();
+  const journalSet = allTimeJournalDayKeys();
+  const isComplete = (key)=> attemptSet.has(key) && journalSet.has(key);
+  let streak = 0;
+  const cur = new Date(); cur.setHours(0,0,0,0);
+  if(!isComplete(dateKey(cur.getTime()))) cur.setDate(cur.getDate() - 1);
+  while(isComplete(dateKey(cur.getTime()))){
+    streak++;
+    cur.setDate(cur.getDate() - 1);
+  }
+  return streak;
+}
+const STREAK_MILESTONES = [3, 7, 14, 21, 30, 45, 60, 90, 120, 180, 365];
+function nextStreakMilestone(streak){
+  return STREAK_MILESTONES.find(m => m > streak) ?? null;
+}
+function ruDays(n){
+  const n10 = n % 10, n100 = n % 100;
+  if(n100 >= 11 && n100 <= 14) return 'дней';
+  if(n10 === 1) return 'день';
+  if(n10 >= 2 && n10 <= 4) return 'дня';
+  return 'дней';
+}
+
 /* ---------- running total (+1 complete / -1 missed) from the start date up
    to, but not including, a given moment — used so the month trend chart
    carries its balance over from previous months instead of resetting to 0
@@ -1228,11 +1261,13 @@ function renderJournalHome(){
   const todayEntry = findTodayJournal();
   const days = daysSinceStart();
   const consciousDays = allTimeFullDaysCount();
+  const streak = currentStreak();
   return `
     <div class="home-hero" style="margin-top:6vh;">
       <div class="eyebrow">Дневник дня</div>
       ${days ? `<div style="font-family:var(--serif); font-size:28px; color:var(--accent); margin:4px 0 2px;">День ${days}</div>` : ''}
-      ${consciousDays ? `<div style="font-size:13px; color:var(--text-muted); margin:0 0 10px;">Дней осознанных занятий: ${consciousDays}</div>` : ''}
+      ${consciousDays ? `<div style="font-size:13px; color:var(--text-muted); margin:0 0 4px;">Дней осознанных занятий: ${consciousDays}</div>` : ''}
+      ${streak ? `<div style="font-size:13px; color:var(--text-muted); margin:0 0 10px;">🔥 Серия: ${streak} ${ruDays(streak)} подряд</div>` : ''}
       <h1>${todayEntry ? 'Сегодняшняя запись уже есть' : 'Как прошёл день?'}</h1>
     </div>
     <button class="btn btn-primary" data-action="new-journal">${todayEntry ? 'Изменить сегодняшнюю запись' : 'Написать новый дневник'}</button>
@@ -1400,10 +1435,18 @@ function renderJournalWizardStep(){
 function renderProgress(){
   const monthDate = state.progressMonth;
   const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
+  const streak = currentStreak();
+  const nextM = nextStreakMilestone(streak);
 
   return `
     <div class="eyebrow">Прогресс</div>
     <h2 style="font-size:24px; margin-bottom:18px;">Календарь</h2>
+
+    <div class="streak-card">
+      <div class="streak-num">🔥 ${streak}</div>
+      <div class="streak-lbl">${streak ? `серия: ${streak} ${ruDays(streak)} подряд` : 'серии пока нет — отметьте подход и дневник в один день'}</div>
+      ${streak ? `<div class="streak-next">${nextM ? `До серии в ${nextM} ${ruDays(nextM)} — ещё ${nextM - streak} ${ruDays(nextM - streak)}` : 'Все уровни пройдены — настоящий рекорд!'}</div>` : ''}
+    </div>
 
     <div class="metric-grid">
       <div class="metric-tile"><div class="num">${totalAttemptsCount()}</div><div class="lbl">подходов всего</div></div>
