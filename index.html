@@ -2009,9 +2009,26 @@ function buildAttemptsPages(){
   const colX = attColX();
   const tableRight = PDF_L_W - PDF_L_MARGIN;
 
+  // "На улице — 2 · Звонок — 1" — counts grouped by the attempt's type,
+  // in the order each type first appears.
+  const typeCounts = [];
+  entries.forEach(e=>{
+    const t = e.title || 'Без типа';
+    const row = typeCounts.find(r=>r[0]===t);
+    if(row) row[1]++; else typeCounts.push([t, 1]);
+  });
+  const summaryLine = typeCounts.map(([t,n])=> `${t} — ${n}`).join('   ·   ');
+
   const pages = [];
   let { ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H);
-  y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Дневник подходов', dayLabel + ' · всего подходов: ' + entries.length);
+  y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Подходы', dayLabel + ' · всего подходов: ' + entries.length);
+
+  if(summaryLine){
+    ctx.fillStyle = RC.muted; ctx.font = '15px ' + REPORT_FONT;
+    const sumLines = wrapLines(ctx, summaryLine, tableRight - PDF_L_MARGIN);
+    sumLines.forEach((l,li)=> ctx.fillText(l, PDF_L_MARGIN, y + li*20));
+    y += sumLines.length * 20 + 14;
+  }
 
   function drawTableHeader(){
     ctx.fillStyle = RC.headBg;
@@ -2058,7 +2075,7 @@ function buildAttemptsPages(){
 
     if(y + rowH > PDF_L_H - 54){
       ({ ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H));
-      y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Дневник подходов', dayLabel + ' · всего подходов: ' + entries.length);
+      y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Подходы', dayLabel + ' · всего подходов: ' + entries.length);
       drawTableHeader();
     }
 
