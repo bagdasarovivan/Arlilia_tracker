@@ -464,16 +464,16 @@ const QUESTIONS = [
 ];
 
 const JOURNAL_STEPS = [
-  { id:'mood', type:'choice', label:'Самочувствие', options:['Отлично','Хорошо','Норм','Тяжело','Плохо'] },
+  { id:'mood', type:'choice_other', label:'Самочувствие', options:['Отлично','Хорошо','Норм','Тяжело','Плохо','Другое'] },
   { id:'glad', type:'text', label:'Радует', hint:'Что порадовало сегодня' },
   { id:'worry', type:'text', label:'Волнует', hint:'Что беспокоит' },
   { id:'dailyRoutine', type:'textarea', label:'Саморегуляция', hint:'Зевки, прогулка, баня и т.д. — что из приёмов применял' },
-  { id:'sleepHours', type:'number', label:'Сон', hint:'Сколько часов спал' },
-  { id:'difficulties', type:'textarea', label:'Трудная тетрадь', hint:'Паузы, ошибки — что было сложно сегодня' },
+  { id:'sleepHours', type:'number_note', label:'Сон', hint:'Сколько часов спал — можно и цифрой, и словами' },
+  { id:'difficulties', type:'textarea', label:'Трудная тетрадь', hint:'Что вызывает трудности' },
   { id:'questions', type:'textarea', label:'Вопросы' },
   { id:'reflections', type:'textarea', label:'Откровения' },
-  { id:'tricks', type:'textarea', label:'Уловки', hint:'Были ли уловки, избегания или что-то ещё' },
-  { id:'praise', type:'textarea', label:'Похвала', hint:'За что могу себя похвалить сегодня' },
+  { id:'tricks', type:'textarea', label:'Уловки', hint:'Были ли какие-то уловки' },
+  { id:'praise', type:'textarea', label:'Похвала', hint:'За что можно похвалить себя' },
   { id:'intentions', type:'textarea', label:'Речевые планы', hint:'Какие подходы хотел бы ещё сделать' },
 ];
 
@@ -513,6 +513,7 @@ let state = {
   journalEditId: null,
   journalDraft: {},
   journalReadEntry: null,
+  journalNoteOpen: {},
 
   progressMonth: (function(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
 };
@@ -551,7 +552,7 @@ function rowToJournal(r){
     ts: new Date(r.entry_date + 'T12:00:00').getTime(),
     mood: r.mood, glad: r.glad, worry: r.worry,
     dailyRoutine: r.daily_routine,
-    sleepHours: r.sleep_hours,
+    sleepHours: r.sleep_hours, sleepHoursNote: r.sleep_note,
     difficulties: r.difficulties,
     questions: r.questions,
     reflections: r.reflections, tricks: r.tricks, praise: r.praise,
@@ -562,9 +563,11 @@ function journalDraftToRow(e){
   return {
     user_id: auth.userId,
     entry_date: e.entryDate,
-    mood: e.mood || null, glad: e.glad || null, worry: e.worry || null,
+    mood: e.mood === 'other' ? (e.moodCustom || null) : (e.mood || null),
+    glad: e.glad || null, worry: e.worry || null,
     daily_routine: e.dailyRoutine || null,
     sleep_hours: e.sleepHours ?? null,
+    sleep_note: e.sleepHoursNote || null,
     difficulties: e.difficulties || null,
     questions: e.questions || null,
     reflections: e.reflections || null, tricks: e.tricks || null,
@@ -694,7 +697,14 @@ function scheduleJournalSave(){
 function isJournalEntryEmpty(entry){
   return !JOURNAL_STEPS.some(f => {
     const v = entry[f.id];
-    return v !== undefined && v !== null && v !== '';
+    if(v !== undefined && v !== null && v !== '') return true;
+    // number_note fields (e.g. "Сон") can be filled in with only the text
+    // note and no number — that still counts as content.
+    if(f.type === 'number_note'){
+      const note = entry[f.id + 'Note'];
+      if(note !== undefined && note !== null && note !== '') return true;
+    }
+    return false;
   });
 }
 
@@ -1095,11 +1105,15 @@ function renderJournalRead(entry){
   const rowsHtml = JOURNAL_STEPS.map(f=>{
     if(f.id === 'mood') return '';
     const v = entry[f.id];
-    if(v === undefined || v === null || v === '') return '';
+    const hasV = v !== undefined && v !== null && v !== '';
+    const noteVal = f.type === 'number_note' ? entry[f.id + 'Note'] : null;
+    const hasNote = noteVal !== undefined && noteVal !== null && noteVal !== '';
+    if(!hasV && !hasNote) return '';
 
-    if(f.type === 'number'){
+    if(f.type === 'number' || f.type === 'number_note'){
       const unit = f.id === 'sleepHours' ? 'сон, часов' : f.label;
-      return readRow(JOURNAL_ICONS[f.id]||'🔹', v, unit);
+      if(hasV) return readRow(JOURNAL_ICONS[f.id]||'🔹', v, hasNote ? `${unit} — ${noteVal}` : unit);
+      return readRow(JOURNAL_ICONS[f.id]||'🔹', null, noteVal, f.label); // text note only, no number
     }
     return readRow(JOURNAL_ICONS[f.id]||'🔹', null, v, f.label);
   }).join('');
@@ -1155,6 +1169,22 @@ function renderJournalWizardStep(){
     control = `<div class="choice-list">${q.options.map(opt => `
       <button class="choice-list-btn ${val===opt?'selected':''}" data-jw-choice="${q.id}" data-jw-val="${opt}">${opt}</button>
     `).join('')}</div>`;
+  } else if(q.type === 'choice_other'){
+    // Any stored value that isn't one of the preset options is treated as a
+    // previously-typed custom answer (mirrors the practice wizard's
+    // choice_other, and how it's saved: the real text is stored directly,
+    // not the word "other" — see journalDraftToRow).
+    const presetIds = q.options.map(o => o === 'Другое' ? 'other' : o);
+    const isOther = val != null && val !== '' && !presetIds.includes(val);
+    const selId = isOther ? 'other' : val;
+    const customVal = isOther ? val : (state.journalDraft[q.id + 'Custom'] || '');
+    control = `<div class="choice-list">${q.options.map(opt => {
+      const optId = opt === 'Другое' ? 'other' : opt;
+      const selected = selId === optId;
+      return `<button class="choice-list-btn ${selected?'selected':''}" data-jw-choice="${q.id}" data-jw-val="${optId.replace(/"/g,'&quot;')}">${opt}</button>`;
+    }).join('')}
+    ${selId === 'other' ? `<input type="text" id="jw-text-${q.id}Custom" value="${String(customVal).replace(/"/g,'&quot;')}" placeholder="Напишите свой вариант" style="margin-top:10px;">` : ''}
+    </div>`;
   } else if(q.type === 'bool'){
     control = `
       <div class="choice-row">
@@ -1163,6 +1193,15 @@ function renderJournalWizardStep(){
       </div>`;
   } else if(q.type === 'number'){
     control = `<input type="number" inputmode="decimal" id="jw-number-${q.id}" value="${val ?? ''}" style="text-align:center; font-size:30px; padding:16px; font-family:Georgia,serif;">`;
+  } else if(q.type === 'number_note'){
+    const noteKey = q.id + 'Note';
+    const noteVal = state.journalDraft[noteKey] || '';
+    const noteOpen = (state.journalNoteOpen && state.journalNoteOpen[q.id]) || !!noteVal;
+    control = `
+      <input type="number" inputmode="decimal" id="jw-number-${q.id}" value="${val ?? ''}" style="text-align:center; font-size:30px; padding:16px; font-family:Georgia,serif;">
+      <button type="button" class="btn-ghost" data-jw-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen ? 'Скрыть текст' : '+ Написать словами'}</button>
+      ${noteOpen ? `<textarea id="jw-text-${noteKey}" placeholder="Можно написать словами, а не только цифрой..." style="margin-top:10px;">${noteVal}</textarea>` : ''}
+    `;
   } else if(q.type === 'text'){
     control = `<input type="text" id="jw-text-${q.id}" value="${val ? String(val).replace(/"/g,'&quot;') : ''}" placeholder="Коротко, по сути...">`;
   } else if(q.type === 'textarea'){
@@ -1412,6 +1451,14 @@ function attachHandlers(){
       render();
     });
   });
+  app.querySelectorAll('[data-jw-note-toggle]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-jw-note-toggle');
+      state.journalNoteOpen = state.journalNoteOpen || {};
+      state.journalNoteOpen[id] = !state.journalNoteOpen[id];
+      render();
+    });
+  });
   app.querySelectorAll('textarea[id^="note-"]').forEach(el=>{
     el.addEventListener('input', (e)=>{
       const id = e.target.id.replace('note-','');
@@ -1436,9 +1483,13 @@ function attachHandlers(){
   app.querySelectorAll('[data-jw-choice]').forEach(el=>{
     el.addEventListener('click', (e)=>{
       const id = e.currentTarget.getAttribute('data-jw-choice');
-      state.journalDraft[id] = e.currentTarget.getAttribute('data-jw-val');
+      const val = e.currentTarget.getAttribute('data-jw-val');
+      state.journalDraft[id] = val;
       scheduleJournalSave();
       render();
+      // Picking "Другое" opens a text field right below — don't auto-advance
+      // past it before the person has had a chance to type anything.
+      if(val === 'other') return;
       const targetIndex = state.journalStepIndex;
       setTimeout(()=>{
         if(state.journalStepIndex === targetIndex && state.journalStepIndex < JOURNAL_STEPS.length - 1){
@@ -1904,7 +1955,12 @@ function buildJournalPages(){
     const rows = [];
     fieldLabels.forEach(([id,lbl])=>{
       let val = e[id];
-      if(id === 'sleepHours' && val != null) val = fmtNum(val);
+      if(id === 'sleepHours'){
+        if(val != null) val = fmtNum(val);
+        const note = e.sleepHoursNote;
+        if(val != null && note) val = val + ' — ' + note;
+        else if(note) val = note; // text note only, no number entered
+      }
       if(val === null || val === undefined || val === '') return;
       rows.push([lbl, String(val)]);
     });
