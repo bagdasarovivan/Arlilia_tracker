@@ -262,6 +262,36 @@
   .cal-arrow.down{ color: var(--warn); }
   .cal-legend{ display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; font-size:12px; color: var(--text-muted); align-items:center; }
   .cal-legend span{ display:inline-flex; align-items:center; gap:5px; }
+
+  /* ---- Exercises ---- */
+  .exercise-cat-list{ display:flex; flex-direction:column; gap:12px; }
+  .exercise-cat-card{
+    display:flex; align-items:center; gap:14px; text-align:left;
+    background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+    padding:18px; font-family: var(--sans); color: var(--text); cursor:pointer;
+  }
+  .exercise-cat-icon{ font-size:28px; flex-shrink:0; width:40px; text-align:center; }
+  .exercise-cat-body{ flex:1; min-width:0; }
+  .exercise-cat-label{ font-family: var(--serif); font-size:19px; }
+  .exercise-cat-sub{ font-size:13px; color: var(--text-muted); margin-top:3px; }
+  .exercise-cat-count{ font-size:14px; color: var(--text-muted); font-weight:600; flex-shrink:0; }
+  .exercise-cat-count.has-progress{ color: var(--good); }
+
+  .exercise-list{ display:flex; flex-direction:column; gap:10px; }
+  .exercise-row{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:4px 14px; }
+  .exercise-row.done{ border-color: var(--good); }
+  .exercise-row-top{ display:flex; align-items:center; gap:12px; min-height:52px; }
+  .exercise-check{
+    width:28px; height:28px; border-radius:50%; flex-shrink:0;
+    border:2px solid var(--border); background: transparent; color: var(--accent-text);
+    font-size:15px; font-weight:700; line-height:1; padding:0;
+  }
+  .exercise-check.checked{ background: var(--good); border-color: var(--good); }
+  .exercise-name{ flex:1; text-align:left; background:none; border:none; color: var(--text); font-size:16px; font-family: var(--sans); padding:10px 0; }
+  .exercise-row.done .exercise-name{ color: var(--text-muted); }
+  .exercise-chevron{ color: var(--text-muted); font-size:11px; flex-shrink:0; }
+  .exercise-detail{ padding:0 0 16px 40px; font-size:14px; line-height:1.55; color: var(--text); }
+  .exercise-note{ margin-top:8px; color: var(--text-muted); font-size:13px; font-style:italic; }
 </style>
 </head>
 <body>
@@ -484,6 +514,87 @@ const JOURNAL_ICONS = {
 };
 const MOOD_ICONS = {'Отлично':'🤩','Хорошо':'😊','Норм':'🙂','Тяжело':'😕','Плохо':'😞'};
 
+/* ---------- Exercise library (from the training materials) ---------- */
+const EXERCISE_CATEGORIES = [
+  {
+    id: 'body', label: 'Тело', icon: '🧘', subtitle: 'Разминка',
+    items: [
+      { name:'Тянемся', desc:'Тянемся руками вверх, в стороны.', note:'После упражнения сбрасываем руки вниз и болтаем руками и ногами.' },
+      { name:'Перекаты', desc:'Перекатываемся с пятки на носок и обратно, балансируем.', note:'Всё делать легко, ощущать свободу в теле.' },
+      { name:'Свободное движение', desc:'Двигаемся из стороны в сторону грациозно.', note:'Как будто внутри стержень, верхняя часть туловища свободная. Поворачиваемся, двигаемся.' },
+      { name:'Круговые движения головы', desc:'Голову мягко и аккуратно вращаем по кругу.', note:'Сначала в одну сторону, потом в другую.' },
+      { name:'Сжимаем лопатки', desc:'Сжимаем лопатки на несколько секунд, затем отпускаем.', note:'После делаем сброс со звуком «ссс».' },
+      { name:'Плечи к ушам', desc:'Держим плечи к ушам, затем отпускаем.', note:'После делаем сброс и снова зажимаем.' },
+      { name:'Пружинка', desc:'Как бы приседаем в очень маленькой амплитуде, как пружинка.', note:'Верхняя часть туловища свободная.' },
+      { name:'Моем полы', desc:'Наклоняемся и делаем вид, что моем полы.', note:'Размашистыми, старательными движениями делаем вид, что моем пол.' },
+      { name:'Циркуль', desc:'Руки над головой вместе, ноги вместе, тянемся вверх как можно выше.', note:'Не отрываем пятки от пола, тянемся вверх, потом хлопок и сброс.' },
+      { name:'Открываем тело', desc:'Ноги, руки расставили в стороны максимально широко, затем хлопок.', note:'Тянемся в стороны как можно шире. В конце сброс с шумным выдохом.' },
+      { name:'Зародыш', desc:'Ложимся на пол в позу зародыша, одна нога вытянута, другая согнута прижата к животу. Руки под голову.', note:'Лежим расслабляемся. Ощущение расслабления.' },
+      { name:'Бег на месте', desc:'Присесть, скукожиться, напрячь плечи и руки и быстро бежать на месте.', note:'Максимально ускориться на месте в таком состоянии, затем встать и расслабиться.' },
+      { name:'Зевок', desc:'Громко зеваем, затем средне, затем тихо. Так по кругу.', note:'Зеваем громко, затем средне и тихо.' },
+      { name:'Ноги на полу', desc:'Ложимся на спину, сгибаем ноги в коленях на весу, затем трясём вверх-вниз ноги. Затем по кругу в одну, потом в другую сторону.', note:'Колени согнуты, не вытягивать ноги.' },
+      { name:'Голова на полу', desc:'Так же лежим на спине, голову крутим по сторонам, затем тянем подбородок к туловищу.', note:'Всё делаем лёжа, вытянувшись.' },
+      { name:'Плечи', desc:'Вращаем плечами вперёд-назад.', note:'Стоим ровно, вращаем плечами.' },
+      { name:'Поясница', desc:'Стоим, одну руку отвели назад, мягко смотрим, затем вернули обратно и так же другую руку.', note:'Делаем всё мягко и аккуратно, не спешим.' },
+      { name:'Голова', desc:'Вращаем голову по кругу.', note:'Мягко вращаем голову в одну сторону, потом в другую.' },
+      { name:'Позвоночник', desc:'Стоя наклоняемся вниз, голова прижата к туловищу, затем так же ровно выпрямляемся. Руки вниз тянутся всегда. Внизу 3 вдоха и 3 выдоха.', note:'Стараемся как можно ближе к телу подняться, как будто находишься в очень узком месте.' },
+      { name:'Конь', desc:'Ноги широко расставили, как будто сели на коня, руки на поясе, большой палец смотрит вперёд. Стоим дышим. Затем сброс, болтаем руками и ногами.', note:'Все чакры открываются, идёт энергия.' },
+    ],
+  },
+  {
+    id: 'voice', label: 'Голос', icon: '🗣️', subtitle: 'Голосовые упражнения',
+    items: [
+      { name:'Зародыш урчит', desc:'Ложимся в позу зародыша и урчим.', note:'Грубо говоря, храпим с разными регистрами: низкий, средний, высокий. Расслабляемся, запоминаем внутренние ощущения.' },
+      { name:'Звучим на спине', desc:'Ложимся на спину, согнули ноги, делаем сброс воздуха звуком. Трясём ногами на звуке.', note:'Издаём разные звуки (О, А, У, И, Ы, Э).' },
+      { name:'Голос в подвал', desc:'Ложимся на живот, голову на руки перед собой. Язык вытягиваем к мягкому нёбу, издаём звук.', note:'Рот прикрыт, стараемся сделать самый низкий звук. Звучим так по кругу несколько раз.' },
+      { name:'Расширяем звук голоса', desc:'Ложимся на спину, руки на голову, издаём звук ДНДНДН. Затем звуки ИЭОИЭОИЭО. Затем звук УУУУУУ.', note:'Издаём звук, лежим расслабленно. Звук «У» выводим в уши мысленно. Рот закрыт.' },
+      { name:'Фонтан', desc:'Ложимся на спину, вдыхаем на 2 секунды, затем 16 раз болтаем животом вверх-вниз, затем на 4 счёта выдыхаем.', note:'Никакого звука нет и дыхания. Работают только мышцы.' },
+      { name:'МэЛэ на полу', desc:'Лёжа на полу сгибаем ноги на весу, издаём звуки ММ, ЛЛ.', note:'Работаем животом, ногами не болтаем.' },
+      { name:'Сдираем липучку с тела', desc:'Сидим на полу, как будто снимаем с тела что-то прилипшее.', note:'Вспоминаем свои мышцы и ощущения. Проминаем своё тело.' },
+      { name:'Согреваем руки', desc:'Трём руки друг о друга, затем тёплым воздухом дуем на руки. Как будто замёрзли, затем произносим низкое «О» на руки продолжительно.', note:'Удлинить выдох.' },
+      { name:'Кувшин с молоком', desc:'Ложимся в позу зародыша, издаём гласные звуки, как будто выливается молоко.', note:'Как будто молоко выливается, булькает.' },
+      { name:'Скороговорки на стуле', desc:'Садимся на стул, разворачиваемся, кладём одну руку на спинку стула, вторую на живот, ноги ровно. Читаем стихи, толкая спинкой живота.', note:'Произносим как скандируем (как «на пи-шу-щей ма-шин-ке...»).' },
+      { name:'Водичка во рту', desc:'Представляем, как будто водичка во рту, издаём звук в пол, одиночный, как бросок (Хммм).', note:'Губы не сжимаем, всё тело расслаблено. Рот закрыт.' },
+      { name:'Гудим', desc:'Гудим на звуке «О».', note:'Рот закрыт, прямой хороший звук.' },
+      { name:'Жуем звук', desc:'Делаем предыдущее упражнение, только жуём звук.', note:'Тело расслаблено.' },
+      { name:'Гитара', desc:'Тянем за кончик носа, как будто играем на гитаре, издаём звук «О» с закрытым ртом.', note:'Всё свободно, расслабленно.' },
+      { name:'Ноздри', desc:'Вдох через одну ноздрю, выдох через другую, через неё же вдох и так по кругу.', note:'Не напрягаемся.' },
+      { name:'Поглаживание носа', desc:'Вдыхаем ртом, затем выдыхаем носом и руками проглаживаем нос сверху вниз.' },
+      { name:'Закрытые слоги', desc:'Произносим открытые слоги на руке: МО МА МЭ МИ МЫ. Затем ММА ММО ММУ ММЫ. Затем МИМОЗЫ МИЛА МАМЕ КУПИЛА.', note:'Не давим, спокойно. Играем с ударением на слогах. Произносим с разным ударением.' },
+      { name:'Счёт', desc:'Произносим счёт от 1 до 10, давя руками на живот.', note:'Давим руками на живот, чтобы работала диафрагма при каждом произнесении числа.' },
+      { name:'Мяч', desc:'Бросаем невидимый мяч со звуком. Разбежались и бросили.', note:'Со звуком «ЭЭЭЭХ».' },
+      { name:'Ленточки', desc:'Со звуком вытягиваем невидимые ленточки из носа.', note:'Легко, выводим звук на губы.' },
+      { name:'Раскачиваем гласные (ребёночек)', desc:'Взяли невидимого ребёнка на руки и из стороны в сторону качаем его со звуками (гласными) АААА, ОООО, УУУУ и т.д.', note:'Как будто качаем ребёночка из стороны в сторону.' },
+      { name:'Подбрасываем ребёночка', desc:'Руки немного вытянуты перед собой, как будто на руках лежит ребёночек, мы его раскачиваем, затем подбрасываем и ловим. С гласными ААААА-А, ОООО-О.', note:'Как будто ребёнок — в момент подбрасывания звук гласной как при броске.' },
+      { name:'Ромашка и малина', desc:'Поднимаем руки вверх через стороны со словом «РАААА», потом сброс и наклоняемся вниз со звуком «МАШКА», точно так же «МАЛИНА».', note:'После сброса делаем снова по несколько раз.' },
+      { name:'Канат', desc:'Стоим ровно, как будто держимся за канат и дёргаем его со звуком «ЭэЭэ».', note:'Ноги полусогнутые, трясём звук.' },
+      { name:'Обезьянки (авторское)', desc:'Наклоняемся немного, как обезьянки, и издаём звук — по типу упражнения «Канат».', note:'Так же со звуком, только в согнутом положении.' },
+      { name:'БРАБРОБРЫ', desc:'Произносим БРА БРО БРУ БРЫ с разной интонацией, задаём вопрос, отвечаем.', note:'Как будто общаемся на БРА БРЭ БРЫ БРО БРУ.' },
+      { name:'ДА ДО ДУ ДЫ', desc:'Как будто распеваем ДА ДА ДА ДА, ДО ДО ДО ДО.', note:'Как будто пропиваем (нараспев).' },
+      { name:'Скороговорки', desc:'Произносим скороговорки с интонацией.', note:'Закрепляем хороший голос.' },
+    ],
+  },
+  {
+    id: 'massage', label: 'Вибрационный массаж', icon: '👐', subtitle: 'Постукивания со звуком',
+    items: [
+      { name:'Лоб', desc:'Издаём звук и постукиваем себя по лбу.', note:'От середины к вискам.' },
+      { name:'Губы', desc:'Верхняя губа — ВВВВВ. Нижняя губа — ЗЗЗЗЗ.' },
+      { name:'Грудь', desc:'Стучим по груди, как Кинг-Конг.', note:'Не сильно.' },
+      { name:'Рёбра', desc:'Стучим ребром кисти по рёбрам.' },
+      { name:'Пах', desc:'В паховых ямках стучим.' },
+      { name:'Живот', desc:'Стучим по животу.' },
+      { name:'Спина', desc:'Попросить кого-то постучать по спине, по лопаткам и позвоночнику.', note:'Нужен помощник, кто может постучать по спине.' },
+    ],
+  },
+];
+// Stable per-exercise ids (catId-01, catId-02, ...) used for "done today"
+// tracking — assigned by position so they stay stable across re-renders
+// without needing to slugify the (sometimes punctuation-heavy) names.
+EXERCISE_CATEGORIES.forEach(cat=>{
+  cat.items.forEach((it,i)=>{ it.id = cat.id + '-' + String(i+1).padStart(2,'0'); });
+});
+function allExercises(){ return EXERCISE_CATEGORIES.flatMap(c=>c.items); }
+function findExercise(id){ return allExercises().find(it=>it.id===id); }
 
 let state = {
   tab: 'practice',            // practice | journal | progress | settings
@@ -514,6 +625,11 @@ let state = {
   journalDraft: {},
   journalReadEntry: null,
   journalNoteOpen: {},
+
+  exerciseCategory: null,     // null = category menu, otherwise a category id
+  exercisesDoneToday: {},     // { [exerciseId]: true } — loaded fresh each day
+  exerciseExpanded: {},       // { [exerciseId]: true } — which rows are expanded
+  exerciseSaving: {},         // { [exerciseId]: true } — in-flight toggle
 
   progressMonth: (function(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
 };
@@ -595,12 +711,44 @@ async function loadAll(){
     }
   }catch(e){ console.error(e); }
   try{
+    const res4 = await sbFetch(`${SUPABASE_URL}/rest/v1/exercise_log?select=exercise_id&done_date=eq.${todayKey()}`);
+    const rows4 = await res4.json();
+    state.exercisesDoneToday = {};
+    if(Array.isArray(rows4)) rows4.forEach(r=>{ state.exercisesDoneToday[r.exercise_id] = true; });
+  }catch(e){ console.error(e); state.exercisesDoneToday = {}; }
+  try{
     const savedTheme = localStorage.getItem('arlilia_theme');
     if(savedTheme) state.settings.theme = savedTheme;
   }catch(e){}
   applyTheme();
   state.loaded = true;
   return true;
+}
+
+async function toggleExercise(exerciseId){
+  const wasDone = !!state.exercisesDoneToday[exerciseId];
+  state.exerciseSaving[exerciseId] = true;
+  state.exercisesDoneToday[exerciseId] = !wasDone; // optimistic
+  render();
+  try{
+    if(wasDone){
+      const res = await sbFetch(`${SUPABASE_URL}/rest/v1/exercise_log?exercise_id=eq.${exerciseId}&done_date=eq.${todayKey()}`, { method:'DELETE' });
+      if(!res.ok) throw new Error('delete failed: ' + res.status);
+    } else {
+      const res = await sbFetch(`${SUPABASE_URL}/rest/v1/exercise_log?on_conflict=user_id,exercise_id,done_date`, {
+        method: 'POST',
+        headers: { 'Prefer': 'resolution=merge-duplicates' },
+        body: JSON.stringify([{ user_id: auth.userId, exercise_id: exerciseId, done_date: todayKey() }]),
+      });
+      if(!res.ok) throw new Error('insert failed: ' + res.status);
+    }
+  }catch(e){
+    console.error(e);
+    state.exercisesDoneToday[exerciseId] = wasDone; // roll back
+    showToast('Не удалось сохранить — проверьте соединение');
+  }
+  state.exerciseSaving[exerciseId] = false;
+  render();
 }
 
 function applyTheme(){
@@ -889,7 +1037,7 @@ function render(){
     let body = '';
     if(state.tab === 'practice') body = renderPracticeHome();
     else if(state.tab === 'journal') body = renderJournalHome();
-    else if(state.tab === 'exercises') body = renderExercisesHome();
+    else if(state.tab === 'exercises') body = state.exerciseCategory ? renderExerciseCategory(state.exerciseCategory) : renderExercisesHome();
     else if(state.tab === 'progress') body = renderProgress();
     else body = renderSettings();
     app.innerHTML = `<div class="content">${body}</div>${renderTabbar()}`;
@@ -1036,15 +1184,68 @@ function renderPracticeWizard(){
   `;
 }
 
-/* ---------- Exercises tab (placeholder — content to be added later) ---------- */
+/* ---------- Exercises tab ---------- */
 function renderExercisesHome(){
+  const total = allExercises().length;
+  const doneCount = Object.keys(state.exercisesDoneToday).length;
   return `
     <div class="home-hero" style="margin-top:6vh;">
       <div class="eyebrow">Упражнения</div>
-      <h1>Раздел в разработке</h1>
+      <h1>Какой блок потренируем?</h1>
     </div>
-    <div class="card" style="text-align:center; color:var(--text-muted);">
-      Здесь скоро появятся упражнения — наполним раздел в ближайшее время.
+    <div class="today-badge-wrap">
+      <div class="today-badge">
+        <div class="today-badge-num">${doneCount}<span style="font-size:28px; color:var(--text-muted);">/${total}</span></div>
+        <div class="today-badge-lbl">сделано сегодня</div>
+      </div>
+    </div>
+    <div class="exercise-cat-list">
+      ${EXERCISE_CATEGORIES.map(cat=>{
+        const catDone = cat.items.filter(it=>state.exercisesDoneToday[it.id]).length;
+        return `
+        <button class="exercise-cat-card" data-action="open-exercise-category" data-cat="${cat.id}">
+          <div class="exercise-cat-icon">${cat.icon}</div>
+          <div class="exercise-cat-body">
+            <div class="exercise-cat-label">${cat.label}</div>
+            <div class="exercise-cat-sub">${cat.subtitle} · ${cat.items.length} упражнений</div>
+          </div>
+          <div class="exercise-cat-count ${catDone>0?'has-progress':''}">${catDone}/${cat.items.length}</div>
+        </button>
+      `;}).join('')}
+    </div>
+  `;
+}
+
+function renderExerciseCategory(catId){
+  const cat = EXERCISE_CATEGORIES.find(c=>c.id===catId);
+  if(!cat){ state.exerciseCategory = null; return renderExercisesHome(); }
+  const catDone = cat.items.filter(it=>state.exercisesDoneToday[it.id]).length;
+
+  return `
+    <div class="top-bar">
+      <button class="back-btn" data-action="exercises-back">‹</button>
+      <h2>${cat.icon} ${cat.label}</h2>
+    </div>
+    <div class="autosave-hint" style="margin:-10px 0 16px;">Сделано сегодня: ${catDone} из ${cat.items.length}</div>
+    <div class="exercise-list">
+      ${cat.items.map(it=>{
+        const done = !!state.exercisesDoneToday[it.id];
+        const open = !!state.exerciseExpanded[it.id];
+        const saving = !!state.exerciseSaving[it.id];
+        return `
+        <div class="exercise-row ${done?'done':''}">
+          <div class="exercise-row-top">
+            <button class="exercise-check ${done?'checked':''}" data-action="toggle-exercise" data-exid="${it.id}" ${saving?'disabled':''} aria-label="Отметить сделанным">${done?'✓':''}</button>
+            <button class="exercise-name" data-action="toggle-exercise-expand" data-exid="${it.id}">${it.name}</button>
+            <span class="exercise-chevron">${open?'︿':'﹀'}</span>
+          </div>
+          ${open ? `
+          <div class="exercise-detail">
+            <div>${it.desc}</div>
+            ${it.note ? `<div class="exercise-note">${it.note}</div>` : ''}
+          </div>` : ''}
+        </div>
+      `;}).join('')}
     </div>
   `;
 }
@@ -1676,6 +1877,15 @@ async function onAction(e){
     setTheme('light'); return;
   } else if(action === 'theme-dark'){
     setTheme('dark'); return;
+  } else if(action === 'open-exercise-category'){
+    state.exerciseCategory = e.currentTarget.getAttribute('data-cat');
+  } else if(action === 'exercises-back'){
+    state.exerciseCategory = null;
+  } else if(action === 'toggle-exercise-expand'){
+    const id = e.currentTarget.getAttribute('data-exid');
+    state.exerciseExpanded[id] = !state.exerciseExpanded[id];
+  } else if(action === 'toggle-exercise'){
+    toggleExercise(e.currentTarget.getAttribute('data-exid')); return;
   }
   render();
 }
