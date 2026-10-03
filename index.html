@@ -87,7 +87,10 @@
     background: var(--surface); border-bottom:1px solid var(--border);
     padding: 14px 20px; margin: -26px -20px 18px;
   }
-  .app-bar-brand{ display:flex; align-items:center; gap:7px; font-family: var(--serif); font-size:19px; font-weight:600; letter-spacing:.05em; color: var(--accent); }
+  .app-bar-brand{ display:flex; align-items:center; gap:9px; font-family: var(--serif); font-size:19px; font-weight:600; letter-spacing:.05em; color: var(--text); }
+  .brand-mark{ display:flex; flex:none; width:32px; height:32px; }
+  .brand-mark svg{ display:block; width:100%; height:100%; }
+  .brand-text{ line-height:1; }
   .app-bar-right{ display:flex; align-items:center; gap:8px; }
   .streak-pill{
     display:inline-flex; align-items:center; gap:4px;
@@ -1088,7 +1091,16 @@ function renderAppBar(){
   const streak = currentStreak();
   return `
     <div class="app-bar">
-      <div class="app-bar-brand">LOG</div>
+      <div class="app-bar-brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32">
+            <rect x="1" y="1" width="30" height="30" rx="9" fill="#1A1D23"/>
+            <circle cx="16" cy="16" r="7.5" fill="none" stroke="#fff" stroke-width="3.2"/>
+            <rect x="2" y="19.3" width="28" height="4.6" rx="2.3" fill="#2F6FED" transform="rotate(-26 16 16)"/>
+          </svg>
+        </span>
+        <span class="brand-text">LOG</span>
+      </div>
       <div class="app-bar-right">
         ${streak ? `<button class="streak-pill" data-action="toggle-streak-info">🔥 ${streak}</button>` : ''}
         <button class="gear-btn ${state.tab==='settings'?'active':''}" data-action="toggle-settings" aria-label="Настройки">⚙</button>
