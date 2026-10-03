@@ -87,7 +87,7 @@
     background: var(--surface); border-bottom:1px solid var(--border);
     padding: 14px 20px; margin: -26px -20px 18px;
   }
-  .app-bar-brand{ display:flex; align-items:center; gap:7px; font-family: var(--serif); font-size:18px; color: var(--text); }
+  .app-bar-brand{ display:flex; align-items:center; gap:7px; font-family: var(--serif); font-size:19px; font-weight:600; letter-spacing:.05em; color: var(--accent); }
   .app-bar-right{ display:flex; align-items:center; gap:8px; }
   .streak-pill{
     display:inline-flex; align-items:center; gap:4px;
@@ -1088,7 +1088,7 @@ function renderAppBar(){
   const streak = currentStreak();
   return `
     <div class="app-bar">
-      <div class="app-bar-brand"></div>
+      <div class="app-bar-brand">LOG</div>
       <div class="app-bar-right">
         ${streak ? `<button class="streak-pill" data-action="toggle-streak-info">🔥 ${streak}</button>` : ''}
         <button class="gear-btn ${state.tab==='settings'?'active':''}" data-action="toggle-settings" aria-label="Настройки">⚙</button>
