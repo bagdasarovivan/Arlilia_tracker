@@ -4,7 +4,7 @@
    calls (Supabase) always go straight to the network — never cached. Bump
    CACHE_NAME whenever the shell itself changes, so clients pick up the
    new version instead of being stuck on a stale cached copy. */
-const CACHE_NAME = 'arlilia-shell-v2';
+const CACHE_NAME = 'arlilia-shell-v3';
 const SHELL_FILES = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -33,7 +33,26 @@ self.addEventListener('fetch', (event) => {
   const isShellOrLib = url.origin === location.origin || url.hostname === 'cdnjs.cloudflare.com';
   if (!isShellOrLib) return; // Supabase (data + auth) always goes straight to the network
 
-  // Stale-while-revalidate: serve from cache instantly, refresh in the background.
+  // The app's HTML (the page itself, '/') changes often while this app is
+  // actively being worked on — network-first so a reload always shows the
+  // latest version, falling back to the cached copy only if offline.
+  if (req.mode === 'navigate' || url.pathname === '/') {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.status === 200) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Everything else (icons, manifest, libs) changes rarely — stale-while-
+  // revalidate: serve from cache instantly, refresh in the background.
   event.respondWith(
     caches.match(req).then((cached) => {
       const network = fetch(req)
