@@ -132,7 +132,7 @@
   .tab-btn.active{ color: var(--accent); }
 
   /* ---- Home / Practice tab ---- */
-  .home-hero{ margin-top: 6vh; margin-bottom: 28px; }
+  .home-hero{ margin-top: 4px; margin-bottom: 28px; }
   .home-hero h1{ font-size: 34px; line-height:1.25; }
   .today-badge-wrap{ display:flex; justify-content:center; margin: 10px 0 30px; }
   .today-badge{
@@ -1305,9 +1305,8 @@ function renderPracticeWizard(){
 /* ---------- Exercises tab ---------- */
 function renderExercisesHome(){
   return `
-    <div class="home-hero" style="margin-top:6vh;">
+    <div class="home-hero" style="margin-top:4px; margin-bottom:18px;">
       <div class="eyebrow">Упражнения</div>
-      <h1>Какой блок посмотрим?</h1>
     </div>
     <div class="exercise-cat-list">
       ${EXERCISE_CATEGORIES.map(cat=>`
@@ -1367,7 +1366,7 @@ function renderJournalHome(){
   const consciousDays = allTimeFullDaysCount();
   const streak = currentStreak();
   return `
-    <div class="home-hero" style="margin-top:6vh;">
+    <div class="home-hero">
       <div class="eyebrow">Дневник дня</div>
       ${days ? `<div style="font-family:var(--serif); font-size:28px; color:var(--accent); margin:4px 0 2px;">День ${days}</div>` : ''}
       ${consciousDays ? `<div style="font-size:13px; color:var(--text-muted); margin:0 0 4px;">Дней осознанных занятий: ${consciousDays}</div>` : ''}
