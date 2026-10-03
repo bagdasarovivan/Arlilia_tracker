@@ -115,6 +115,23 @@
   }
   .gear-btn.active{ color: var(--accent); border-color: var(--accent); }
 
+  /* ---- Onboarding: popup + pointing arrow at the settings gear ---- */
+  .onboard-arrow-wrap{
+    position: fixed; top:0; right:16px; z-index:50;
+    display:flex; flex-direction:column; align-items:flex-end;
+    padding-top: 58px;
+  }
+  .onboard-arrow{
+    font-size:30px; line-height:1; color: var(--accent);
+    margin-right:16px; animation: onboard-bounce 1.2s ease-in-out infinite;
+  }
+  @keyframes onboard-bounce{ 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-6px); } }
+  .onboard-callout{
+    background: var(--surface); border:1px solid var(--accent); border-radius: var(--radius);
+    padding:16px; width: min(280px, calc(100vw - 32px)); margin-top:2px;
+    box-shadow: 0 10px 28px -10px rgba(0,0,0,.35);
+  }
+
   /* ---- Bottom nav ---- */
   .tabbar{
     position: sticky; bottom:0; left:0; right:0;
@@ -689,6 +706,8 @@ let state = {
   confirmReset: false,
   resetBusy: false,
   startDateSaving: false,
+  onboarding: 0,               // 0 hidden | 1 welcome popup | 2 arrow at settings gear
+  focusStartDate: false,
 
   settings: { startDate: null, theme: 'light' },
 
@@ -1133,7 +1152,7 @@ function render(){
     else if(state.tab === 'exercises') body = state.exerciseCategory ? renderExerciseCategory(state.exerciseCategory) : renderExercisesHome();
     else if(state.tab === 'progress') body = renderProgress();
     else body = renderSettings();
-    app.innerHTML = `${renderAppBar()}<div class="content">${body}</div>${renderTabbar()}`;
+    app.innerHTML = `${renderAppBar()}<div class="content">${body}</div>${renderTabbar()}${state.tab !== 'settings' ? renderOnboarding() : ''}`;
   }
   attachHandlers();
   if(state.focusStartDate){
@@ -1176,6 +1195,43 @@ function renderStreakInfo(){
       </div>
     </div>
   `;
+}
+
+// First-time setup nudge, shown once (per device) to someone who hasn't
+// set a start date yet: a short welcome popup, then an arrow pointing at
+// the settings gear in the top bar — "Пропустить" ends it at either step
+// and is remembered so it never shows again.
+function renderOnboarding(){
+  if(state.onboarding === 1){
+    return `
+      <div class="modal-backdrop" data-action="onboarding-skip">
+        <div class="modal-card" style="text-align:center;">
+          <div style="font-size:34px; margin-bottom:6px;">👋</div>
+          <div class="modal-title">Добро пожаловать в LOG</div>
+          <div class="modal-text">Прежде чем начать — укажите дату начала занятий. Тогда дневник будет считать дни по порядку и показывать пропущенные.</div>
+          <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn btn-ghost" style="flex:1;" data-action="onboarding-skip">Пропустить</button>
+            <button class="btn btn-primary" style="flex:1;" data-action="onboarding-next">Показать</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  if(state.onboarding === 2){
+    return `
+      <div class="onboard-arrow-wrap">
+        <div class="onboard-arrow">↑</div>
+        <div class="onboard-callout">
+          <div class="modal-text" style="margin-bottom:12px;">Здесь, в настройках — укажите дату начала занятий</div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-ghost" style="flex:1;" data-action="onboarding-skip">Пропустить</button>
+            <button class="hint-card-btn" style="flex:1;" data-action="goto-start-date">Перейти</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  return '';
 }
 
 function renderLogin(){
@@ -1232,7 +1288,6 @@ function renderPracticeHome(){
   return `
     <div class="home-hero">
       <div class="eyebrow">Подходы</div>
-      <h1>Как прошёл сегодняшний подход?</h1>
     </div>
     <div class="today-badge-wrap">
       <div class="today-badge">
@@ -1931,6 +1986,11 @@ function doAuthFromForm(){
   else doLoginFromForm();
 }
 
+function endOnboarding(){
+  state.onboarding = 0;
+  try{ localStorage.setItem('arlilia_onboarding_done', '1'); }catch(e){}
+}
+
 async function onAction(e){
   const action = e.currentTarget.getAttribute('data-action');
 
@@ -1951,6 +2011,15 @@ async function onAction(e){
     if(state.tab !== 'settings') state.lastTab = state.tab;
     state.tab = 'settings';
     state.focusStartDate = true;
+    endOnboarding();
+    render();
+    return;
+  } else if(action === 'onboarding-next'){
+    state.onboarding = 2;
+    render();
+    return;
+  } else if(action === 'onboarding-skip'){
+    endOnboarding();
     render();
     return;
   } else if(action === 'confirm-start-date'){
@@ -2507,6 +2576,13 @@ async function boot(){
     state.loggedIn = false;
   } else if(state.loadOffline){
     showToast('Нет соединения — показаны сохранённые данные');
+  } else if(!state.settings.startDate){
+    // First-time setup nudge: a popup, then an arrow pointing at the
+    // settings gear — only for someone who hasn't set a start date yet
+    // and hasn't dismissed this before (per device).
+    let seen = false;
+    try{ seen = localStorage.getItem('arlilia_onboarding_done') === '1'; }catch(e){}
+    if(!seen) state.onboarding = 1;
   }
   render();
 }
