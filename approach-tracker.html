@@ -723,6 +723,10 @@ const EXERCISE_CATEGORIES = [
       { name:'Спина', desc:'Попросить кого-то постучать по спине, по лопаткам и позвоночнику.', note:'Нужен помощник, кто может постучать по спине.' },
     ],
   },
+  {
+    id: 'facepoints', label: 'Точечный массаж лица', icon: '💆', subtitle: 'Точки на лице',
+    items: [], // упражнения будут добавлены позже
+  },
 ];
 // Stable per-exercise ids (catId-01, catId-02, ...) — kept for the expand/
 // collapse UI state, assigned by position so they stay stable across
@@ -1426,7 +1430,7 @@ function renderExercisesHome(){
           <div class="exercise-cat-icon">${cat.icon}</div>
           <div class="exercise-cat-body">
             <div class="exercise-cat-label">${cat.label}</div>
-            <div class="exercise-cat-sub">${cat.subtitle} · ${cat.items.length} упражнений</div>
+            <div class="exercise-cat-sub">${cat.items.length ? cat.subtitle + ' · ' + cat.items.length + ' упражнений' : cat.subtitle + ' · скоро'}</div>
           </div>
           <div class="exercise-cat-count">›</div>
         </button>
@@ -1445,6 +1449,7 @@ function renderExerciseCategory(catId){
       <h2>${cat.icon} ${cat.label}</h2>
     </div>
     <div class="exercise-list">
+      ${cat.items.length ? '' : '<div class="empty">Упражнения скоро появятся</div>'}
       ${cat.items.map(it=>{
         const open = !!state.exerciseExpanded[it.id];
         return `
