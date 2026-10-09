@@ -431,21 +431,58 @@ function clearSession(){
 // refresh token — it's genuinely expired/revoked, session really is gone),
 // or 'network' (couldn't even reach the server — a connectivity blip, not
 // a reason to log anyone out).
-async function refreshSession(){
+//
+// Supabase rotates the refresh token on every refresh, so the OLD one stops
+// working the moment a refresh succeeds. Two things used to turn that into
+// surprise logouts: (1) two refreshes racing each other (several requests
+// 401-ing at once, or this tab and another/installed copy of the app), and
+// (2) another tab having already rotated the token, leaving this tab holding
+// a dead one. So refreshes are single-flight, and before giving up on a
+// rejected token we check whether another tab saved a newer one.
+let refreshInFlight = null;
+function refreshSession(){
+  if(refreshInFlight) return refreshInFlight;
+  refreshInFlight = doRefreshSession().finally(()=>{ refreshInFlight = null; });
+  return refreshInFlight;
+}
+async function doRefreshSession(){
+  syncSessionFromStorage(); // pick up a newer token if another tab rotated it
   if(!auth.refreshToken) return 'invalid';
+  const usedToken = auth.refreshToken;
   try{
     const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
       method: 'POST',
       headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: auth.refreshToken }),
+      body: JSON.stringify({ refresh_token: usedToken }),
     });
     if(res.ok){
       const data = await res.json();
       setSession(data);
       return 'ok';
     }
-    return (res.status === 400 || res.status === 401) ? 'invalid' : 'network';
+    if(res.status === 400 || res.status === 401){
+      // Rejected — but maybe only because another tab already used (and
+      // replaced) this token a moment ago. If storage now holds a different
+      // token, the session is alive: adopt it instead of logging out.
+      syncSessionFromStorage();
+      if(auth.refreshToken && auth.refreshToken !== usedToken && auth.expiresAt - Date.now() > 30 * 1000) return 'ok';
+      return 'invalid';
+    }
+    return 'network';
   }catch(e){ return 'network'; }
+}
+// Re-reads the saved session so this tab never keeps using a refresh token
+// that another tab has already replaced.
+function syncSessionFromStorage(){
+  try{
+    const raw = localStorage.getItem('arlilia_session');
+    if(!raw) return;
+    const s = JSON.parse(raw);
+    if(s && s.refresh_token && (s.expires_at || 0) >= (auth.expiresAt || 0)){
+      auth.accessToken = s.access_token; auth.refreshToken = s.refresh_token;
+      auth.userId = s.user_id; auth.email = s.email; auth.expiresAt = s.expires_at;
+    }
+  }catch(e){}
 }
 // Proactively renews the access token a few minutes before it expires, so
 // the app rarely has to rely on the reactive 401-then-refresh path below —
@@ -453,7 +490,8 @@ async function refreshSession(){
 async function ensureFreshToken(){
   if(!auth.accessToken || !auth.refreshToken) return;
   if(auth.expiresAt - Date.now() > 5 * 60 * 1000) return;
-  await refreshSession();
+  const status = await refreshSession();
+  if(status === 'invalid') auth.sessionInvalid = true;
 }
 async function sbFetch(url, options){
   options = options || {};
@@ -2574,6 +2612,7 @@ async function boot(){
   if(ok === false){
     clearSession();
     state.loggedIn = false;
+    state.loginNotice = 'Сессия истекла — войдите снова. Дальше вход будет сохраняться.';
   } else if(state.loadOffline){
     showToast('Нет соединения — показаны сохранённые данные');
   } else if(!state.settings.startDate){
@@ -2587,6 +2626,34 @@ async function boot(){
   render();
 }
 boot();
+
+// Keep the login alive. A phone suspends the page in the background, so the
+// short-lived access token routinely expires while the app is closed; renew
+// it the moment the app comes back to the foreground (before any data call
+// has a chance to fail), and keep this tab in step with other tabs/windows
+// that may have rotated the refresh token.
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState !== 'visible' || !state.loggedIn) return;
+  syncSessionFromStorage();
+  auth.sessionInvalid = false;
+  ensureFreshToken().then(()=>{
+    // The server genuinely rejected the saved login — say so, rather than
+    // leaving the screen showing data that can no longer be saved.
+    if(auth.sessionInvalid && state.loggedIn){
+      clearSession();
+      state.loggedIn = false; state.loaded = false;
+      state.loginNotice = 'Сессия истекла — войдите снова. Дальше вход будет сохраняться.';
+      render();
+    }
+  });
+});
+window.addEventListener('online', ()=>{ if(state.loggedIn) ensureFreshToken(); });
+window.addEventListener('storage', (ev)=>{
+  if(ev.key === 'arlilia_session') syncSessionFromStorage();
+});
+// Ask the browser not to evict this site's saved data (the saved login lives
+// in localStorage) when it's low on space. Best-effort; ignored if unsupported.
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 
 // Register the service worker (app shell caching) only once the app is up
 // and running, so it never competes with real data loads for bandwidth.
