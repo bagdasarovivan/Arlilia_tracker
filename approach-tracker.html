@@ -1356,7 +1356,7 @@ function renderExercisesHome(){
       <div class="eyebrow">Упражнения</div>
     </div>
     <div class="exercise-cat-list">
-      ${EXERCISE_CATEGORIES.map(cat=>`
+      ${EXERCISE_CATEGORIES.filter(cat=>cat.items.length).map(cat=>`
         <button class="exercise-cat-card" data-action="open-exercise-category" data-cat="${cat.id}">
           <div class="exercise-cat-icon">${cat.icon}</div>
           <div class="exercise-cat-body">
