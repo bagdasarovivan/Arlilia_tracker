@@ -314,10 +314,10 @@
   .note-card b{ color: var(--text); font-weight:600; }
 
   /* ---- Calendar ---- */
-  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:5px; }
   .cal-weekdays{ margin-bottom:6px; }
   .cal-weekday{ font-size:11px; color: var(--text-muted); text-align:center; padding-bottom:2px; }
-  .cal-cell{ position:relative; aspect-ratio:1; border-radius:12px; background: var(--surface); border:1px solid var(--border); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; padding-top:2px; }
+  .cal-cell{ position:relative; min-width:0; aspect-ratio:1; border-radius:12px; background: var(--surface); border:1px solid var(--border); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; padding-top:2px; }
   .cal-cell.empty{ background:transparent; border:none; }
   .cal-cell.done{ background: color-mix(in srgb, var(--good) 20%, var(--surface)); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }
   .cal-cell.today{ border-color: var(--accent); border-width:2px; }
@@ -1035,6 +1035,13 @@ const STREAK_MILESTONES = [3, 7, 14, 21, 30, 45, 60, 90, 120, 180, 365];
 function nextStreakMilestone(streak){
   return STREAK_MILESTONES.find(m => m > streak) ?? null;
 }
+function ruExercises(n){
+  const n10 = n % 10, n100 = n % 100;
+  if(n100 >= 11 && n100 <= 14) return 'упражнений';
+  if(n10 === 1) return 'упражнение';
+  if(n10 >= 2 && n10 <= 4) return 'упражнения';
+  return 'упражнений';
+}
 function ruDays(n){
   const n10 = n % 10, n100 = n % 100;
   if(n100 >= 11 && n100 <= 14) return 'дней';
@@ -1214,7 +1221,7 @@ function renderLogin(){
   return `
     <div style="padding:14vh 20px 24px; max-width:360px; margin:0 auto;">
       <div class="eyebrow" style="text-align:center;">${isSignup ? 'Регистрация' : 'Вход'}</div>
-      <h1 style="text-align:center; margin-bottom:34px;">Дневник подходов</h1>
+      <h1 style="text-align:center; margin-bottom:34px;">LOG</h1>
       <div class="choice-row" style="margin-bottom:22px;">
         <button class="choice-btn ${!isSignup?'selected':''}" data-action="auth-mode-login">Вход</button>
         <button class="choice-btn ${isSignup?'selected':''}" data-action="auth-mode-signup">Регистрация</button>
@@ -1363,7 +1370,7 @@ function renderExercisesHome(){
           <div class="exercise-cat-icon">${cat.icon}</div>
           <div class="exercise-cat-body">
             <div class="exercise-cat-label">${cat.label}</div>
-            <div class="exercise-cat-sub">${cat.items.length ? cat.subtitle + ' · ' + cat.items.length + ' упражнений' : cat.subtitle + ' · скоро'}</div>
+            <div class="exercise-cat-sub">${cat.items.length ? cat.subtitle + ' · ' + cat.items.length + ' ' + ruExercises(cat.items.length) : cat.subtitle + ' · скоро'}</div>
           </div>
           <div class="exercise-cat-count">›</div>
         </button>
