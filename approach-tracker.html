@@ -1379,8 +1379,19 @@ function renderExerciseCategory(catId){
       <button class="back-btn" data-action="exercises-back">‹</button>
       <h2>${cat.icon} ${cat.label}</h2>
     </div>
-    ${cat.intro ? `<div class="exercise-intro">${cat.intro.map(b=>`<p class="exercise-p">${b.title ? `<strong>${b.title}.</strong> ` : ''}${b.text}</p>`).join('')}</div>` : ''}
     <div class="exercise-list">
+      ${cat.intro ? (()=>{
+        const iid = 'intro-' + cat.id;
+        const open = !!state.exerciseExpanded[iid];
+        return `
+        <div class="exercise-row">
+          <div class="exercise-row-top">
+            <button class="exercise-name" data-action="toggle-exercise-expand" data-exid="${iid}">Общее описание</button>
+            <span class="exercise-chevron">${open?'︿':'﹀'}</span>
+          </div>
+          ${open ? `<div class="exercise-detail">${cat.intro.map(b=>`<p class="exercise-p">${b.title ? `<strong>${b.title}.</strong> ` : ''}${b.text}</p>`).join('')}</div>` : ''}
+        </div>`;
+      })() : ''}
       ${cat.items.length ? '' : '<div class="empty">Упражнения скоро появятся</div>'}
       ${cat.items.map(it=>{
         const open = !!state.exerciseExpanded[it.id];
