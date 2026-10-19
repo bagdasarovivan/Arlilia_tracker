@@ -1878,7 +1878,10 @@ function attachHandlers(){
       const bv = e.currentTarget.getAttribute('data-bool-val');
       state.answers[id] = bv === 'silent' ? 'silent' : bv === 'true';
       render();
-      if(manual) return;
+      // The ritual question has an optional description: if it's open or already
+      // filled in, stay on the step (so the text isn't skipped); otherwise go on.
+      const noteOpenNow = (state.noteOpen && state.noteOpen[id]) || !!state.answers[id + 'Note'];
+      if(manual && noteOpenNow) return;
       const targetIndex = state.qIndex;
       setTimeout(()=>{
         if(state.qIndex === targetIndex && state.qIndex < activeQuestions().length - 1){
