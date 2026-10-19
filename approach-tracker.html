@@ -650,7 +650,7 @@ const JOURNAL_STEPS = [
   { id:'glad', type:'textarea', label:'Радует', hint:'Что порадовало сегодня' },
   { id:'worry', type:'textarea', label:'Волнует', hint:'Что беспокоит' },
   { id:'speechMode', type:'choice_other', label:'Речевой режим', options:['Режим молчания','Другое'], hint:'Как соблюдал речевой режим по методике' },
-  { id:'dailyRoutine', type:'textarea', label:'Саморегуляция', hint:'Зевки, прогулка, баня и т.д. — что из приёмов применял' },
+  { id:'dailyRoutine', type:'multi_other', label:'Саморегуляция', options:['Джекобсон','Прогулка','Зевки'], hint:'Что из приёмов применял — можно выбрать несколько' },
   { id:'sleepHours', type:'number_note', label:'Сон', hint:'Сколько часов спал — можно и цифрой, и словами' },
   { id:'difficulties', type:'textarea', label:'Трудная тетрадь', hint:'Что вызывает трудности' },
   { id:'questions', type:'textarea', label:'Вопросы' },
@@ -699,6 +699,7 @@ let state = {
   startDateSaving: false,
   onboarding: 0,               // 0 hidden | 1 welcome popup | 2 arrow at settings gear
   focusStartDate: false,
+  multiOtherOpen: {},
 
   settings: { startDate: null, theme: 'light' },
 
@@ -777,6 +778,21 @@ function rowToJournal(r){
     reflections: r.reflections, tricks: r.tricks, praise: r.praise,
     intentions: r.intentions,
   };
+}
+/* Multi-select with a free-text "Другое": the value is stored as one plain string
+   ("Джекобсон, Прогулка, свой текст"), so older free-text entries still read fine. */
+function parseMulti(val, presets){
+  const sel = new Set(); const rest = [];
+  String(val || '').split(',').map(t=>t.trim()).filter(Boolean).forEach(t=>{
+    if(presets.includes(t)) sel.add(t); else rest.push(t);
+  });
+  return { sel, other: rest.join(', ') };
+}
+function buildMulti(sel, other, presets){
+  const parts = presets.filter(p=>sel.has(p));
+  const o = (other || '').trim();
+  if(o) parts.push(o);
+  return parts.join(', ');
 }
 function journalDraftToRow(e){
   return {
@@ -1619,6 +1635,15 @@ function renderJournalWizardStep(){
     control = `<input type="text" id="jw-text-${q.id}" value="${esc(val)}" placeholder="Коротко, по сути...">`;
   } else if(q.type === 'textarea'){
     control = `<textarea id="jw-text-${q.id}" placeholder="Коротко, по сути...">${esc(val)}</textarea>`;
+  } else if(q.type === 'multi_other'){
+    const m = parseMulti(val, q.options);
+    const otherOpen = !!m.other || !!(state.multiOtherOpen && state.multiOtherOpen[q.id]);
+    control = `<div class="choice-list">${q.options.map(opt => `
+      <button class="choice-list-btn ${m.sel.has(opt)?'selected':''}" data-jw-multi="${q.id}" data-jw-val="${esc(opt)}">${opt}</button>
+    `).join('')}
+      <button class="choice-list-btn ${otherOpen?'selected':''}" data-jw-multi-other="${q.id}">Другое</button>
+      ${otherOpen ? `<input type="text" id="jw-mother-${q.id}" value="${esc(m.other)}" placeholder="Напишите свой вариант" style="margin-top:10px;">` : ''}
+    </div>`;
   }
 
   const isFirst = idx === 0;
@@ -1935,6 +1960,44 @@ function attachHandlers(){
       }, 260);
     });
   });
+  app.querySelectorAll('[data-jw-multi]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-jw-multi');
+      const opt = e.currentTarget.getAttribute('data-jw-val');
+      const q = JOURNAL_STEPS.find(x=>x.id===id);
+      const m = parseMulti(state.journalDraft[id], q.options);
+      if(m.sel.has(opt)) m.sel.delete(opt); else m.sel.add(opt);
+      state.journalDraft[id] = buildMulti(m.sel, m.other, q.options);
+      scheduleJournalSave();
+      render();
+    });
+  });
+  app.querySelectorAll('[data-jw-multi-other]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-jw-multi-other');
+      const q = JOURNAL_STEPS.find(x=>x.id===id);
+      const m = parseMulti(state.journalDraft[id], q.options);
+      const open = !!m.other || !!state.multiOtherOpen[id];
+      if(open){ // closing "Другое" drops its text
+        state.multiOtherOpen[id] = false;
+        state.journalDraft[id] = buildMulti(m.sel, '', q.options);
+        scheduleJournalSave();
+      } else {
+        state.multiOtherOpen[id] = true;
+      }
+      render();
+      const inp = document.getElementById('jw-mother-' + id); if(inp) inp.focus();
+    });
+  });
+  app.querySelectorAll('#app input[id^="jw-mother-"]').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const id = e.target.id.replace('jw-mother-','');
+      const q = JOURNAL_STEPS.find(x=>x.id===id);
+      const m = parseMulti(state.journalDraft[id], q.options);
+      state.journalDraft[id] = buildMulti(m.sel, e.target.value, q.options);
+      scheduleJournalSave();
+    });
+  });
   app.querySelectorAll('#app input[id^="jw-text-"], #app textarea[id^="jw-text-"]').forEach(el=>{
     el.addEventListener('input', (e)=>{
       const id = e.target.id.replace('jw-text-','');
@@ -2106,6 +2169,7 @@ async function onAction(e){
     state.journalDraft = entry;
     state.journalEditId = entry.entryDate;
     state.journalStepIndex = 0;
+    state.multiOtherOpen = {};
     state.journalFormActive = true;
   } else if(action === 'view-old-journal'){
     const jid = parseInt(e.currentTarget.getAttribute('data-jid'),10);
