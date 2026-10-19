@@ -631,15 +631,19 @@ const TITLE_OPTIONS = ['Подход на улице', 'Звонок', 'Публ
 const MINDSET_OPTIONS = ['Супер', 'Хорошо', 'Нормально', 'Плохо', 'Другое'];
 const REACTION_OPTIONS = ['Спокойно', 'Адекватно', 'Доброжелательно', 'С интересом', 'С восхищением', 'С сочувствием', 'С удивлением', 'С пониманием', 'Безразлично', 'Недоверчиво', 'Тревожно', 'Боязливо', 'Недовольно', 'Раздражённо', 'Неадекватно', 'Другое'];
 
-const QUESTIONS = [
+const ALL_QUESTIONS = [
   { id:'title', type:'choice_other', label:'Название речевого поступка', options: TITLE_OPTIONS, hint:'С кем и где был подход' },
   { id:'mindsetBefore', type:'choice_other', label:'Настрой', options: MINDSET_OPTIONS, hint:'Каким было состояние перед подходом' },
   { id:'reactionAfter', type:'choice_other', label:'Реакция', options: REACTION_OPTIONS, hint:'Реакция этого человека на то, что к нему подошли' },
   { id:'ritual', type:'bool_manual', label:'Соблюдал речевой ритуал?', hint:'Расслабление, мягкое начало, зрительный контакт' },
-  { id:'voice', type:'scale_note', label:'Речь по методике', lowLabel:'сбивался', highLabel:'чисто', hint:'Темп, дыхание, слитность речи. Хорошо: свободный, чистый, звонкий. Срыв: слабый, гнусавый, сдавленный' },
+  { id:'voice', type:'scale_note', label:'Речь по методике', lowLabel:'сбивался', highLabel:'чисто', hint:'Слитность, мягкая атака, плавность' },
   { id:'hand', type:'scale_note', label:'Ощущение руки', lowLabel:'напряжена, скованно', highLabel:'свободно, естественно', hint:'Насколько чувствовал руку во время общения' },
   { id:'anxiety', type:'scale_note', label:'Волнение', lowLabel:'спокоен', highLabel:'максимум', hint:'Было ли волнение' },
 ];
+// In silent mode ("Режим молчания") there is no hand-feeling question to answer.
+function activeQuestions(){
+  return ALL_QUESTIONS.filter(q => !(q.id === 'hand' && state.answers.ritual === 'silent'));
+}
 
 const JOURNAL_STEPS = [
   { id:'mood', type:'choice_other', label:'Самочувствие', options:['Отлично','Хорошо','Норм','Тяжело','Плохо','Другое'] },
@@ -723,13 +727,21 @@ let state = {
 };
 
 /* ---------- storage (Supabase) ---------- */
+const SILENT_LABEL = 'Режим молчания';
+function parseRitual(ritual, note){
+  if(ritual === null || ritual === undefined){
+    if(note === SILENT_LABEL) return { ritual: 'silent', ritualNote: '' };
+    if(typeof note === 'string' && note.startsWith(SILENT_LABEL + ': ')) return { ritual: 'silent', ritualNote: note.slice(SILENT_LABEL.length + 2) };
+  }
+  return { ritual, ritualNote: note };
+}
 function rowToAttempt(r){
   return {
     id: r.id,
     ts: new Date(r.created_at).getTime(),
     title: r.title,
     mindsetBefore: r.mindset_before, reactionAfter: r.reaction_after,
-    ritual: r.ritual, ritualNote: r.ritual_note,
+    ...parseRitual(r.ritual, r.ritual_note),
     voice: r.voice, voiceNote: r.voice_note,
     hand: r.hand, handNote: r.hand_note,
     anxiety: r.anxiety, anxietyNote: r.anxiety_note,
@@ -745,9 +757,9 @@ function attemptToRow(e){
     mindset_before: mindsetBefore,
     reaction_after: reactionAfter,
     ritual: typeof e.ritual === 'boolean' ? e.ritual : null,
-    ritual_note: e.ritualNote || null,
+    ritual_note: e.ritual === 'silent' ? (e.ritualNote ? SILENT_LABEL + ': ' + e.ritualNote : SILENT_LABEL) : (e.ritualNote || null),
     voice: e.voice ?? null, voice_note: e.voiceNote || null,
-    hand: e.hand ?? null, hand_note: e.handNote || null,
+    hand: e.ritual === 'silent' ? null : (e.hand ?? null), hand_note: e.ritual === 'silent' ? null : (e.handNote || null),
     anxiety: e.anxiety ?? null, anxiety_note: e.anxietyNote || null,
   };
 }
@@ -1296,8 +1308,8 @@ function renderPracticeHome(){
 }
 
 function renderPracticeWizard(){
-  const q = QUESTIONS[state.qIndex];
-  const dots = QUESTIONS.map((_,i)=>{
+  const q = activeQuestions()[state.qIndex];
+  const dots = activeQuestions().map((_,i)=>{
     let cls = 'dot';
     if(i < state.qIndex) cls += ' done';
     if(i === state.qIndex) cls += ' current';
@@ -1330,6 +1342,7 @@ function renderPracticeWizard(){
         <button class="choice-btn ${val===true?'selected':''}" data-bool-id="${q.id}" data-bool-val="true" data-manual="${manual}">Да</button>
         <button class="choice-btn ${val===false?'selected':''}" data-bool-id="${q.id}" data-bool-val="false" data-manual="${manual}">Нет</button>
       </div>
+      ${q.id === 'ritual' ? `<button class="choice-btn ${val==='silent'?'selected':''}" data-bool-id="${q.id}" data-bool-val="silent" data-manual="${manual}" style="width:100%; margin-top:12px;">🤫 Режим молчания</button>` : ''}
       <button type="button" class="btn-ghost" data-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen2 ? 'Скрыть описание' : '+ Добавить описание'}</button>
       ${noteOpen2 ? `<textarea id="note-${q.id}" placeholder="Подробности, если нужно..." style="margin-top:10px;">${esc(noteVal2)}</textarea>` : ''}
     `;
@@ -1354,7 +1367,7 @@ function renderPracticeWizard(){
   }
 
   const isFirst = state.qIndex === 0;
-  const isLast = state.qIndex === QUESTIONS.length - 1;
+  const isLast = state.qIndex === activeQuestions().length - 1;
 
   return `
     <div style="padding:22px 20px 24px; display:flex; flex-direction:column; min-height:100vh;">
@@ -1837,12 +1850,13 @@ function attachHandlers(){
     el.addEventListener('click', (e)=>{
       const id = e.currentTarget.getAttribute('data-bool-id');
       const manual = e.currentTarget.getAttribute('data-manual') === '1';
-      state.answers[id] = e.currentTarget.getAttribute('data-bool-val') === 'true';
+      const bv = e.currentTarget.getAttribute('data-bool-val');
+      state.answers[id] = bv === 'silent' ? 'silent' : bv === 'true';
       render();
       if(manual) return;
       const targetIndex = state.qIndex;
       setTimeout(()=>{
-        if(state.qIndex === targetIndex && state.qIndex < QUESTIONS.length - 1){
+        if(state.qIndex === targetIndex && state.qIndex < activeQuestions().length - 1){
           state.qIndex++;
           render();
         }
@@ -1858,7 +1872,7 @@ function attachHandlers(){
       if(val === 'other') return;
       const targetIndex = state.qIndex;
       setTimeout(()=>{
-        if(state.qIndex === targetIndex && state.qIndex < QUESTIONS.length - 1){
+        if(state.qIndex === targetIndex && state.qIndex < activeQuestions().length - 1){
           state.qIndex++;
           render();
         }
@@ -2067,13 +2081,13 @@ async function onAction(e){
     resetAllData(); return;
   } else if(action === 'start-practice'){
     state.practiceActive = true; state.qIndex = 0; state.answers = {}; state.noteOpen = {};
-    QUESTIONS.forEach(q => { if(q.type==='scale' || q.type==='scale_note') state.answers[q.id] = 5; });
+    ALL_QUESTIONS.forEach(q => { if(q.type==='scale' || q.type==='scale_note') state.answers[q.id] = 5; });
   } else if(action === 'cancel-practice'){
     state.practiceActive = false;
   } else if(action === 'prev-question'){
     state.qIndex = Math.max(0, state.qIndex - 1);
   } else if(action === 'next-question'){
-    state.qIndex = Math.min(QUESTIONS.length - 1, state.qIndex + 1);
+    state.qIndex = Math.min(activeQuestions().length - 1, state.qIndex + 1);
   } else if(action === 'save-practice'){
     state.practiceActive = false;
     render();
@@ -2367,7 +2381,7 @@ function buildAttemptsPages(){
   // lowLabel/highLabel shown in the practice wizard so it can't drift out
   // of sync with the actual questions.
   const scaleLegend = ['voice','hand','anxiety'].map(id=>{
-    const q = QUESTIONS.find(qq=>qq.id===id);
+    const q = ALL_QUESTIONS.find(qq=>qq.id===id);
     return q ? `${q.label}: 0 — ${q.lowLabel}, 10 — ${q.highLabel}` : null;
   }).filter(Boolean).join('   ·   ');
 
@@ -2410,7 +2424,7 @@ function buildAttemptsPages(){
       voice: fmtNum(e.voice),
       hand: fmtNum(e.hand),
       anxiety: fmtNum(e.anxiety),
-      ritual: e.ritual===true?'Соблюдал':e.ritual===false?'Не соблюдал':'—',
+      ritual: e.ritual===true?'Соблюдал':e.ritual===false?'Не соблюдал':e.ritual==='silent'?'Режим молчания':'—',
     };
     const lineH = 24, noteLineH = 18, noteGap = 7;
     ctx.font = '17px ' + REPORT_FONT;
