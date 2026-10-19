@@ -640,9 +640,9 @@ const ALL_QUESTIONS = [
   { id:'hand', type:'scale_note', label:'Ощущение руки', lowLabel:'напряжена, скованно', highLabel:'свободно, естественно', hint:'Насколько чувствовал руку во время общения' },
   { id:'anxiety', type:'scale_note', label:'Волнение', lowLabel:'спокоен', highLabel:'максимум', hint:'Было ли волнение' },
 ];
-// In silent mode ("Режим молчания") there is no hand-feeling question to answer.
+// In silent mode ("Режим молчания") there is no speech to rate, so the speech and hand questions are skipped.
 function activeQuestions(){
-  return ALL_QUESTIONS.filter(q => !(q.id === 'hand' && state.answers.ritual === 'silent'));
+  return ALL_QUESTIONS.filter(q => !((q.id === 'hand' || q.id === 'voice') && state.answers.ritual === 'silent'));
 }
 
 const JOURNAL_STEPS = [
@@ -759,7 +759,7 @@ function attemptToRow(e){
     reaction_after: reactionAfter,
     ritual: typeof e.ritual === 'boolean' ? e.ritual : null,
     ritual_note: e.ritual === 'silent' ? (e.ritualNote ? SILENT_LABEL + ': ' + e.ritualNote : SILENT_LABEL) : (e.ritualNote || null),
-    voice: e.voice ?? null, voice_note: e.voiceNote || null,
+    voice: e.ritual === 'silent' ? null : (e.voice ?? null), voice_note: e.ritual === 'silent' ? null : (e.voiceNote || null),
     hand: e.ritual === 'silent' ? null : (e.hand ?? null), hand_note: e.ritual === 'silent' ? null : (e.handNote || null),
     anxiety: e.anxiety ?? null, anxiety_note: e.anxietyNote || null,
   };
