@@ -2643,7 +2643,7 @@ function buildJournalPages(){
       if(val != null && note) val = val + ' — ' + note;
       else if(note) val = note; // text note only, no number entered
     }
-    if(val === null || val === undefined || val === '') return;
+    if(val === null || val === undefined || String(val).trim() === '') val = '—'; // unanswered question: a dash
 
     ctx.font = '17px ' + REPORT_FONT;
     const valLines = wrapLines(ctx, String(val), valueW);
