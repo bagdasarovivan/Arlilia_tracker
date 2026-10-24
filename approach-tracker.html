@@ -663,7 +663,7 @@ const JOURNAL_STEPS = [
   { id:'mood', type:'choice_other', label:'Самочувствие', options:['Отлично','Хорошо','Норм','Тяжело','Плохо','Другое'] },
   { id:'glad', type:'textarea', label:'Радует', hint:'Что порадовало сегодня' },
   { id:'worry', type:'textarea', label:'Волнует', hint:'Что беспокоит' },
-  { id:'speechMode', type:'choice_other', label:'Речевой режим', options:['Режим молчания','Другое'], hint:'Как соблюдал речевой режим по методике' },
+  { id:'speechMode', type:'choice_other', label:'Речевой режим', options:['Режим молчания','Другое'], describe:true, hint:'Как соблюдал речевой режим по методике' },
   { id:'dailyRoutine', type:'multi_other', label:'Саморегуляция', options:['Смех','Плач','Рычание','Движение','Сон'], legacy:['Джекобсон','Прогулка','Зевки'], hint:'Что из приёмов применял — можно выбрать несколько' },
   { id:'sleepHours', type:'number_note', label:'Сон', hint:'Сколько часов спал — можно и цифрой, и словами' },
   { id:'difficulties', type:'textarea', label:'Трудная тетрадь', hint:'Что вызывает трудности' },
@@ -783,13 +783,23 @@ function attemptToRow(e){
     anxiety: e.anxiety ?? null, anxiety_note: e.anxietyNote || null,
   };
 }
+// "Режим молчания: как прошло" → { speechMode:'Режим молчания', speechModeNote:'как прошло' }.
+// Stored in the same single column, so no DB change is needed.
+function splitDescribed(val, presets, key){
+  if(val == null) return { [key]: val };
+  for(const p of presets){
+    if(val === p) return { [key]: p };
+    if(val.startsWith(p + ': ')) return { [key]: p, [key + 'Note']: val.slice(p.length + 2) };
+  }
+  return { [key]: val };
+}
 function rowToJournal(r){
   return {
     id: r.id,
     entryDate: r.entry_date,
     ts: new Date(r.entry_date + 'T12:00:00').getTime(),
     mood: r.mood, glad: r.glad, worry: r.worry,
-    speechMode: r.speech_mode,
+    ...splitDescribed(r.speech_mode, ['Режим молчания'], 'speechMode'),
     dailyRoutine: r.daily_routine,
     sleepHours: r.sleep_hours, sleepHoursNote: r.sleep_note,
     difficulties: r.difficulties,
@@ -836,7 +846,7 @@ function journalDraftToRow(e){
     entry_date: e.entryDate,
     mood: e.mood === 'other' ? (e.moodCustom || null) : (e.mood || null),
     glad: e.glad || null, worry: e.worry || null,
-    speech_mode: e.speechMode === 'other' ? (e.speechModeCustom || null) : (e.speechMode || null),
+    speech_mode: e.speechMode === 'other' ? (e.speechModeCustom || null) : (e.speechMode ? e.speechMode + (e.speechModeNote ? ': ' + e.speechModeNote : '') : null),
     daily_routine: e.dailyRoutine || null,
     sleep_hours: e.sleepHours ?? null,
     sleep_note: e.sleepHoursNote || null,
@@ -990,10 +1000,11 @@ async function persistJournal(){
   const draft = state.journalDraft;
   if(!draft || !draft.entryDate) return;
   try{
+    const sentBody = JSON.stringify([journalDraftToRow(draft)]);
     const res = await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?on_conflict=entry_date,user_id`, {
       method: 'POST',
       headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' },
-      body: JSON.stringify([journalDraftToRow(draft)]),
+      body: sentBody,
     });
     if(!res.ok){
       const errText = await res.text();
@@ -1007,7 +1018,10 @@ async function persistJournal(){
       const idx = state.journalEntries.findIndex(j => j.entryDate === updated.entryDate);
       if(idx >= 0) state.journalEntries[idx] = updated; else state.journalEntries.push(updated);
       if(state.journalDraft && state.journalDraft.entryDate === updated.entryDate){
-        state.journalDraft = updated;
+        // Only swap in the server copy if nothing was changed while the request
+        // was in flight — otherwise a quick second tap (e.g. a second
+        // «Саморегуляция» option) would be overwritten by the stale response.
+        if(JSON.stringify([journalDraftToRow(state.journalDraft)]) === sentBody) state.journalDraft = updated;
         state.journalEditId = updated.entryDate;
       }
     }
@@ -1716,6 +1730,14 @@ function renderJournalWizardStep(){
     }).join('')}
     ${selId === 'other' ? `<input type="text" id="jw-text-${q.id}Custom" value="${esc(customVal)}" placeholder="Напишите свой вариант" style="margin-top:10px;">` : ''}
     </div>`;
+    if(q.describe && selId !== 'other'){
+      const dKey = q.id + 'Note';
+      const dVal = state.journalDraft[dKey] || '';
+      const dOpen = (state.journalNoteOpen && state.journalNoteOpen[q.id]) || !!dVal;
+      control += `
+        <button type="button" class="btn-ghost" data-jw-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${dOpen ? 'Скрыть описание' : '+ Добавить описание'}</button>
+        ${dOpen ? `<textarea id="jw-text-${dKey}" placeholder="Как всё прошло, что получилось, что нет..." style="margin-top:10px;">${esc(dVal)}</textarea>` : ''}`;
+    }
   } else if(q.type === 'bool'){
     control = `
       <div class="choice-row">
@@ -2088,6 +2110,8 @@ function attachHandlers(){
       // Picking "Другое" opens a text field right below — don't auto-advance
       // past it before the person has had a chance to type anything.
       if(val === 'other') return;
+      const jq = JOURNAL_STEPS.find(x=>x.id===id);
+      if(jq && jq.describe && ((state.journalNoteOpen && state.journalNoteOpen[id]) || state.journalDraft[id + 'Note'])) return;
       const targetIndex = state.journalStepIndex;
       setTimeout(()=>{
         if(state.journalStepIndex === targetIndex && state.journalStepIndex < JOURNAL_STEPS.length - 1){
@@ -2797,6 +2821,7 @@ function buildJournalPages(){
       if(val != null && note) val = val + ' — ' + note;
       else if(note) val = note; // text note only, no number entered
     }
+    if(id === 'speechMode' && val && entry.speechModeNote) val = val + ': ' + entry.speechModeNote;
     if(val === null || val === undefined || String(val).trim() === '') val = '—'; // unanswered question: a dash
 
     ctx.font = '17px ' + REPORT_FONT;
