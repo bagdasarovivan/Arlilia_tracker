@@ -297,6 +297,13 @@
   .trend-legend{ display:flex; justify-content:space-between; font-size:12px; color: var(--text-muted); margin-top:6px; flex-wrap:wrap; gap:8px; }
   .trend-empty{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:24px 12px; margin-top:16px; text-align:center; color: var(--text-muted); font-size:13px; }
   .report-actions{ margin-top:20px; display:flex; flex-direction:column; gap:10px; }
+  .attempt-row{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:12px 14px; margin-bottom:8px; }
+  .attempt-row-top{ display:flex; align-items:baseline; gap:10px; }
+  .attempt-row-num{ color: var(--text-muted); font-size:13px; flex:none; }
+  .attempt-row-title{ flex:1; min-width:0; font-size:15px; overflow-wrap:anywhere; }
+  .attempt-row-sub{ margin:4px 0 0 0; font-size:13px; color: var(--text-muted); overflow-wrap:anywhere; }
+  .attempt-row-actions{ display:flex; gap:8px; margin-top:10px; }
+  .attempt-row-actions .btn-ghost{ width:auto; flex:1; padding:8px 10px; font-size:14px; }
   .report-row{ display:flex; gap:8px; align-items:stretch; flex-wrap:wrap; }
   .report-row .btn-primary{ flex:1 1 140px; }
   .report-row .btn-ghost{ width:auto; flex:0 0 auto; padding-left:14px; padding-right:14px; white-space:nowrap; }
@@ -712,6 +719,8 @@ let state = {
 
   entries: [],
   practiceActive: false,
+  editingAttemptId: null,      // set while the wizard edits an existing attempt
+  confirmDeleteAttemptId: null,
   qIndex: 0,
   answers: {},
   noteOpen: {},
@@ -896,6 +905,60 @@ function setTheme(theme){
   render();
 }
 
+function answersFromAttempt(a){
+  const ans = {};
+  [['title', TITLE_OPTIONS], ['mindsetBefore', MINDSET_OPTIONS], ['reactionAfter', REACTION_OPTIONS]].forEach(([id, opts])=>{
+    const v = a[id];
+    if(v === null || v === undefined || v === '') return;
+    if(opts.includes(v) && v !== 'Другое') ans[id] = v;
+    else { ans[id] = 'other'; ans[id + 'Custom'] = v; }
+  });
+  ans.ritual = a.ritual === null || a.ritual === undefined ? undefined : a.ritual; // true | false | 'silent'
+  ans.ritualNote = a.ritualNote || '';
+  ['voice','hand','anxiety'].forEach(id=>{
+    ans[id] = a[id] ?? 5;
+    ans[id + 'Note'] = a[id + 'Note'] || '';
+  });
+  return ans;
+}
+async function updateAttempt(id, answers){
+  try{
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Prefer': 'return=representation' },
+      body: JSON.stringify(attemptToRow(answers)),
+    });
+    if(!res.ok){
+      const errText = await res.text();
+      console.error('updateAttempt failed', res.status, errText);
+      showToast('Не сохранилось: ' + res.status);
+      return null;
+    }
+    const rows = await res.json();
+    if(Array.isArray(rows) && rows[0]) return rowToAttempt(rows[0]);
+    showToast('Подход не изменился — пустой ответ сервера');
+    return null;
+  }catch(err){
+    console.error(err);
+    showToast('Нет соединения с сервером — изменения не сохранены');
+    return null;
+  }
+}
+async function deleteAttempt(id){
+  try{
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if(!res.ok){
+      console.error('deleteAttempt failed', res.status);
+      showToast('Не удалось удалить: ' + res.status);
+      return false;
+    }
+    return true;
+  }catch(err){
+    console.error(err);
+    showToast('Нет соединения с сервером — подход не удалён');
+    return false;
+  }
+}
 async function insertAttempt(answers){
   try{
     const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts`, {
@@ -1708,6 +1771,36 @@ function renderJournalWizardStep(){
 }
 
 /* ---------- Progress tab (calendar) ---------- */
+function renderDayAttempts(){
+  const dateStr = state.reportDate || todayKey();
+  const list = attemptsOnDate(dateStr);
+  if(!list.length) return `<div class="autosave-hint" style="margin:0 0 14px;">За этот день подходов нет</div>`;
+  return `<div style="margin-bottom:14px;">
+    ${list.map((a,i)=>{
+      const time = new Date(a.ts).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+      const parts = [time, a.ritual==='silent' ? 'Режим молчания' : a.reactionAfter].filter(Boolean);
+      const confirming = state.confirmDeleteAttemptId === a.id;
+      return `<div class="attempt-row">
+        <div class="attempt-row-top">
+          <span class="attempt-row-num">№${i+1}</span>
+          <span class="attempt-row-title">${esc(a.title || 'Без названия')}</span>
+        </div>
+        <div class="attempt-row-sub">${esc(parts.join(' · '))}</div>
+        ${confirming ? `
+        <div class="attempt-row-sub" style="color: var(--warn); margin-top:10px;">Удалить этот подход? Это нельзя отменить.</div>
+        <div class="attempt-row-actions">
+          <button class="btn btn-ghost" data-action="cancel-delete-attempt">Отмена</button>
+          <button class="btn btn-primary" style="background: var(--warn); flex:1; width:auto; padding:8px 10px; font-size:14px;" data-action="confirm-delete-attempt" data-aid="${esc(a.id)}">Да, удалить</button>
+        </div>` : `
+        <div class="attempt-row-actions">
+          <button class="btn btn-ghost" data-action="edit-attempt" data-aid="${esc(a.id)}">Изменить</button>
+          <button class="btn btn-ghost" style="color: var(--warn); border-color: var(--warn);" data-action="ask-delete-attempt" data-aid="${esc(a.id)}">Удалить</button>
+        </div>`}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 function renderProgress(){
   const monthDate = state.progressMonth;
   const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
@@ -1742,6 +1835,7 @@ function renderProgress(){
     <div class="date-input-wrap" style="margin-bottom:14px;">
       <input type="date" id="report-date" value="${state.reportDate || todayKey()}">
     </div>
+    ${renderDayAttempts()}
     <div class="report-actions">
       <div class="report-row">
         <button class="btn btn-primary" data-action="export-attempts-pdf">PDF подходов</button>
@@ -2083,6 +2177,11 @@ function attachHandlers(){
     reportDateEl.addEventListener('input', (e)=>{
       state.reportDate = e.target.value || todayKey();
     });
+    reportDateEl.addEventListener('change', (e)=>{
+      state.reportDate = e.target.value || todayKey();
+      state.confirmDeleteAttemptId = null;
+      render();
+    });
   }
   ['login-password','login-password2'].forEach(id=>{
     const el = app.querySelector('#'+id);
@@ -2203,9 +2302,30 @@ async function onAction(e){
   } else if(action === 'confirm-reset-data'){
     resetAllData(); return;
   } else if(action === 'start-practice'){
+    state.editingAttemptId = null;
     state.practiceActive = true; state.qIndex = 0; state.answers = {}; state.noteOpen = {};
     ALL_QUESTIONS.forEach(q => { if(q.type==='scale' || q.type==='scale_note') state.answers[q.id] = 5; });
+  } else if(action === 'edit-attempt'){
+    const a = state.entries.find(x=> String(x.id) === e.currentTarget.getAttribute('data-aid'));
+    if(!a) return;
+    state.editingAttemptId = a.id;
+    state.answers = answersFromAttempt(a);
+    state.noteOpen = {};
+    state.qIndex = 0;
+    state.practiceActive = true;
+  } else if(action === 'ask-delete-attempt'){
+    state.confirmDeleteAttemptId = e.currentTarget.getAttribute('data-aid');
+  } else if(action === 'cancel-delete-attempt'){
+    state.confirmDeleteAttemptId = null;
+  } else if(action === 'confirm-delete-attempt'){
+    const id = e.currentTarget.getAttribute('data-aid');
+    state.confirmDeleteAttemptId = null;
+    if(await deleteAttempt(id)){
+      state.entries = state.entries.filter(x=> String(x.id) !== id);
+      showToast('Подход удалён');
+    }
   } else if(action === 'cancel-practice'){
+    state.editingAttemptId = null;
     state.practiceActive = false;
   } else if(action === 'prev-question'){
     state.qIndex = Math.max(0, state.qIndex - 1);
@@ -2214,6 +2334,18 @@ async function onAction(e){
   } else if(action === 'save-practice'){
     state.practiceActive = false;
     render();
+    if(state.editingAttemptId){
+      const editId = state.editingAttemptId;
+      state.editingAttemptId = null;
+      const updated = await updateAttempt(editId, state.answers);
+      if(updated){
+        const idx = state.entries.findIndex(x=> String(x.id) === String(editId));
+        if(idx >= 0) state.entries[idx] = updated; else state.entries.push(updated);
+        showToast('Изменения сохранены');
+      }
+      render();
+      return;
+    }
     const saved = await insertAttempt(state.answers);
     if(saved) state.entries.push(saved);
     render();
