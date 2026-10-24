@@ -814,7 +814,6 @@ function parseMulti(val, presets, legacy){
   const sel = new Set(); const others = [];
   String(val || '').split(',').map(t=>t.trim()).filter(Boolean).forEach(t=>{
     if(presets.includes(t)) sel.add(t);
-    else if((legacy || []).includes(t)) return; // retired options: not shown, dropped on the next edit
     else if(!others.includes(t)) others.push(t);
   });
   return { sel, others };
@@ -2382,6 +2381,12 @@ async function onAction(e){
       entry = { entryDate, ts: new Date(entryDate + 'T12:00:00').getTime() };
       state.journalEntries.push(entry);
     }
+    // Retired preset options from older entries are dropped when the entry is
+    // opened for editing (a person typing the same word as their own variant
+    // afterwards keeps it).
+    JOURNAL_STEPS.filter(q=>q.type==='multi_other' && q.legacy).forEach(q=>{
+      if(entry[q.id]) entry[q.id] = buildMulti(...(m=>[m.sel, m.others.filter(o=>!q.legacy.includes(o)), q.options])(parseMulti(entry[q.id], q.options)));
+    });
     state.journalDraft = entry;
     state.journalEditId = entry.entryDate;
     state.journalStepIndex = 0;
