@@ -655,7 +655,7 @@ const JOURNAL_STEPS = [
   { id:'glad', type:'textarea', label:'Радует', hint:'Что порадовало сегодня' },
   { id:'worry', type:'textarea', label:'Волнует', hint:'Что беспокоит' },
   { id:'speechMode', type:'choice_other', label:'Речевой режим', options:['Режим молчания','Другое'], hint:'Как соблюдал речевой режим по методике' },
-  { id:'dailyRoutine', type:'multi_other', label:'Саморегуляция', options:['Смех','Плач','Рычание','Движение','Сон'], hint:'Что из приёмов применял — можно выбрать несколько' },
+  { id:'dailyRoutine', type:'multi_other', label:'Саморегуляция', options:['Смех','Плач','Рычание','Движение','Сон'], legacy:['Джекобсон','Прогулка','Зевки'], hint:'Что из приёмов применял — можно выбрать несколько' },
   { id:'sleepHours', type:'number_note', label:'Сон', hint:'Сколько часов спал — можно и цифрой, и словами' },
   { id:'difficulties', type:'textarea', label:'Трудная тетрадь', hint:'Что вызывает трудности' },
   { id:'questions', type:'textarea', label:'Вопросы' },
@@ -788,10 +788,12 @@ function rowToJournal(r){
 }
 /* Multi-select with a free-text "Другое": the value is stored as one plain string
    ("Джекобсон, Прогулка, свой текст"), so older free-text entries still read fine. */
-function parseMulti(val, presets){
+function parseMulti(val, presets, legacy){
   const sel = new Set(); const others = [];
   String(val || '').split(',').map(t=>t.trim()).filter(Boolean).forEach(t=>{
-    if(presets.includes(t)) sel.add(t); else if(!others.includes(t)) others.push(t);
+    if(presets.includes(t)) sel.add(t);
+    else if((legacy || []).includes(t)) return; // retired options: not shown, dropped on the next edit
+    else if(!others.includes(t)) others.push(t);
   });
   return { sel, others };
 }
@@ -805,7 +807,7 @@ function addMultiCustom(id, text){
   const q = JOURNAL_STEPS.find(x=>x.id===id);
   const t = String(text || '').replace(/,/g, ' ').trim();
   if(!t) return false;
-  const m = parseMulti(state.journalDraft[id], q.options);
+  const m = parseMulti(state.journalDraft[id], q.options, q.legacy);
   if(q.options.includes(t)) m.sel.add(t); else if(!m.others.includes(t)) m.others.push(t);
   state.journalDraft[id] = buildMulti(m.sel, m.others, q.options);
   scheduleJournalSave();
@@ -1670,7 +1672,7 @@ function renderJournalWizardStep(){
   } else if(q.type === 'textarea'){
     control = `<textarea id="jw-text-${q.id}" placeholder="Коротко, по сути...">${esc(val)}</textarea>`;
   } else if(q.type === 'multi_other'){
-    const m = parseMulti(val, q.options);
+    const m = parseMulti(val, q.options, q.legacy);
     const otherOpen = !!(state.multiOtherOpen && state.multiOtherOpen[q.id]);
     control = `<div class="choice-list">${q.options.map(opt => `
       <button class="choice-list-btn ${m.sel.has(opt)?'selected':''}" data-jw-multi="${q.id}" data-jw-val="${esc(opt)}">${opt}</button>
@@ -2010,7 +2012,7 @@ function attachHandlers(){
       const opt = e.currentTarget.getAttribute('data-jw-val');
       const q = JOURNAL_STEPS.find(x=>x.id===id);
       commitPendingMulti();
-      const m = parseMulti(state.journalDraft[id], q.options);
+      const m = parseMulti(state.journalDraft[id], q.options, q.legacy);
       if(m.sel.has(opt)) m.sel.delete(opt); else m.sel.add(opt);
       state.journalDraft[id] = buildMulti(m.sel, m.others, q.options);
       scheduleJournalSave();
@@ -2023,7 +2025,7 @@ function attachHandlers(){
       const idx = parseInt(e.currentTarget.getAttribute('data-jw-idx'), 10);
       const q = JOURNAL_STEPS.find(x=>x.id===id);
       commitPendingMulti();
-      const m = parseMulti(state.journalDraft[id], q.options);
+      const m = parseMulti(state.journalDraft[id], q.options, q.legacy);
       // commitPendingMulti may have appended a new one; indexes of existing ones stay valid
       m.others.splice(idx, 1);
       state.journalDraft[id] = buildMulti(m.sel, m.others, q.options);
