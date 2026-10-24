@@ -297,13 +297,15 @@
   .trend-legend{ display:flex; justify-content:space-between; font-size:12px; color: var(--text-muted); margin-top:6px; flex-wrap:wrap; gap:8px; }
   .trend-empty{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:24px 12px; margin-top:16px; text-align:center; color: var(--text-muted); font-size:13px; }
   .report-actions{ margin-top:20px; display:flex; flex-direction:column; gap:10px; }
-  .attempt-row{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:12px 14px; margin-bottom:8px; }
-  .attempt-row-top{ display:flex; align-items:baseline; gap:10px; }
+  .attempt-list{ border:1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+  .attempt-row{ padding:6px 10px; border-bottom:1px solid var(--border); }
+  .attempt-row:last-child{ border-bottom:none; }
+  .attempt-row-top{ display:flex; align-items:center; gap:8px; }
   .attempt-row-num{ color: var(--text-muted); font-size:13px; flex:none; }
-  .attempt-row-title{ flex:1; min-width:0; font-size:15px; overflow-wrap:anywhere; }
-  .attempt-row-sub{ margin:4px 0 0 0; font-size:13px; color: var(--text-muted); overflow-wrap:anywhere; }
-  .attempt-row-actions{ display:flex; gap:8px; margin-top:10px; }
-  .attempt-row-actions .btn-ghost{ width:auto; flex:1; padding:8px 10px; font-size:14px; }
+  .attempt-row-title{ flex:1; min-width:0; font-size:14px; overflow-wrap:anywhere; }
+  .attempt-mini{ flex:none; background:none; border:1px solid var(--border); border-radius:8px; padding:5px 9px; font-size:13px; color: var(--text); cursor:pointer; font-family:inherit; }
+  .attempt-mini.danger{ color: var(--warn); border-color: var(--warn); }
+  @media (max-width:370px){ .report-row.nowrap .btn{ font-size:14px; white-space:nowrap; } .report-row.nowrap .btn-ghost{ padding-left:8px !important; padding-right:8px !important; } }
   .report-row{ display:flex; gap:8px; align-items:stretch; flex-wrap:wrap; }
   .report-row .btn-primary{ flex:1 1 140px; }
   .report-row .btn-ghost{ width:auto; flex:0 0 auto; padding-left:14px; padding-right:14px; white-space:nowrap; }
@@ -721,6 +723,7 @@ let state = {
   practiceActive: false,
   editingAttemptId: null,      // set while the wizard edits an existing attempt
   confirmDeleteAttemptId: null,
+  editListOpen: false,
   qIndex: 0,
   answers: {},
   noteOpen: {},
@@ -1774,28 +1777,21 @@ function renderJournalWizardStep(){
 function renderDayAttempts(){
   const dateStr = state.reportDate || todayKey();
   const list = attemptsOnDate(dateStr);
-  if(!list.length) return `<div class="autosave-hint" style="margin:0 0 14px;">За этот день подходов нет</div>`;
-  return `<div style="margin-bottom:14px;">
+  if(!list.length) return `<div class="autosave-hint" style="margin:0;">За этот день подходов нет</div>`;
+  return `<div class="attempt-list">
     ${list.map((a,i)=>{
       const time = new Date(a.ts).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
-      const parts = [time, a.ritual==='silent' ? 'Режим молчания' : a.reactionAfter].filter(Boolean);
       const confirming = state.confirmDeleteAttemptId === a.id;
       return `<div class="attempt-row">
         <div class="attempt-row-top">
-          <span class="attempt-row-num">№${i+1}</span>
+          <span class="attempt-row-num">${time}</span>
           <span class="attempt-row-title">${esc(a.title || 'Без названия')}</span>
+          ${confirming ? `
+          <button class="attempt-mini" data-action="cancel-delete-attempt">Отмена</button>
+          <button class="attempt-mini danger" data-action="confirm-delete-attempt" data-aid="${esc(a.id)}">Удалить?</button>` : `
+          <button class="attempt-mini" data-action="edit-attempt" data-aid="${esc(a.id)}" aria-label="Изменить">✏️</button>
+          <button class="attempt-mini" data-action="ask-delete-attempt" data-aid="${esc(a.id)}" aria-label="Удалить">🗑</button>`}
         </div>
-        <div class="attempt-row-sub">${esc(parts.join(' · '))}</div>
-        ${confirming ? `
-        <div class="attempt-row-sub" style="color: var(--warn); margin-top:10px;">Удалить этот подход? Это нельзя отменить.</div>
-        <div class="attempt-row-actions">
-          <button class="btn btn-ghost" data-action="cancel-delete-attempt">Отмена</button>
-          <button class="btn btn-primary" style="background: var(--warn); flex:1; width:auto; padding:8px 10px; font-size:14px;" data-action="confirm-delete-attempt" data-aid="${esc(a.id)}">Да, удалить</button>
-        </div>` : `
-        <div class="attempt-row-actions">
-          <button class="btn btn-ghost" data-action="edit-attempt" data-aid="${esc(a.id)}">Изменить</button>
-          <button class="btn btn-ghost" style="color: var(--warn); border-color: var(--warn);" data-action="ask-delete-attempt" data-aid="${esc(a.id)}">Удалить</button>
-        </div>`}
       </div>`;
     }).join('')}
   </div>`;
@@ -1835,12 +1831,13 @@ function renderProgress(){
     <div class="date-input-wrap" style="margin-bottom:14px;">
       <input type="date" id="report-date" value="${state.reportDate || todayKey()}">
     </div>
-    ${renderDayAttempts()}
     <div class="report-actions">
-      <div class="report-row">
-        <button class="btn btn-primary" data-action="export-attempts-pdf">PDF подходов</button>
+      <div class="report-row nowrap" style="flex-wrap:nowrap;">
+        <button class="btn btn-primary" style="flex:1 1 0; min-width:0; padding-left:8px; padding-right:8px;" data-action="export-attempts-pdf">PDF подходов</button>
         <button class="btn btn-ghost" data-action="copy-attempts-image" title="Скопировать картинкой">📋 Копировать</button>
+        <button class="btn btn-ghost${state.editListOpen?' active':''}" data-action="toggle-edit-list" title="Изменить или удалить подходы" aria-label="Изменить или удалить подходы" style="padding-left:12px;padding-right:12px;">✏️</button>
       </div>
+      ${state.editListOpen ? renderDayAttempts() : ''}
       <div class="report-row">
         <button class="btn btn-primary" data-action="export-journal-pdf">PDF дневника</button>
         <button class="btn btn-ghost" data-action="copy-journal-image" title="Скопировать картинкой">📋 Копировать</button>
@@ -2305,6 +2302,9 @@ async function onAction(e){
     state.editingAttemptId = null;
     state.practiceActive = true; state.qIndex = 0; state.answers = {}; state.noteOpen = {};
     ALL_QUESTIONS.forEach(q => { if(q.type==='scale' || q.type==='scale_note') state.answers[q.id] = 5; });
+  } else if(action === 'toggle-edit-list'){
+    state.editListOpen = !state.editListOpen;
+    state.confirmDeleteAttemptId = null;
   } else if(action === 'edit-attempt'){
     const a = state.entries.find(x=> String(x.id) === e.currentTarget.getAttribute('data-aid'));
     if(!a) return;
