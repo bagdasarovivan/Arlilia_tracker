@@ -145,6 +145,9 @@
     font-size:12px; padding:6px 4px; display:flex; flex-direction:column;
     align-items:center; gap:4px; font-family: var(--sans);
   }
+  .tab-btn{ min-width:0; padding-left:2px; padding-right:2px; }
+  .tab-btn span{ white-space:nowrap; }
+  @media (max-width: 370px){ .tab-btn{ font-size:10.5px; } .tab-btn .ic{ font-size:18px; } }
   .tab-btn .ic{ font-size:19px; }
   .tab-btn.active{ color: var(--accent); }
 
@@ -1199,7 +1202,8 @@ function render(){
     let body = '';
     if(state.tab === 'practice') body = renderPracticeHome();
     else if(state.tab === 'journal') body = renderJournalHome();
-    else if(state.tab === 'exercises') body = state.exerciseCategory ? renderExerciseCategory(state.exerciseCategory) : renderExercisesHome();
+    else if(state.tab === 'exercises') body = state.exerciseCategory ? renderExerciseCategory(state.exerciseCategory) : renderExercisesHome(false);
+    else if(state.tab === 'reference') body = state.exerciseCategory ? renderExerciseCategory(state.exerciseCategory) : renderExercisesHome(true);
     else if(state.tab === 'progress') body = renderProgress();
     else body = renderSettings();
     app.innerHTML = `${renderAppBar()}<div class="content">${body}</div>${renderTabbar()}${state.tab !== 'settings' ? renderOnboarding() : ''}`;
@@ -1320,6 +1324,7 @@ function renderTabbar(){
     {id:'practice', ic:'🚶', label:'Подходы'},
     {id:'journal', ic:'📓', label:'Дневник'},
     {id:'exercises', ic:'📋', label:'Упражнения'},
+    {id:'reference', ic:'📚', label:'Справочник'},
     {id:'progress', ic:'📈', label:'Прогресс'},
   ];
   return `<div class="tabbar">
@@ -1428,13 +1433,14 @@ function renderPracticeWizard(){
 }
 
 /* ---------- Exercises tab ---------- */
-function renderExercisesHome(){
+const REFERENCE_CATS = ['about', 'rules'];
+function renderExercisesHome(reference){
   return `
     <div class="home-hero" style="margin-top:4px; margin-bottom:18px;">
-      <div class="eyebrow">Упражнения</div>
+      <div class="eyebrow">${reference ? 'Справочник' : 'Упражнения'}</div>
     </div>
     <div class="exercise-cat-list">
-      ${EXERCISE_CATEGORIES.filter(cat=>cat.items.length).map(cat=>`
+      ${EXERCISE_CATEGORIES.filter(cat=>cat.items.length && REFERENCE_CATS.includes(cat.id) === !!reference).map(cat=>`
         <button class="exercise-cat-card" data-action="open-exercise-category" data-cat="${cat.id}">
           <div class="exercise-cat-icon">${cat.icon}</div>
           <div class="exercise-cat-body">
@@ -1894,6 +1900,7 @@ function attachHandlers(){
   app.querySelectorAll('[data-tab]').forEach(el=> el.addEventListener('click', e=>{
     const next = e.currentTarget.getAttribute('data-tab');
     state.tab = next;
+    state.exerciseCategory = null; // exercises / reference tabs always open on their menu
     if(next !== 'settings') state.lastTab = next;
     render();
   }));
