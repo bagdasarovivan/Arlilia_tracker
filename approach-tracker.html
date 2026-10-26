@@ -649,14 +649,14 @@ const ALL_QUESTIONS = [
   { id:'title', type:'choice_other', label:'Название речевого поступка', options: TITLE_OPTIONS, hint:'С кем и где был подход' },
   { id:'mindsetBefore', type:'choice_other', label:'Настрой', options: MINDSET_OPTIONS, hint:'Каким было состояние перед подходом' },
   { id:'reactionAfter', type:'choice_other', label:'Реакция', options: REACTION_OPTIONS, hint:'Реакция этого человека на то, что к нему подошли' },
-  { id:'ritual', type:'bool_manual', label:'Соблюдал речевой ритуал?', hint:'Расслабление, мягкое начало, зрительный контакт' },
+  { id:'ritual', type:'ritual', label:'Речевой ритуал', hint:'Что из ритуала было в этом подходе — можно выбрать несколько или все' },
   { id:'voice', type:'scale_note', label:'Речь по методике', lowLabel:'сбивался', highLabel:'чисто', hint:'Слитность, мягкая атака, плавность' },
   { id:'hand', type:'scale_note', label:'Ощущение руки', lowLabel:'напряжена, скованно', highLabel:'свободно, естественно', hint:'Насколько чувствовал руку во время общения' },
   { id:'anxiety', type:'scale_note', label:'Волнение', lowLabel:'спокоен', highLabel:'максимум', hint:'Было ли волнение' },
 ];
 // In silent mode ("Режим молчания") there is no speech to rate, so the speech and hand questions are skipped.
 function activeQuestions(){
-  return ALL_QUESTIONS.filter(q => !((q.id === 'hand' || q.id === 'voice') && state.answers.ritual === 'silent'));
+  return ALL_QUESTIONS.filter(q => !((q.id === 'hand' || q.id === 'voice') && state.answers.silent));
 }
 
 const JOURNAL_STEPS = [
@@ -748,12 +748,42 @@ let state = {
 
 /* ---------- storage (Supabase) ---------- */
 const SILENT_LABEL = 'Режим молчания';
+const RITUAL_ITEMS = ['Зрительный контакт','Доброжелательный взгляд','Отомри','Щелинка'];
+const RITUAL_PREFIX = 'Ритуал: ';
+// ritual_note holds (no DB change needed): optional line «Режим молчания»,
+// optional line «Ритуал: a, b», then the free-text description.
 function parseRitual(ritual, note){
-  if(ritual === null || ritual === undefined){
-    if(note === SILENT_LABEL) return { ritual: 'silent', ritualNote: '' };
-    if(typeof note === 'string' && note.startsWith(SILENT_LABEL + ': ')) return { ritual: 'silent', ritualNote: note.slice(SILENT_LABEL.length + 2) };
+  let silent = false, items = [];
+  let rest = typeof note === 'string' ? note : '';
+  if(rest === SILENT_LABEL || rest.startsWith(SILENT_LABEL + ': ')){ // older one-line format
+    silent = true; rest = rest.slice(SILENT_LABEL.length).replace(/^: /, '');
+  } else {
+    const lines = rest.split('\n');
+    if(lines[0] === SILENT_LABEL){ silent = true; lines.shift(); }
+    if(lines[0] && lines[0].startsWith(RITUAL_PREFIX)){
+      items = lines.shift().slice(RITUAL_PREFIX.length).split(', ').filter(x=>RITUAL_ITEMS.includes(x));
+    }
+    rest = lines.join('\n');
   }
-  return { ritual, ritualNote: note };
+  return { silent, ritualItems: items, ritual: (silent || items.length) ? null : (ritual ?? null), ritualNote: rest };
+}
+function ritualToRow(e){
+  const items = (e.ritualItems || []).filter(x=>RITUAL_ITEMS.includes(x));
+  const lines = [];
+  if(e.silent) lines.push(SILENT_LABEL);
+  if(items.length) lines.push(RITUAL_PREFIX + items.join(', '));
+  if(e.ritualNote) lines.push(e.ritualNote);
+  return {
+    ritual: items.length ? true : (!e.silent && typeof e.ritualLegacy === 'boolean' ? e.ritualLegacy : null),
+    ritual_note: lines.join('\n') || null,
+  };
+}
+function ritualText(e){
+  const parts = [];
+  if(e.silent) parts.push(SILENT_LABEL);
+  if(e.ritualItems && e.ritualItems.length) parts.push(...e.ritualItems);
+  else if(!e.silent) { if(e.ritual === true) parts.push('Соблюдал'); else if(e.ritual === false) parts.push('Не соблюдал'); }
+  return parts.join(', ');
 }
 function rowToAttempt(r){
   return {
@@ -776,10 +806,9 @@ function attemptToRow(e){
     title,
     mindset_before: mindsetBefore,
     reaction_after: reactionAfter,
-    ritual: typeof e.ritual === 'boolean' ? e.ritual : null,
-    ritual_note: e.ritual === 'silent' ? (e.ritualNote ? SILENT_LABEL + ': ' + e.ritualNote : SILENT_LABEL) : (e.ritualNote || null),
-    voice: e.ritual === 'silent' ? null : (e.voice ?? null), voice_note: e.ritual === 'silent' ? null : (e.voiceNote || null),
-    hand: e.ritual === 'silent' ? null : (e.hand ?? null), hand_note: e.ritual === 'silent' ? null : (e.handNote || null),
+    ...ritualToRow(e),
+    voice: e.silent ? null : (e.voice ?? null), voice_note: e.silent ? null : (e.voiceNote || null),
+    hand: e.silent ? null : (e.hand ?? null), hand_note: e.silent ? null : (e.handNote || null),
     anxiety: e.anxiety ?? null, anxiety_note: e.anxietyNote || null,
   };
 }
@@ -923,7 +952,9 @@ function answersFromAttempt(a){
     if(opts.includes(v) && v !== 'Другое') ans[id] = v;
     else { ans[id] = 'other'; ans[id + 'Custom'] = v; }
   });
-  ans.ritual = a.ritual === null || a.ritual === undefined ? undefined : a.ritual; // true | false | 'silent'
+  ans.silent = !!a.silent;
+  ans.ritualItems = (a.ritualItems || []).slice();
+  ans.ritualLegacy = a.ritual; // older yes/no answer, kept if nothing new is chosen
   ans.ritualNote = a.ritualNote || '';
   ['voice','hand','anxiety'].forEach(id=>{
     ans[id] = a[id] ?? 5;
@@ -1487,6 +1518,20 @@ function renderPracticeWizard(){
       <button type="button" class="btn-ghost" data-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen2 ? 'Скрыть описание' : '+ Добавить описание'}</button>
       ${noteOpen2 ? `<textarea id="note-${q.id}" placeholder="Подробности, если нужно..." style="margin-top:10px;">${esc(noteVal2)}</textarea>` : ''}
     `;
+  } else if(q.type === 'ritual'){
+    const items = state.answers.ritualItems || [];
+    const noteVal3 = state.answers.ritualNote || '';
+    const noteOpen3 = (state.noteOpen && state.noteOpen.ritual) || !!noteVal3;
+    const allOn = items.length === RITUAL_ITEMS.length;
+    control = `
+      <div class="choice-list">
+        ${RITUAL_ITEMS.map(o=>`<button class="choice-list-btn ${items.includes(o)?'selected':''}" data-ritual-item="${esc(o)}">${o}</button>`).join('')}
+        <button type="button" class="btn-ghost" data-ritual-all style="padding:11px;">${allOn ? 'Снять все' : 'Выбрать все'}</button>
+      </div>
+      <div class="choice-row" style="margin-top:12px;"><button class="choice-btn ${state.answers.silent?'selected':''}" data-ritual-silent>Режим молчания</button></div>
+      <button type="button" class="btn-ghost" data-note-toggle="ritual" style="margin-top:20px; padding:11px;">${noteOpen3 ? 'Скрыть описание' : '+ Добавить описание'}</button>
+      ${noteOpen3 ? `<textarea id="note-ritual" placeholder="Подробности, если нужно..." style="margin-top:10px;">${esc(noteVal3)}</textarea>` : ''}
+    `;
   } else if(q.type === 'choice_other'){
     const val = state.answers[q.id];
     const customVal = state.answers[q.id + 'Custom'] || '';
@@ -2037,6 +2082,28 @@ function attachHandlers(){
       state.answers[id] = parseInt(e.target.value,10);
       const valEl = e.target.parentElement.querySelector('.scale-value');
       if(valEl) valEl.textContent = e.target.value;
+    });
+  });
+  app.querySelectorAll('[data-ritual-item]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const o = e.currentTarget.getAttribute('data-ritual-item');
+      const cur = new Set(state.answers.ritualItems || []);
+      if(cur.has(o)) cur.delete(o); else cur.add(o);
+      state.answers.ritualItems = RITUAL_ITEMS.filter(x=>cur.has(x));
+      render();
+    });
+  });
+  app.querySelectorAll('[data-ritual-all]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const all = (state.answers.ritualItems || []).length === RITUAL_ITEMS.length;
+      state.answers.ritualItems = all ? [] : RITUAL_ITEMS.slice();
+      render();
+    });
+  });
+  app.querySelectorAll('[data-ritual-silent]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      state.answers.silent = !state.answers.silent;
+      render();
     });
   });
   app.querySelectorAll('[data-bool-id]').forEach(el=>{
@@ -2650,13 +2717,13 @@ function downloadCanvasFallback(canvas){
 /* ---- Attempts: wide multi-column table, landscape, one day at a time ---- */
 const ATT_COLS = [
   { id:'num',      label:'№',          w:40  },
-  { id:'title',    label:'Тип',        w:170 },
-  { id:'mindset',  label:'Настрой',    w:160 },
-  { id:'reaction', label:'Реакция',    w:230 },
-  { id:'voice',    label:'Речь',       w:170, note:'voiceNote'   },
-  { id:'hand',     label:'Рука',       w:170, note:'handNote'    },
-  { id:'anxiety',  label:'Волнение',   w:180, note:'anxietyNote' },
-  { id:'ritual',   label:'Ритуал',     w:156, note:'ritualNote' },
+  { id:'title',    label:'Тип',        w:160 },
+  { id:'mindset',  label:'Настрой',    w:150 },
+  { id:'reaction', label:'Реакция',    w:200 },
+  { id:'voice',    label:'Речь',       w:130, note:'voiceNote'   },
+  { id:'hand',     label:'Рука',       w:130, note:'handNote'    },
+  { id:'anxiety',  label:'Волнение',   w:140, note:'anxietyNote' },
+  { id:'ritual',   label:'Ритуал',     w:326, note:'ritualNote' },
 ];
 function attColX(){
   const gap = 16; let x = PDF_L_MARGIN; const map = {};
@@ -2713,7 +2780,7 @@ function buildAttemptsPages(){
       voice: fmtNum(e.voice),
       hand: fmtNum(e.hand),
       anxiety: fmtNum(e.anxiety),
-      ritual: e.ritual===true?'Соблюдал':e.ritual===false?'Не соблюдал':e.ritual==='silent'?'Режим молчания':'—',
+      ritual: ritualText(e) || '—',
     };
     const lineH = 24, noteLineH = 18, noteGap = 7;
     ctx.font = '17px ' + REPORT_FONT;
