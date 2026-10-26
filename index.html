@@ -914,7 +914,24 @@ async function loadAll(){
   }catch(e){}
   applyTheme();
   state.loaded = true;
+  if(!state.loadOffline) touchLastSeen();
   return true;
+}
+
+// Notes "the person opened the app today" (at most once a day) so the server-side
+// cleanup of long-unused accounts can tell active people from inactive ones.
+// Fails silently — e.g. before the SQL that adds the column has been run.
+async function touchLastSeen(){
+  const today = todayKey();
+  try{ if(localStorage.getItem('arlilia_last_seen') === today + ':' + auth.userId) return; }catch(e){}
+  try{
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/app_settings?on_conflict=user_id`, {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ user_id: auth.userId, last_seen_at: new Date().toISOString() }]),
+    });
+    if(res.ok){ try{ localStorage.setItem('arlilia_last_seen', today + ':' + auth.userId); }catch(e){} }
+  }catch(e){ /* ignore */ }
 }
 
 function applyTheme(){
