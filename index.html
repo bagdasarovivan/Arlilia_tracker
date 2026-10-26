@@ -649,7 +649,7 @@ const ALL_QUESTIONS = [
   { id:'title', type:'choice_other', label:'Название речевого поступка', options: TITLE_OPTIONS, hint:'С кем и где был подход' },
   { id:'mindsetBefore', type:'choice_other', label:'Мой настрой', options: MINDSET_OPTIONS, hint:'Каким было моё состояние перед подходом' },
   { id:'reactionAfter', type:'choice_other', label:'Реакция собеседника', options: REACTION_OPTIONS, hint:'Как собеседник отреагировал на то, что к нему подошли' },
-  { id:'ritual', type:'ritual', label:'Речевой ритуал', hint:'Что из ритуала было в этом подходе — можно выбрать несколько или все' },
+  { id:'ritual', type:'ritual', label:'Речевой ритуал', hint:'Что из ритуала было в этом подходе — можно выбрать несколько' },
   { id:'voice', type:'scale_note', label:'Речь по методике', lowLabel:'сбивался', highLabel:'чисто', hint:'Слитность, мягкая атака, плавность' },
   { id:'hand', type:'scale_note', label:'Ощущение руки', lowLabel:'напряжена, скованно', highLabel:'свободно, естественно', hint:'Насколько чувствовал руку во время общения' },
   { id:'anxiety', type:'scale_note', label:'Волнение', lowLabel:'спокоен', highLabel:'максимум', hint:'Было ли волнение' },
@@ -1522,11 +1522,9 @@ function renderPracticeWizard(){
     const items = state.answers.ritualItems || [];
     const noteVal3 = state.answers.ritualNote || '';
     const noteOpen3 = (state.noteOpen && state.noteOpen.ritual) || !!noteVal3;
-    const allOn = items.length === RITUAL_ITEMS.length;
     control = `
       <div class="choice-list">
         ${RITUAL_ITEMS.map(o=>`<button class="choice-list-btn ${items.includes(o)?'selected':''}" data-ritual-item="${esc(o)}">${o}</button>`).join('')}
-        <button type="button" class="btn-ghost" data-ritual-all style="padding:11px;">${allOn ? 'Снять все' : 'Выбрать все'}</button>
       </div>
       <div class="choice-row" style="margin-top:12px;"><button class="choice-btn ${state.answers.silent?'selected':''}" data-ritual-silent>Режим молчания</button></div>
       <button type="button" class="btn-ghost" data-note-toggle="ritual" style="margin-top:20px; padding:11px;">${noteOpen3 ? 'Скрыть описание' : '+ Добавить описание'}</button>
@@ -2090,13 +2088,6 @@ function attachHandlers(){
       const cur = new Set(state.answers.ritualItems || []);
       if(cur.has(o)) cur.delete(o); else cur.add(o);
       state.answers.ritualItems = RITUAL_ITEMS.filter(x=>cur.has(x));
-      render();
-    });
-  });
-  app.querySelectorAll('[data-ritual-all]').forEach(el=>{
-    el.addEventListener('click', ()=>{
-      const all = (state.answers.ritualItems || []).length === RITUAL_ITEMS.length;
-      state.answers.ritualItems = all ? [] : RITUAL_ITEMS.slice();
       render();
     });
   });
