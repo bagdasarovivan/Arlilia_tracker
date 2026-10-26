@@ -861,21 +861,19 @@ async function loadAll(){
   state.loadOffline = false;
   await ensureFreshToken();
   try{
-    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?select=*&order=created_at.asc`);
+    const { res, rows } = await fetchAllRows(`${SUPABASE_URL}/rest/v1/attempts?select=*&user_id=eq.${auth.userId}&order=created_at.asc`);
     if(res.status === 401){
       if(auth.sessionInvalid) return false; // Supabase really did reject the session
       state.loadOffline = true; return true; // just a connectivity blip — stay logged in
     }
-    const rows = await res.json();
     state.entries = Array.isArray(rows) ? rows.map(rowToAttempt) : [];
   }catch(e){ console.error(e); state.loadOffline = true; }
   try{
-    const res2 = await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?select=*&order=entry_date.asc`);
-    const rows2 = await res2.json();
+    const { rows: rows2 } = await fetchAllRows(`${SUPABASE_URL}/rest/v1/journal_entries?select=*&user_id=eq.${auth.userId}&order=entry_date.asc`);
     state.journalEntries = Array.isArray(rows2) ? rows2.map(rowToJournal) : [];
   }catch(e){ console.error(e); }
   try{
-    const res3 = await sbFetch(`${SUPABASE_URL}/rest/v1/app_settings?select=*&limit=1`);
+    const res3 = await sbFetch(`${SUPABASE_URL}/rest/v1/app_settings?select=*&user_id=eq.${auth.userId}&limit=1`);
     const rows3 = await res3.json();
     if(Array.isArray(rows3) && rows3[0]){
       state.settings.startDate = rows3[0].start_date || null;
@@ -935,7 +933,7 @@ function answersFromAttempt(a){
 }
 async function updateAttempt(id, answers){
   try{
-    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?id=eq.${encodeURIComponent(id)}`, {
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?id=eq.${encodeURIComponent(id)}&user_id=eq.${auth.userId}`, {
       method: 'PATCH',
       headers: { 'Prefer': 'return=representation' },
       body: JSON.stringify(attemptToRow(answers)),
@@ -958,7 +956,7 @@ async function updateAttempt(id, answers){
 }
 async function deleteAttempt(id){
   try{
-    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?id=eq.${encodeURIComponent(id)}&user_id=eq.${auth.userId}`, { method: 'DELETE' });
     if(!res.ok){
       console.error('deleteAttempt failed', res.status);
       showToast('Не удалось удалить: ' + res.status);
@@ -970,6 +968,21 @@ async function deleteAttempt(id){
     showToast('Нет соединения с сервером — подход не удалён');
     return false;
   }
+}
+// Supabase returns at most 1000 rows per request, so a long-time user would
+// silently lose their oldest/newest records. Read in pages of 1000 until done.
+async function fetchAllRows(url){
+  const PAGE = 1000;
+  let all = [], res = null;
+  for(let from = 0; ; from += PAGE){
+    res = await sbFetch(url, { headers: { 'Range-Unit': 'items', 'Range': `${from}-${from + PAGE - 1}` } });
+    if(!res.ok && res.status !== 206) return { res, rows: null };
+    const rows = await res.json();
+    if(!Array.isArray(rows)) return { res, rows: null };
+    all = all.concat(rows);
+    if(rows.length < PAGE) break;
+  }
+  return { res, rows: all };
 }
 async function insertAttempt(answers){
   try{
@@ -1028,7 +1041,7 @@ async function persistJournal(){
 }
 async function deleteJournalEntry(entryDate){
   try{
-    await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?entry_date=eq.${entryDate}`, {
+    await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?entry_date=eq.${entryDate}&user_id=eq.${auth.userId}`, {
       method: 'DELETE',
     });
   }catch(e){ console.error(e); }
