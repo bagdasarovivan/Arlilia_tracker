@@ -789,6 +789,7 @@ function rowToAttempt(r){
   return {
     id: r.id,
     ts: new Date(r.created_at).getTime(),
+    scrubbed: !!r.scrubbed_at,
     title: r.title,
     mindsetBefore: r.mindset_before, reactionAfter: r.reaction_after,
     ...parseRitual(r.ritual, r.ritual_note),
@@ -827,6 +828,7 @@ function rowToJournal(r){
     id: r.id,
     entryDate: r.entry_date,
     ts: new Date(r.entry_date + 'T12:00:00').getTime(),
+    scrubbed: !!r.scrubbed_at,
     mood: r.mood === 'Норм' ? 'Нормальное' : r.mood, glad: r.glad, worry: r.worry,
     ...splitDescribed(r.speech_mode, ['Режим молчания'], 'speechMode'),
     dailyRoutine: r.daily_routine,
@@ -1101,6 +1103,7 @@ function scheduleJournalSave(){
   journalSaveTimer = setTimeout(persistJournal, 500);
 }
 function isJournalEntryEmpty(entry){
+  if(entry.scrubbed) return false; // text removed after 3 days, but the entry still counts as filled
   return !JOURNAL_STEPS.some(f => {
     const v = entry[f.id];
     if(v !== undefined && v !== null && v !== '') return true;
@@ -1163,6 +1166,9 @@ function journalEntriesInMonth(monthDate){
     const d = new Date(e.ts);
     return d.getFullYear()===monthDate.getFullYear() && d.getMonth()===monthDate.getMonth();
   }).sort((a,b)=>a.ts-b.ts);
+}
+function journalScrubbedOn(dateStr){
+  return state.journalEntries.some(e=> e.scrubbed && dateKey(e.ts) === dateStr);
 }
 function attemptsOnDate(dateStr){
   return state.entries.filter(e=> dateKey(e.ts) === dateStr).sort((a,b)=>a.ts-b.ts);
@@ -1733,6 +1739,17 @@ function renderJournalRead(entry){
     return readRow(JOURNAL_ICONS[f.id]||'🔹', null, v, f.label);
   }).join('');
 
+  if(entry.scrubbed){
+    const dn0 = dayNumberForTs(entry.ts);
+    return `
+    <div style="padding:22px 20px 40px;">
+      <div class="top-bar">
+        <button class="back-btn" data-action="journal-read-back">‹</button>
+        <h2 style="text-transform:capitalize;">${dn0 ? 'День ' + dn0 : weekdayDateLabel(entry.ts)}</h2>
+      </div>
+      <div class="empty">В этот день дневник был заполнен.<br>Текст записи хранится 3 дня и потом удаляется — осталась только отметка.</div>
+    </div>`;
+  }
   const moodVal = entry.mood;
   const moodIcon = MOOD_ICONS[moodVal] || '🙂';
   const dn = dayNumberForTs(entry.ts);
@@ -1879,11 +1896,11 @@ function renderDayAttempts(){
       return `<div class="attempt-row">
         <div class="attempt-row-top">
           <span class="attempt-row-num">${time}</span>
-          <span class="attempt-row-title">${esc(a.title || 'Без названия')}</span>
+          <span class="attempt-row-title">${a.scrubbed ? 'Подробности удалены' : esc(a.title || 'Без названия')}</span>
           ${confirming ? `
           <button class="attempt-mini" data-action="cancel-delete-attempt">Отмена</button>
           <button class="attempt-mini danger" data-action="confirm-delete-attempt" data-aid="${esc(a.id)}">Удалить?</button>` : `
-          <button class="attempt-mini" data-action="edit-attempt" data-aid="${esc(a.id)}" aria-label="Изменить">✏️</button>
+          ${a.scrubbed ? '' : `<button class="attempt-mini" data-action="edit-attempt" data-aid="${esc(a.id)}" aria-label="Изменить">✏️</button>`}
           <button class="attempt-mini" data-action="ask-delete-attempt" data-aid="${esc(a.id)}" aria-label="Удалить">🗑</button>`}
         </div>
       </div>`;
@@ -2750,6 +2767,7 @@ function buildAttemptsPages(){
   // in the order each type first appears.
   const typeCounts = [];
   entries.forEach(e=>{
+    if(e.scrubbed) return;
     const t = e.title || 'Без типа';
     const row = typeCounts.find(r=>r[0]===t);
     if(row) row[1]++; else typeCounts.push([t, 1]);
@@ -2762,6 +2780,12 @@ function buildAttemptsPages(){
                            // unused bottom margin instead of stacking dead space.
   let { ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H);
   y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Таблица осознанности', dayLabel + ' · подходов за день: ' + entries.length + ' · за всё время: ' + totalAttemptsCount());
+
+  if(entries.some(e=>e.scrubbed)){
+    ctx.fillStyle = RC.muted; ctx.font = 'italic 16px ' + REPORT_FONT;
+    ctx.fillText('Подробности подходов хранятся 7 дней, потом остаётся только их количество.', PDF_L_MARGIN, y);
+    y += 40;
+  }
 
   if(summaryLine){
     ctx.fillStyle = RC.muted; ctx.font = '17px ' + REPORT_FONT;
@@ -2867,7 +2891,7 @@ function copyAttemptsImage(){
 function buildJournalPages(){
   const dateStr = state.reportDate || todayKey();
   const entry = journalEntryOnDate(dateStr);
-  if(!entry) return null;
+  if(!entry || entry.scrubbed) return null;
 
   const fieldLabels = [
     ['mood','Самочувствие'], ['glad','Радует'], ['worry','Волнует'], ['speechMode','Речевой режим'],
@@ -2934,7 +2958,7 @@ function buildJournalPages(){
 }
 async function generateJournalPdf(){
   const built = buildJournalPages();
-  if(!built){ showToast('За этот день нет записи дневника'); return; }
+  if(!built){ showToast(journalScrubbedOn(state.reportDate || todayKey()) ? 'Текст этого дневника уже удалён — хранится 3 дня' : 'За этот день нет записи дневника'); return; }
   if(!window.jspdf) showToast('Готовим PDF…');
   const ok = await ensureJsPDF();
   if(!ok){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
@@ -2942,7 +2966,7 @@ async function generateJournalPdf(){
 }
 function copyJournalImage(){
   const built = buildJournalPages();
-  if(!built){ showToast('За этот день нет записи дневника'); return; }
+  if(!built){ showToast(journalScrubbedOn(state.reportDate || todayKey()) ? 'Текст этого дневника уже удалён — хранится 3 дня' : 'За этот день нет записи дневника'); return; }
   copyCanvasImage(mergeCanvasesVertically(built.pages, built.pageBottoms, PDF_P_MARGIN + 24), 0);
 }
 
