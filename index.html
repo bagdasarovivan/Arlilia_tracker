@@ -2189,8 +2189,8 @@ function renderSettings(){
         <input type="date" id="settings-start-date" value="${state.settings.startDate || ''}">
       </div>
       <div style="display:flex; gap:10px; margin-top:12px;">
-        <button class="btn btn-primary" style="flex:1;" data-action="confirm-start-date" ${state.startDateSaving ? 'disabled' : ''}>${state.startDateSaving ? 'Сохраняем…' : 'Подтвердить дату'}</button>
-        ${state.settings.startDate ? `<button class="btn btn-ghost" style="flex:1;" data-action="reset-start-date" ${state.startDateSaving ? 'disabled' : ''}>Сбросить дату</button>` : ''}
+        <button class="btn btn-primary" style="flex:1; min-width:0; padding-left:6px; padding-right:6px; font-size:15px;" data-action="confirm-start-date" ${state.startDateSaving ? 'disabled' : ''}>${state.startDateSaving ? 'Сохраняем…' : 'Подтвердить дату'}</button>
+        ${state.settings.startDate ? `<button class="btn btn-ghost" style="flex:1; min-width:0; padding-left:6px; padding-right:6px; font-size:15px;" data-action="reset-start-date" ${state.startDateSaving ? 'disabled' : ''}>Сбросить дату</button>` : ''}
       </div>
       ${days ? `<div class="autosave-hint" style="margin:10px 0 0;">Сейчас: День ${days}</div>` : ''}
       ${consciousDays ? `<div class="autosave-hint" style="margin:4px 0 0;">Дней осознанных занятий: ${consciousDays}</div>` : ''}
