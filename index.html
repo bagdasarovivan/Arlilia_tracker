@@ -645,18 +645,23 @@ const TITLE_OPTIONS = ['Подход на улице', 'Звонок', 'Публ
 const MINDSET_OPTIONS = ['Супер', 'Хорошо', 'Нормально', 'Плохо', 'Другое'];
 const REACTION_OPTIONS = ['Спокойно', 'Адекватно', 'Доброжелательно', 'С интересом', 'С восхищением', 'С сочувствием', 'С удивлением', 'С пониманием', 'Безразлично', 'Недоверчиво', 'Тревожно', 'Боязливо', 'Недовольно', 'Раздражённо', 'Неадекватно', 'Другое'];
 
+const START_OPTIONS = ['Мягко', 'Звонко', 'Неторопливо'];
+const TONE_OPTIONS = ['Спокойно', 'Доброжелательно', 'С достоинством'];
+
 const ALL_QUESTIONS = [
   { id:'title', type:'choice_other', label:'Название речевого поступка', options: TITLE_OPTIONS, hint:'С кем и где был подход' },
   { id:'mindsetBefore', type:'choice_other', label:'Мой настрой', options: MINDSET_OPTIONS, hint:'Каким было моё состояние перед подходом' },
   { id:'reactionAfter', type:'choice_other', label:'Реакция собеседника', options: REACTION_OPTIONS, hint:'Как собеседник отреагировал на то, что к нему подошли' },
   { id:'ritual', type:'ritual', label:'Речевой ритуал', hint:'Что из ритуала было в этом подходе — можно выбрать несколько' },
+  { id:'speechStart', type:'multi', label:'Начало речи', hint:'Как начал говорить — можно выбрать несколько', options: START_OPTIONS },
+  { id:'speechTone', type:'multi', label:'Тон голоса', hint:'Каким был тон — можно выбрать несколько', options: TONE_OPTIONS },
   { id:'voice', type:'scale_note', label:'Речь по методике', lowLabel:'сбивался', highLabel:'чисто', hint:'Слитность, мягкая атака, плавность' },
   { id:'hand', type:'scale_note', label:'Ощущение руки', lowLabel:'напряжена, скованно', highLabel:'свободно, естественно', hint:'Насколько чувствовал руку во время общения' },
   { id:'anxiety', type:'scale_note', label:'Волнение', lowLabel:'спокоен', highLabel:'максимум', hint:'Было ли волнение' },
 ];
 // In silent mode ("Режим молчания") there is no speech to rate, so the speech and hand questions are skipped.
 function activeQuestions(){
-  return ALL_QUESTIONS.filter(q => !((q.id === 'hand' || q.id === 'voice') && state.answers.silent));
+  return ALL_QUESTIONS.filter(q => !((q.id === 'hand' || q.id === 'voice' || q.id === 'speechStart' || q.id === 'speechTone') && state.answers.silent));
 }
 
 const JOURNAL_STEPS = [
@@ -750,10 +755,12 @@ let state = {
 const SILENT_LABEL = 'Режим молчания';
 const RITUAL_ITEMS = ['Зрительный контакт','Доброжелательный взгляд','Отомри','Щелинка'];
 const RITUAL_PREFIX = 'Ритуал: ';
+const START_PREFIX = 'Начало речи: ';
+const TONE_PREFIX = 'Тон голоса: ';
 // ritual_note holds (no DB change needed): optional line «Режим молчания»,
 // optional line «Ритуал: a, b», then the free-text description.
 function parseRitual(ritual, note){
-  let silent = false, items = [];
+  let silent = false, items = [], speechStart = [], speechTone = [];
   let rest = typeof note === 'string' ? note : '';
   if(rest === SILENT_LABEL || rest.startsWith(SILENT_LABEL + ': ')){ // older one-line format
     silent = true; rest = rest.slice(SILENT_LABEL.length).replace(/^: /, '');
@@ -763,15 +770,25 @@ function parseRitual(ritual, note){
     if(lines[0] && lines[0].startsWith(RITUAL_PREFIX)){
       items = lines.shift().slice(RITUAL_PREFIX.length).split(', ').filter(x=>RITUAL_ITEMS.includes(x));
     }
+    if(lines[0] && lines[0].startsWith(START_PREFIX)){
+      speechStart = lines.shift().slice(START_PREFIX.length).split(', ').filter(x=>START_OPTIONS.includes(x));
+    }
+    if(lines[0] && lines[0].startsWith(TONE_PREFIX)){
+      speechTone = lines.shift().slice(TONE_PREFIX.length).split(', ').filter(x=>TONE_OPTIONS.includes(x));
+    }
     rest = lines.join('\n');
   }
-  return { silent, ritualItems: items, ritual: (silent || items.length) ? null : (ritual ?? null), ritualNote: rest };
+  return { silent, ritualItems: items, speechStart, speechTone, ritual: (silent || items.length) ? null : (ritual ?? null), ritualNote: rest };
 }
 function ritualToRow(e){
   const items = (e.ritualItems || []).filter(x=>RITUAL_ITEMS.includes(x));
   const lines = [];
   if(e.silent) lines.push(SILENT_LABEL);
   if(items.length) lines.push(RITUAL_PREFIX + items.join(', '));
+  const st = e.silent ? [] : (e.speechStart || []).filter(x=>START_OPTIONS.includes(x));
+  const tn = e.silent ? [] : (e.speechTone || []).filter(x=>TONE_OPTIONS.includes(x));
+  if(st.length) lines.push(START_PREFIX + st.join(', '));
+  if(tn.length) lines.push(TONE_PREFIX + tn.join(', '));
   if(e.ritualNote) lines.push(e.ritualNote);
   return {
     ritual: items.length ? true : (!e.silent && typeof e.ritualLegacy === 'boolean' ? e.ritualLegacy : null),
@@ -973,6 +990,8 @@ function answersFromAttempt(a){
   });
   ans.silent = !!a.silent;
   ans.ritualItems = (a.ritualItems || []).slice();
+  ans.speechStart = (a.speechStart || []).slice();
+  ans.speechTone = (a.speechTone || []).slice();
   ans.ritualLegacy = a.ritual; // older yes/no answer, kept if nothing new is chosen
   ans.ritualNote = a.ritualNote || '';
   ['voice','hand','anxiety'].forEach(id=>{
@@ -1541,6 +1560,9 @@ function renderPracticeWizard(){
       <button type="button" class="btn-ghost" data-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen2 ? 'Скрыть описание' : '+ Добавить описание'}</button>
       ${noteOpen2 ? `<textarea id="note-${q.id}" placeholder="Подробности, если нужно..." style="margin-top:10px;">${esc(noteVal2)}</textarea>` : ''}
     `;
+  } else if(q.type === 'multi'){
+    const cur = state.answers[q.id] || [];
+    control = `<div class="choice-list">${q.options.map(o=>`<button class="choice-list-btn ${cur.includes(o)?'selected':''}" data-multi-id="${q.id}" data-multi-val="${esc(o)}">${o}</button>`).join('')}</div>`;
   } else if(q.type === 'ritual'){
     const items = state.answers.ritualItems || [];
     const noteVal3 = state.answers.ritualNote || '';
@@ -2122,6 +2144,17 @@ function attachHandlers(){
       const cur = new Set(state.answers.ritualItems || []);
       if(cur.has(o)) cur.delete(o); else cur.add(o);
       state.answers.ritualItems = RITUAL_ITEMS.filter(x=>cur.has(x));
+      render();
+    });
+  });
+  app.querySelectorAll('[data-multi-id]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-multi-id');
+      const o = e.currentTarget.getAttribute('data-multi-val');
+      const q = ALL_QUESTIONS.find(x=>x.id === id);
+      const cur = new Set(state.answers[id] || []);
+      if(cur.has(o)) cur.delete(o); else cur.add(o);
+      state.answers[id] = q.options.filter(x=>cur.has(x));
       render();
     });
   });
@@ -2741,14 +2774,16 @@ function downloadCanvasFallback(canvas){
 
 /* ---- Attempts: wide multi-column table, landscape, one day at a time ---- */
 const ATT_COLS = [
-  { id:'num',      label:'№',          w:40  },
-  { id:'title',    label:'Тип',        w:160 },
-  { id:'mindset',  label:'Настрой',    w:150 },
-  { id:'reaction', label:'Реакция',    w:200 },
-  { id:'voice',    label:'Речь',       w:130, note:'voiceNote'   },
-  { id:'hand',     label:'Рука',       w:130, note:'handNote'    },
-  { id:'anxiety',  label:'Волнение',   w:140, note:'anxietyNote' },
-  { id:'ritual',   label:'Ритуал',     w:326, note:'ritualNote' },
+  { id:'num',      label:'№',          w:36  },
+  { id:'title',    label:'Тип',        w:130 },
+  { id:'mindset',  label:'Настрой',    w:110 },
+  { id:'reaction', label:'Реакция',    w:165 },
+  { id:'voice',    label:'Речь',       w:110, note:'voiceNote'   },
+  { id:'hand',     label:'Рука',       w:110, note:'handNote'    },
+  { id:'anxiety',  label:'Волнение',   w:110, note:'anxietyNote' },
+  { id:'ritual',   label:'Ритуал',     w:188, note:'ritualNote' },
+  { id:'start',    label:'Начало речи', w:120 },
+  { id:'tone',     label:'Тон голоса', w:165 },
 ];
 function attColX(){
   const gap = 16; let x = PDF_L_MARGIN; const map = {};
@@ -2813,6 +2848,8 @@ function buildAttemptsPages(){
       hand: fmtNum(e.hand),
       anxiety: fmtNum(e.anxiety),
       ritual: ritualText(e) || '—',
+      start: (e.speechStart || []).join(', ') || '—',
+      tone: (e.speechTone || []).join(', ') || '—',
     };
     const lineH = 24, noteLineH = 18, noteGap = 7;
     ctx.font = '17px ' + REPORT_FONT;
