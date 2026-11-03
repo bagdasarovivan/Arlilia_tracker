@@ -612,6 +612,7 @@ async function signUp(email, password){
   }
 }
 function logout(){
+  clearLocalUserData();
   clearSession();
   state.loggedIn = false;
   state.loaded = false;
@@ -628,6 +629,7 @@ async function resetAllData(){
     await saveStartDate(null);
     state.entries = [];
     state.journalEntries = [];
+    lsSet(outboxKey(), []); lsSet(jPendKey(), {}); saveCache();
     state.confirmReset = false;
     state.resetBusy = false;
     showToast('Все данные сброшены — можно начинать заново');
@@ -904,6 +906,94 @@ function journalDraftToRow(e){
   };
 }
 
+/* ---------- offline support ----------
+   The last loaded data is kept on the phone, so the app opens and shows it
+   without internet. New attempts made offline wait in an "outbox" (and a
+   journal entry in "journal pending") and are sent when the connection is
+   back. Everything is per account and wiped on logout. */
+function lsGet(key, fallback){
+  try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; }
+}
+function lsSet(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){} }
+const cacheKey  = ()=> 'arlilia_cache_' + auth.userId;
+const outboxKey = ()=> 'arlilia_outbox_' + auth.userId;
+const jPendKey  = ()=> 'arlilia_jpending_' + auth.userId;
+function saveCache(){
+  if(!auth.userId || !state.loaded) return;
+  lsSet(cacheKey(), { entries: state.entries, journal: state.journalEntries, startDate: state.settings.startDate || null });
+}
+function loadCache(){
+  const c = lsGet(cacheKey(), null);
+  if(!c) return false;
+  state.entries = Array.isArray(c.entries) ? c.entries : [];
+  state.journalEntries = Array.isArray(c.journal) ? c.journal : [];
+  if(c.startDate) state.settings.startDate = c.startDate;
+  return true;
+}
+function clearLocalUserData(){
+  if(!auth.userId) return;
+  try{ [cacheKey(), outboxKey(), jPendKey(), 'arlilia_last_seen'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
+}
+function isNetworkError(err){ return err instanceof TypeError; }
+function mergeOutboxIntoEntries(){
+  lsGet(outboxKey(), []).forEach(it=>{
+    if(state.entries.some(x=>x.id === it.tempId)) return;
+    state.entries.push({ ...rowToAttempt({ ...it.row, id: it.tempId }), pending: true });
+  });
+  state.entries.sort((a,b)=>a.ts-b.ts);
+}
+let flushing = false;
+async function flushOutbox(){
+  if(flushing || !auth.userId || !state.loggedIn) return;
+  flushing = true;
+  try{
+    let changed = false;
+    // 1) attempts made offline
+    for(const it of lsGet(outboxKey(), [])){
+      try{
+        const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts`, {
+          method: 'POST', headers: { 'Prefer': 'return=representation' }, body: JSON.stringify(it.row),
+        });
+        if(res.status === 401) break; // not signed in right now — try again later
+        let rows = null;
+        if(res.ok) rows = await res.json();
+        if(res.ok && Array.isArray(rows) && rows[0]){
+          const idx = state.entries.findIndex(x=>x.id === it.tempId);
+          const real = rowToAttempt(rows[0]);
+          if(idx >= 0) state.entries[idx] = real; else state.entries.push(real);
+        } else if(res.status >= 400 && res.status < 500){
+          console.error('outbox item rejected', res.status); // will never succeed — drop it
+          state.entries = state.entries.filter(x=>x.id !== it.tempId);
+        } else break;
+        lsSet(outboxKey(), lsGet(outboxKey(), []).filter(x=>x.tempId !== it.tempId));
+        changed = true;
+      }catch(e){ break; } // still offline
+    }
+    // 2) journal entries saved offline
+    const pend = lsGet(jPendKey(), {});
+    for(const date of Object.keys(pend)){
+      try{
+        const res = await sbFetch(`${SUPABASE_URL}/rest/v1/journal_entries?on_conflict=entry_date,user_id`, {
+          method: 'POST', headers: { 'Prefer': 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify([pend[date]]),
+        });
+        if(res.status === 401) break;
+        if(res.ok){
+          const rows = await res.json();
+          if(Array.isArray(rows) && rows[0]){
+            const updated = rowToJournal(rows[0]);
+            const idx = state.journalEntries.findIndex(j=>j.entryDate === updated.entryDate);
+            if(idx >= 0) state.journalEntries[idx] = updated; else state.journalEntries.push(updated);
+            if(state.journalDraft && state.journalDraft.entryDate === updated.entryDate && !state.journalFormActive) state.journalDraft = updated;
+          }
+        } else if(!(res.status >= 400 && res.status < 500)) break;
+        const left = lsGet(jPendKey(), {}); delete left[date]; lsSet(jPendKey(), left);
+        changed = true;
+      }catch(e){ break; }
+    }
+    if(changed){ saveCache(); if(!state.practiceActive && !state.journalFormActive) render(); }
+  } finally { flushing = false; }
+}
+
 async function loadAll(){
   auth.sessionInvalid = false;
   state.loadOffline = false;
@@ -912,10 +1002,11 @@ async function loadAll(){
     const { res, rows } = await fetchAllRows(`${SUPABASE_URL}/rest/v1/attempts?select=*&user_id=eq.${auth.userId}&order=created_at.asc`);
     if(res.status === 401){
       if(auth.sessionInvalid) return false; // Supabase really did reject the session
-      state.loadOffline = true; return true; // just a connectivity blip — stay logged in
+      state.loadOffline = true; loadCache(); state.loaded = true; mergeOutboxIntoEntries(); applyTheme(); return true; // just a connectivity blip — stay logged in
     }
-    state.entries = Array.isArray(rows) ? rows.map(rowToAttempt) : [];
+    if(Array.isArray(rows)) state.entries = rows.map(rowToAttempt); else state.loadOffline = true;
   }catch(e){ console.error(e); state.loadOffline = true; }
+  if(state.loadOffline){ loadCache(); }
   try{
     const { rows: rows2 } = await fetchAllRows(`${SUPABASE_URL}/rest/v1/journal_entries?select=*&user_id=eq.${auth.userId}&order=entry_date.asc`);
     state.journalEntries = Array.isArray(rows2) ? rows2.map(rowToJournal) : [];
@@ -933,7 +1024,8 @@ async function loadAll(){
   }catch(e){}
   applyTheme();
   state.loaded = true;
-  if(!state.loadOffline) touchLastSeen();
+  mergeOutboxIntoEntries();
+  if(!state.loadOffline){ saveCache(); touchLastSeen(); flushOutbox(); }
   return true;
 }
 
@@ -1024,6 +1116,10 @@ async function updateAttempt(id, answers){
   }
 }
 async function deleteAttempt(id){
+  if(String(id).startsWith('local-')){
+    lsSet(outboxKey(), lsGet(outboxKey(), []).filter(x=>x.tempId !== id));
+    return true;
+  }
   try{
     const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts?id=eq.${encodeURIComponent(id)}&user_id=eq.${auth.userId}`, { method: 'DELETE' });
     if(!res.ok){
@@ -1072,8 +1168,13 @@ async function insertAttempt(answers){
     return null;
   }catch(err){
     console.error(err);
-    showToast('Нет соединения с сервером — подход не сохранён');
-    return null;
+    if(!isNetworkError(err)){ showToast('Подход не сохранён'); return null; }
+    // Offline: keep it on the phone and send it when the connection is back.
+    const row = { ...attemptToRow(answers), created_at: new Date().toISOString() };
+    const tempId = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    lsSet(outboxKey(), lsGet(outboxKey(), []).concat([{ tempId, row }]));
+    showToast('Нет сети — подход сохранён на телефоне и отправится позже');
+    return { ...rowToAttempt({ ...row, id: tempId }), pending: true };
   }
 }
 
@@ -1093,6 +1194,7 @@ async function persistJournal(){
       showToast('Дневник не сохранился: ' + res.status);
       return;
     }
+    { const pend = lsGet(jPendKey(), {}); if(pend[draft.entryDate]){ delete pend[draft.entryDate]; lsSet(jPendKey(), pend); } }
     const rows = await res.json();
     if(Array.isArray(rows) && rows[0]){
       const updated = rowToJournal(rows[0]);
@@ -1106,7 +1208,13 @@ async function persistJournal(){
         state.journalEditId = updated.entryDate;
       }
     }
-  }catch(e){ console.error(e); showToast('Нет соединения — дневник не сохранён'); }
+  }catch(e){
+    console.error(e);
+    if(isNetworkError(e)){
+      const pend = lsGet(jPendKey(), {}); pend[draft.entryDate] = journalDraftToRow(draft); lsSet(jPendKey(), pend);
+      showToast('Нет сети — дневник сохранён на телефоне и отправится позже');
+    } else showToast('Нет соединения — дневник не сохранён');
+  }
 }
 async function deleteJournalEntry(entryDate){
   try{
@@ -1118,6 +1226,7 @@ async function deleteJournalEntry(entryDate){
 }
 let journalSaveTimer = null;
 function scheduleJournalSave(){
+  saveCache();
   clearTimeout(journalSaveTimer);
   journalSaveTimer = setTimeout(persistJournal, 500);
 }
@@ -1918,11 +2027,11 @@ function renderDayAttempts(){
       return `<div class="attempt-row">
         <div class="attempt-row-top">
           <span class="attempt-row-num">${time}</span>
-          <span class="attempt-row-title">${a.scrubbed ? 'Подробности удалены' : esc(a.title || 'Без названия')}</span>
+          <span class="attempt-row-title">${a.scrubbed ? 'Подробности удалены' : esc(a.title || 'Без названия')}${a.pending ? ' ⏳' : ''}</span>
           ${confirming ? `
           <button class="attempt-mini" data-action="cancel-delete-attempt">Отмена</button>
           <button class="attempt-mini danger" data-action="confirm-delete-attempt" data-aid="${esc(a.id)}">Удалить?</button>` : `
-          ${a.scrubbed ? '' : `<button class="attempt-mini" data-action="edit-attempt" data-aid="${esc(a.id)}" aria-label="Изменить">✏️</button>`}
+          ${(a.scrubbed || a.pending) ? '' : `<button class="attempt-mini" data-action="edit-attempt" data-aid="${esc(a.id)}" aria-label="Изменить">✏️</button>`}
           <button class="attempt-mini" data-action="ask-delete-attempt" data-aid="${esc(a.id)}" aria-label="Удалить">🗑</button>`}
         </div>
       </div>`;
@@ -2483,6 +2592,7 @@ async function onAction(e){
     state.confirmDeleteAttemptId = null;
     if(await deleteAttempt(id)){
       state.entries = state.entries.filter(x=> String(x.id) !== id);
+      saveCache();
       showToast('Подход удалён');
     }
   } else if(action === 'cancel-practice'){
@@ -2502,13 +2612,14 @@ async function onAction(e){
       if(updated){
         const idx = state.entries.findIndex(x=> String(x.id) === String(editId));
         if(idx >= 0) state.entries[idx] = updated; else state.entries.push(updated);
+        saveCache();
         showToast('Изменения сохранены');
       }
       render();
       return;
     }
     const saved = await insertAttempt(state.answers);
-    if(saved) state.entries.push(saved);
+    if(saved){ state.entries.push(saved); saveCache(); }
     render();
     return;
 
@@ -3050,6 +3161,7 @@ document.addEventListener('visibilitychange', ()=>{
   syncSessionFromStorage();
   auth.sessionInvalid = false;
   ensureFreshToken().then(()=>{
+    flushOutbox();
     // The server genuinely rejected the saved login — say so, rather than
     // leaving the screen showing data that can no longer be saved.
     if(auth.sessionInvalid && state.loggedIn){
@@ -3060,7 +3172,7 @@ document.addEventListener('visibilitychange', ()=>{
     }
   });
 });
-window.addEventListener('online', ()=>{ if(state.loggedIn) ensureFreshToken(); });
+window.addEventListener('online', ()=>{ if(state.loggedIn) ensureFreshToken().then(flushOutbox); });
 window.addEventListener('storage', (ev)=>{
   if(ev.key === 'arlilia_session') syncSessionFromStorage();
 });
