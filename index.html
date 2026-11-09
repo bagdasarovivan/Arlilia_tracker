@@ -376,6 +376,17 @@
   @keyframes splash-in{ 0%{ opacity:0; transform:scale(.9); filter:drop-shadow(0 0 0 rgba(47,111,237,0)); } 100%{ opacity:1; transform:scale(1); filter:drop-shadow(0 0 18px rgba(47,111,237,.75)); } }
   @keyframes splash-out{ to{ opacity:0; visibility:hidden; } }
   @media (prefers-reduced-motion: reduce){ #splash svg{ animation:none; opacity:1; transform:none; } }
+
+.ft-item{ display:flex; flex-direction:column; align-items:flex-start; gap:4px; text-align:left; }
+.ft-desc{ font-size:13px; font-weight:400; line-height:1.4; opacity:.7; }
+.ft-all{ margin-top:6px; font-weight:600; }
+.ft-group{ margin:14px 0 2px; font-size:12px; letter-spacing:.06em; text-transform:uppercase; opacity:.6; }
+.ft-details{ display:flex; flex-direction:column; gap:6px; }
+.goal-card{ margin:18px 0 6px; padding:14px 16px; border:1px solid var(--border, rgba(128,128,128,.3)); border-radius:14px; }
+.goal-title{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; opacity:.6; margin-bottom:6px; }
+.goal-text{ font-size:17px; font-weight:600; }
+.goal-desc{ font-size:14px; opacity:.75; margin-top:4px; }
+.ft-detail-label{ font-size:14px; opacity:.75; margin-top:8px; }
 </style>
 </head>
 <body>
@@ -642,46 +653,98 @@ async function resetAllData(){
   }
 }
 
-/* Вопросы к подходу — по мотивам таблицы "речевой поступок" методики саморегуляции */
-const TITLE_OPTIONS = ['Подход на улице', 'Звонок', 'Публичное выступление', 'Другое'];
-const MINDSET_OPTIONS = ['Супер', 'Хорошо', 'Нормально', 'Плохо', 'Другое'];
-const REACTION_OPTIONS = ['Спокойно', 'Адекватно', 'Доброжелательно', 'С интересом', 'С восхищением', 'С сочувствием', 'С удивлением', 'С пониманием', 'Безразлично', 'Недоверчиво', 'Тревожно', 'Боязливо', 'Недовольно', 'Раздражённо', 'Неадекватно', 'Другое'];
-
-const START_OPTIONS = ['Мягко', 'Звонко', 'Неторопливо'];
+/* Вопросы к ФТ (речевому поступку) — по текстам логопеда, версия от 10 ноября */
+const TITLE_OPTIONS = ['Подходы', 'Телефон', 'Публичное выступление', 'Другое'];
+const MINDSET_OPTIONS = ['Доброжелательный', 'Внутренняя улыбка', 'Желаю счастья', 'Нейтральный', 'Другое'];
+const REACTION_OPTIONS = ['Спокойно', 'Адекватно', 'Доброжелательно', 'С интересом', 'С восхищением', 'С сочувствием', 'С удивлением', 'С пониманием', 'Безразлично', 'Недоверчиво', 'Боязливо', 'Суетливо', 'Другое'];
+// Подсказки к названию ФТ: кому, где, что…
+const FT_DETAIL_LABELS = {
+  'Подходы': ['Кому?', 'Где?', 'Что?'],
+  'Телефон': ['Кому?', 'От кого?', 'О чём?'],
+  'Публичное выступление': ['Где?', 'Аудитория?', 'Тема?'],
+};
+// Списки отметок. t — полный текст, s — короткое название для таблицы, desc — пояснение под пунктом.
+const FT_LISTS = {
+  ritual: { label:'Ритуал речи', hint:'Перед каждой ФТ — отметьте, что сделали', all:'Весь ритуал выполнил', allShort:'Весь ритуал', items:[
+    { id:'goal',     t:'Вспомнил цель ФТ', s:'Цель' },
+    { id:'otmv',     t:'ОТМВ — настраиваю внимание', s:'ОТМВ' },
+    { id:'supports', t:'Опоры: стопы, мягкие колени, дыхание (нижнее), «щелинка», рука', s:'Опоры' },
+    { id:'contact',  t:'Зрительный контакт с вниманием на своём теле', s:'Зрительный контакт' },
+    { id:'record',   t:'Включаю диктофон или камеру', s:'Запись' },
+    { id:'walk',     t:'Походка, осанка с достоинством', s:'Походка' },
+  ]},
+  start: { label:'Начало речи', hint:'Что получилось в начале речи', allShort:'Всё', items:[
+    { id:'top',     t:'Начинаю речь от «верхушки» и на «щелинке»', s:'Верхушка и щелинка', desc:'Осознаём диафрагмальное дыхание, дожидаемся «верхушки» вдоха, не задерживаем дыхание и сразу начинаем звучать на «щелинке» с мягкой атакой голоса.' },
+    { id:'thumb',   t:'Большой палец запускает речь', s:'Большой палец', desc:'В момент верхушки вдоха большой палец нажимает и запускает звучание.' },
+    { id:'spring',  t:'«Пружинка» в первом слоге', s:'Пружинка', desc:'Палец мягко нажимает, как бы сжимая пружинку. Челюсть синхронно с пальцем опадает вместе с опусканием голоса по тону.' },
+    { id:'release', t:'«Отпускание»', s:'Отпускание', desc:'Палец возвращается в исходное положение без усилий, челюсть синхронно легко без усилий возвращается на «щелинку».' },
+  ]},
+  method: { label:'Речь по методике', hint:'Что получилось в речи', all:'Все элементы речи по методике выполнил', allShort:'Все элементы', items:[
+    { id:'relax',  t:'Рука приглашает к расслаблению', s:'Расслабление', desc:'Четыре особых момента в речи, где важно почувствовать расслабление: 1. Перед речью. 2. На первом слоге. 3. На акценте. 4. В паузе.' },
+    { id:'flow',   t:'Рука ведёт слитную речь', s:'Слитность', desc:'Пальцы передают звучание, как эстафету, без прерывания звука, согласные короткие, не разрывают звук.' },
+    { id:'light',  t:'Безударные слоги лёгкие', s:'Безударные', desc:'Пальцы на безударных слогах прикасаются легко, без надавливания — «медвежата».' },
+    { id:'accent', t:'Акцент сильнее первого слога', s:'Акцент', desc:'Палец на акценте ведёт себя так же, как большой палец, но более выражено по длительности и громкости — «медведица».' },
+    { id:'pause',  t:'Пауза — отдых', s:'Пауза', desc:'В паузе отдыхаем, расслабляемся, и в случае длинной паузы можем перейти на физиологическое дыхание.' },
+  ]},
+  voice: { label:'Голос', hint:'Что получилось в голосе', allShort:'Всё', items:[
+    { id:'ring',    t:'Звонкий на «щелинке»', s:'Звонкий', desc:'Начинаем звучание сразу громким и звонким голосом.' },
+    { id:'vowel',   t:'Отчётливый гласный на щелинке', s:'Гласный', desc:'Звук на «щелинке» отчётливо воспроизводит нужный гласный звук.' },
+    { id:'impulse', t:'Импульс энергии в первом слоге на всю фразу', s:'Импульс', desc:'Величина вдоха и «пружинка» на первом слоге должна быть достаточной для уверенного произнесения всего речевого отрезка.' },
+    { id:'cons',    t:'Короткие, лёгкие согласные', s:'Согласные', desc:'Согласные и стечения согласных произносим коротко и легко, не мешая воздуху озвучивать гласный звук, стоящий за согласными.' },
+    { id:'flight',  t:'Полётность голоса', s:'Полётность', desc:'Голос не обрывается сразу и резко, а какое-то время ещё поддерживается нашим вниманием, пока не достигнет слушателя.' },
+  ]},
+};
+const FT_LIST_KEYS = ['ritual', 'start', 'method', 'voice'];
+const FT_SPEECH_KEYS = ['start', 'method', 'voice']; // skipped in silent mode
+const FT_ITEM_SHORT = {};
+FT_LIST_KEYS.forEach(k=> FT_LISTS[k].items.forEach(it=>{ FT_ITEM_SHORT[it.id] = it.s; }));
+function ftDetailsText(title, d){
+  const labels = FT_DETAIL_LABELS[title];
+  if(!labels || !Array.isArray(d)) return '';
+  return labels.map((l,i)=> d[i] ? `${l} ${d[i]}` : '').filter(Boolean).join(' · ');
+}
 
 const ALL_QUESTIONS = [
-  { id:'title', type:'choice_other', label:'Название речевого поступка', options: TITLE_OPTIONS, hint:'С кем и где был подход' },
-  { id:'mindsetBefore', type:'choice_other', label:'Мой настрой', options: MINDSET_OPTIONS, hint:'Каким было моё состояние перед подходом' },
-  { id:'reactionAfter', type:'choice_other', label:'Реакция собеседника', options: REACTION_OPTIONS, hint:'Как собеседник отреагировал на то, что к нему подошли' },
-  { id:'ritual', type:'ritual', label:'Речевой ритуал', hint:'Что из ритуала было в этом подходе — можно выбрать несколько' },
-  { id:'speechStart', type:'multi', allowOther:true, label:'Начало речи', hint:'Как начал говорить — можно выбрать несколько или добавить своё', options: START_OPTIONS },
-  { id:'voice', type:'scale_note', label:'Речь по методике', lowLabel:'сбивался', highLabel:'чисто', hint:'Слитность, мягкая атака, плавность' },
-  { id:'hand', type:'scale_note', label:'Ощущение руки', lowLabel:'напряжена, скованно', highLabel:'свободно, естественно', hint:'Насколько чувствовал руку во время общения' },
-  { id:'anxiety', type:'scale_note', label:'Волнение', lowLabel:'спокоен', highLabel:'максимум', hint:'Было ли волнение' },
+  { id:'title', type:'choice_other', label:'Название ФТ', options: TITLE_OPTIONS, hint:'Какая это ФТ' },
+  { id:'details', type:'ftdetails', label:'Подробности', hint:'' },
+  { id:'mindsetBefore', type:'choice_other', label:'Мой настрой', options: MINDSET_OPTIONS, hint:'Каким было моё состояние перед ФТ' },
+  { id:'reactionAfter', type:'choice_other', label:'Реакция собеседника', options: REACTION_OPTIONS, hint:'Как собеседник отреагировал' },
+  { id:'ritual', type:'ftlist', label:'Ритуал речи', hint: FT_LISTS.ritual.hint },
+  { id:'start', type:'ftlist', label:'Начало речи', hint: FT_LISTS.start.hint },
+  { id:'method', type:'ftlist', label:'Речь по методике', hint: FT_LISTS.method.hint },
+  { id:'voice', type:'ftlist', label:'Голос', hint: FT_LISTS.voice.hint },
+  { id:'anxiety', type:'scale_note', label:'Речевое волнение', lowLabel:'спокоен', highLabel:'максимум', hint:'Уровень своей тревоги по поводу ФТ по 10-балльной шкале' },
+  { id:'hard', type:'fthard', label:'Что было трудно', hint:'Выделите наиболее трудные элементы ФТ для дальнейших тренировок — можно выбрать несколько' },
 ];
 // In silent mode ("Режим молчания") there is no speech to rate, so the speech and hand questions are skipped.
 function activeQuestions(){
-  return ALL_QUESTIONS.filter(q => !((q.id === 'hand' || q.id === 'voice' || q.id === 'speechStart') && state.answers.silent));
+  const title = state.answers.title;
+  return ALL_QUESTIONS.filter(q =>
+    !(FT_SPEECH_KEYS.includes(q.id) && state.answers.silent) &&
+    !(q.id === 'details' && !FT_DETAIL_LABELS[title]));
 }
 
+const SPEECH_MODES = ['Режим молчания (РМ)', 'Режим ограниченной речи', 'Режим спонтанной речи', 'Другое'];
+const SPEECH_MODES_DESCRIBE = ['Режим молчания (РМ)', 'Режим ограниченной речи']; // these two ask «как выполнялся»
 const JOURNAL_STEPS = [
-  { id:'mood', type:'choice_other', label:'Самочувствие', options:['Отлично','Хорошо','Нормальное','Тяжело','Плохо','Другое'] },
-  { id:'glad', type:'textarea', label:'Радует', hint:'Что порадовало сегодня' },
-  { id:'worry', type:'textarea', label:'Волнует', hint:'Что беспокоит' },
-  { id:'speechMode', type:'choice_other', label:'Речевой режим', options:['Режим молчания','Другое'], describe:true, hint:'Как соблюдал речевой режим по методике' },
-  { id:'dailyRoutine', type:'multi_other', label:'Саморегуляция', options:['Смех','Плач','Рычание','Движение','Сон','Джекобсон'], legacy:['Прогулка','Зевки'], hint:'Что из приёмов применял — можно выбрать несколько' },
-  { id:'sleepHours', type:'number_note', label:'Сон', hint:'Сколько часов спал — можно и цифрой, и словами' },
-  { id:'difficulties', type:'textarea', label:'Трудная тетрадь', hint:'Что вызывает трудности' },
-  { id:'questions', type:'textarea', label:'Вопросы' },
-  { id:'reflections', type:'textarea', label:'Откровения' },
-  { id:'tricks', type:'textarea', label:'Уловки', hint:'Были ли какие-то уловки' },
-  { id:'praise', type:'textarea', label:'Похвала', hint:'За что можно похвалить себя' },
-  { id:'intentions', type:'textarea', label:'Речевые планы', hint:'Какие подходы хотел бы ещё сделать' },
+  { id:'mood', type:'choice_other', label:'Настрой', options:['Отлично','Хорошо','Нормальное','Тяжело','Плохо','Другое'] },
+  { id:'speechMode', type:'choice_other', label:'Речевой режим', options: SPEECH_MODES, describe: SPEECH_MODES_DESCRIBE, hint:'Какой режим был сегодня и как он выполнялся' },
+  { id:'glad', type:'textarea', label:'Что порадовало' },
+  { id:'lessons', type:'textarea', label:'Логопедические занятия', hint:'Над чем работал' },
+  { id:'ftNotes', type:'textarea', label:'ФТ', hint:'Наблюдения, что удалось' },
+  { id:'difficulties', type:'textarea', label:'Трудная тетрадь', hint:'Что было трудно, что не получилось' },
+  { id:'dailyRoutine', type:'multi_other', label:'Приёмы саморегуляции', options:['Зарядка','Прикладная релаксация','Прогулки','Выразительное движение','«Ключ»','Режим дня'], legacy:[], hint:'Что применял — можно выбрать несколько' },
+  { id:'sleepHours', type:'sleep', label:'Сон', hint:'Высыпаюсь или нет, и сколько часов' },
+  { id:'reflections', type:'textarea', label:'Вопросы, открытия, откровения' },
+  { id:'praise', type:'textarea', label:'За что себя хвалю' },
+  { id:'intentions', type:'textarea', label:'Цели на следующий день', hint:'Что сделать? Сколько?' },
 ];
+// Поля прежней версии дневника: в мастере их больше нет, но старые записи их показывают.
+const JOURNAL_LEGACY_FIELDS = [['worry','Волнует'], ['tricks','Уловки'], ['questions','Вопросы']];
 
 const JOURNAL_ICONS = {
-  glad:'✨', worry:'🌧️', speechMode:'🗣️', dailyRoutine:'🎙️',
-  difficulties:'⛅', sleepHours:'🌙',
+  glad:'✨', lessons:'📚', ftNotes:'🎯', speechMode:'🗣️', dailyRoutine:'🧘',
+  difficulties:'⛅', sleepHours:'🌙', worry:'🌧️',
   questions:'❓', reflections:'💭', tricks:'🎭', praise:'🏅', intentions:'🧭',
 };
 const MOOD_ICONS = {'Отлично':'🤩','Хорошо':'😊','Нормальное':'🙂','Тяжело':'😕','Плохо':'😞'};
@@ -731,6 +794,8 @@ let state = {
   editListOpen: false,
   qIndex: 0,
   answers: {},
+  dayGoals: {},
+  goalEditing: false,
   noteOpen: {},
 
   journalEntries: [],
@@ -807,10 +872,25 @@ function rowToAttempt(r){
     scrubbed: !!r.scrubbed_at,
     title: r.title,
     mindsetBefore: r.mindset_before, reactionAfter: r.reaction_after,
-    ...parseRitual(r.ritual, r.ritual_note),
+    ...(r.ft && typeof r.ft === 'object'
+      ? { ft: r.ft, silent: !!r.ft.silent, ritualItems: [], speechStart: [], ritual: null, ritualNote: r.ritual_note || '' }
+      : parseRitual(r.ritual, r.ritual_note)),
     voice: r.voice, voiceNote: r.voice_note,
     hand: r.hand, handNote: r.hand_note,
     anxiety: r.anxiety, anxietyNote: r.anxiety_note,
+  };
+}
+function ftFromAnswers(e){
+  const silent = !!e.silent;
+  const pick = (k)=> (silent && FT_SPEECH_KEYS.includes(k)) ? [] : (e[k + 'Sel'] || []);
+  const allowed = new Set(FT_LIST_KEYS.filter(k=> !(silent && FT_SPEECH_KEYS.includes(k))).flatMap(k=> FT_LISTS[k].items.map(it=>it.id)));
+  const titleName = e.title === 'other' ? '' : e.title;
+  return {
+    d: FT_DETAIL_LABELS[titleName] ? (e.detail || []).slice(0,3).map(x=>String(x||'').trim()) : [],
+    ritual: pick('ritual'), start: pick('start'), method: pick('method'), voice: pick('voice'),
+    hard: (e.hardSel || []).filter(id=>allowed.has(id)),
+    hardOther: (e.hardOther || []).map(x=>String(x).trim()).filter(Boolean),
+    silent,
   };
 }
 function attemptToRow(e){
@@ -822,9 +902,10 @@ function attemptToRow(e){
     title,
     mindset_before: mindsetBefore,
     reaction_after: reactionAfter,
-    ...ritualToRow(e),
-    voice: e.silent ? null : (e.voice ?? null), voice_note: e.silent ? null : (e.voiceNote || null),
-    hand: e.silent ? null : (e.hand ?? null), hand_note: e.silent ? null : (e.handNote || null),
+    ritual: null,
+    ritual_note: e.ritualNote || null,
+    ft: ftFromAnswers(e),
+    voice: null, voice_note: null, hand: null, hand_note: null,
     anxiety: e.anxiety ?? null, anxiety_note: e.anxietyNote || null,
   };
 }
@@ -845,7 +926,8 @@ function rowToJournal(r){
     ts: new Date(r.entry_date + 'T12:00:00').getTime(),
     scrubbed: !!r.scrubbed_at,
     mood: r.mood === 'Норм' ? 'Нормальное' : r.mood, glad: r.glad, worry: r.worry,
-    ...splitDescribed(r.speech_mode, ['Режим молчания'], 'speechMode'),
+    ...splitDescribed(typeof r.speech_mode === 'string' ? r.speech_mode.replace(/^Режим молчания(?= *$|: )/, 'Режим молчания (РМ)') : r.speech_mode, SPEECH_MODES_DESCRIBE, 'speechMode'),
+    lessons: r.lessons, ftNotes: r.ft_notes, sleepQuality: r.sleep_quality,
     dailyRoutine: r.daily_routine,
     sleepHours: r.sleep_hours, sleepHoursNote: r.sleep_note,
     difficulties: r.difficulties,
@@ -891,7 +973,8 @@ function journalDraftToRow(e){
     entry_date: e.entryDate,
     mood: e.mood === 'other' ? (e.moodCustom || null) : (e.mood || null),
     glad: e.glad || null, worry: e.worry || null,
-    speech_mode: e.speechMode === 'other' ? (e.speechModeCustom || null) : (e.speechMode ? e.speechMode + (e.speechModeNote ? ': ' + e.speechModeNote : '') : null),
+    speech_mode: e.speechMode === 'other' ? (e.speechModeCustom || null) : (e.speechMode ? e.speechMode + (e.speechModeNote && SPEECH_MODES_DESCRIBE.includes(e.speechMode) ? ': ' + e.speechModeNote : '') : null),
+    lessons: e.lessons || null, ft_notes: e.ftNotes || null, sleep_quality: e.sleepQuality || null,
     daily_routine: e.dailyRoutine || null,
     sleep_hours: e.sleepHours ?? null,
     sleep_note: e.sleepHoursNote || null,
@@ -916,13 +999,14 @@ const outboxKey = ()=> 'arlilia_outbox_' + auth.userId;
 const jPendKey  = ()=> 'arlilia_jpending_' + auth.userId;
 function saveCache(){
   if(!auth.userId || !state.loaded) return;
-  lsSet(cacheKey(), { entries: state.entries, journal: state.journalEntries, startDate: state.settings.startDate || null });
+  lsSet(cacheKey(), { entries: state.entries, journal: state.journalEntries, goals: state.dayGoals, startDate: state.settings.startDate || null });
 }
 function loadCache(){
   const c = lsGet(cacheKey(), null);
   if(!c) return false;
   state.entries = Array.isArray(c.entries) ? c.entries : [];
   state.journalEntries = Array.isArray(c.journal) ? c.journal : [];
+  state.dayGoals = (c.goals && typeof c.goals === 'object') ? c.goals : {};
   if(c.startDate) state.settings.startDate = c.startDate;
   return true;
 }
@@ -1022,6 +1106,16 @@ async function loadAll(){
     state.journalEntries = Array.isArray(rows2) ? rows2.map(rowToJournal) : [];
   }catch(e){ console.error(e); }
   try{
+    const resG = await sbFetch(`${SUPABASE_URL}/rest/v1/day_goals?select=goal_date,goal,description&user_id=eq.${auth.userId}`);
+    const rowsG = await resG.json();
+    if(Array.isArray(rowsG)){
+      const prev = state.dayGoals || {};
+      state.dayGoals = {};
+      rowsG.forEach(g=>{ state.dayGoals[g.goal_date] = { goal: g.goal || '', description: g.description || '' }; });
+      Object.keys(prev).forEach(k=>{ if(!state.dayGoals[k] && prev[k].unsynced) state.dayGoals[k] = prev[k]; });
+    }
+  }catch(e){ console.error(e); }
+  try{
     const res3 = await sbFetch(`${SUPABASE_URL}/rest/v1/app_settings?select=*&user_id=eq.${auth.userId}&limit=1`);
     const rows3 = await res3.json();
     if(Array.isArray(rows3) && rows3[0]){
@@ -1090,15 +1184,15 @@ function answersFromAttempt(a){
     if(opts.includes(v) && v !== 'Другое') ans[id] = v;
     else { ans[id] = 'other'; ans[id + 'Custom'] = v; }
   });
-  ans.silent = !!a.silent;
-  ans.ritualItems = (a.ritualItems || []).slice();
-  ans.speechStart = (a.speechStart || []).slice();
-  ans.ritualLegacy = a.ritual; // older yes/no answer, kept if nothing new is chosen
+  const ft = a.ft || {};
+  ans.silent = !!ft.silent;
+  ans.detail = (ft.d || []).slice();
+  FT_LIST_KEYS.forEach(k=>{ ans[k + 'Sel'] = (ft[k] || []).slice(); });
+  ans.hardSel = (ft.hard || []).slice();
+  ans.hardOther = (ft.hardOther || []).slice();
   ans.ritualNote = a.ritualNote || '';
-  ['voice','hand','anxiety'].forEach(id=>{
-    ans[id] = a[id] ?? 5;
-    ans[id + 'Note'] = a[id + 'Note'] || '';
-  });
+  ans.anxiety = a.anxiety ?? 5;
+  ans.anxietyNote = a.anxietyNote || '';
   return ans;
 }
 async function updateAttempt(id, answers){
@@ -1241,6 +1335,7 @@ function scheduleJournalSave(){
 }
 function isJournalEntryEmpty(entry){
   if(entry.scrubbed) return false; // text removed after 3 days, but the entry still counts as filled
+  if(entry.sleepQuality || JOURNAL_LEGACY_FIELDS.some(([k]) => entry[k])) return false;
   return !JOURNAL_STEPS.some(f => {
     const v = entry[f.id];
     if(v !== undefined && v !== null && v !== '') return true;
@@ -1635,8 +1730,59 @@ function renderPracticeHome(){
         <div class="today-badge-lbl">подход${todayCount===1?'':(todayCount>=2&&todayCount<=4?'а':'ов')} сегодня</div>
       </div>
     </div>
+    ${renderDayGoal(todayK)}
     <button class="btn btn-primary" data-action="start-practice">Записать подход</button>
   `;
+}
+
+function prevDateKey(k){
+  const d = new Date(k + 'T12:00:00'); d.setDate(d.getDate() - 1);
+  return dateKey(d.getTime());
+}
+function renderDayGoal(dk){
+  const g = (state.dayGoals && state.dayGoals[dk]) || null;
+  if(state.goalEditing){
+    return `<div class="goal-card">
+      <div class="goal-title">Цель всех ФТ на день</div>
+      <input type="text" id="goal-text" value="${esc(g ? g.goal : '')}" placeholder="Например: начало речи на щелинке">
+      <div class="goal-title" style="margin-top:12px;">Описание цели</div>
+      <textarea id="goal-desc" placeholder="Что будем тренировать (из трудной тетради)">${esc(g ? g.description : '')}</textarea>
+      <div class="nav-row" style="margin-top:12px;">
+        <button class="btn btn-ghost" data-action="cancel-goal">Отмена</button>
+        <button class="btn btn-primary" data-action="save-goal">Сохранить</button>
+      </div>
+    </div>`;
+  }
+  if(g && (g.goal || g.description)){
+    return `<div class="goal-card">
+      <div class="goal-title">Цель всех ФТ на день</div>
+      <div class="goal-text">${esc(g.goal)}</div>
+      ${g.description ? `<div class="goal-desc">${esc(g.description)}</div>` : ''}
+      <button class="attempt-mini" data-action="edit-goal" style="margin-top:10px;">✏️ Изменить</button>
+    </div>`;
+  }
+  const yj = journalEntryOnDate(prevDateKey(dk));
+  const hint = yj && !yj.scrubbed && yj.intentions ? String(yj.intentions).trim() : '';
+  return `<div class="goal-card">
+    <div class="goal-title">Цель всех ФТ на день</div>
+    <button class="btn-ghost" data-action="edit-goal" style="padding:11px;">+ Поставить цель</button>
+    ${hint ? `<div class="goal-desc" style="margin-top:10px;">Из вчерашнего дневника: «${esc(hint.length > 120 ? hint.slice(0,120) + '…' : hint)}»</div>
+    <button class="attempt-mini" data-action="use-goal-hint" style="margin-top:6px;">Взять как цель</button>` : ''}
+  </div>`;
+}
+async function saveDayGoal(dk, goal, description){
+  state.dayGoals = state.dayGoals || {};
+  state.dayGoals[dk] = { goal, description, unsynced: true };
+  saveCache();
+  try{
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/day_goals?on_conflict=user_id,goal_date`, {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ user_id: auth.userId, goal_date: dk, goal: goal || null, description: description || null, updated_at: new Date().toISOString() }]),
+    });
+    if(res.ok){ delete state.dayGoals[dk].unsynced; saveCache(); }
+    else { console.error('goal save', res.status, await res.text()); showToast('Цель не сохранилась на сервере: ' + res.status); }
+  }catch(e){ showToast('Нет связи — цель сохранится на этом устройстве'); }
 }
 
 function renderPracticeWizard(){
@@ -1689,18 +1835,45 @@ function renderPracticeWizard(){
         <input type="text" id="wiz-other-${q.id}" placeholder="Своё слово" style="flex:1; min-width:0;">
         <button type="button" class="btn-ghost" data-wiz-other-add="${q.id}" style="width:auto; padding:0 18px;">Добавить</button>
       </div>` : ''}` : ''}</div>`;
-  } else if(q.type === 'ritual'){
-    const items = state.answers.ritualItems || [];
+  } else if(q.type === 'ftdetails'){
+    const labels = FT_DETAIL_LABELS[state.answers.title] || [];
+    const d = state.answers.detail || [];
+    control = `<div class="ft-details">${labels.map((l,i)=>`
+      <label class="ft-detail-label" for="ftd-${i}">${esc(l)}</label>
+      <input type="text" id="ftd-${i}" data-ft-detail="${i}" value="${esc(d[i] || '')}" placeholder="Коротко">`).join('')}</div>`;
+  } else if(q.type === 'ftlist'){
+    const L = FT_LISTS[q.id];
+    const sel = state.answers[q.id + 'Sel'] || [];
+    const allOn = L.items.every(it=>sel.includes(it.id));
+    const isRitual = q.id === 'ritual';
     const noteVal3 = state.answers.ritualNote || '';
     const noteOpen3 = (state.noteOpen && state.noteOpen.ritual) || !!noteVal3;
     control = `
       <div class="choice-list">
-        ${RITUAL_ITEMS.map(o=>`<button class="choice-list-btn ${items.includes(o)?'selected':''}" data-ritual-item="${esc(o)}">${o}</button>`).join('')}
+        ${L.items.map(it=>`<button class="choice-list-btn ft-item ${sel.includes(it.id)?'selected':''}" data-ft-item="${q.id}:${it.id}">
+          <span>${esc(it.t)}</span>${it.desc ? `<span class="ft-desc">${esc(it.desc)}</span>` : ''}</button>`).join('')}
+        ${L.all ? `<button class="choice-list-btn ft-all ${allOn?'selected':''}" data-ft-all="${q.id}">${esc(L.all)}</button>` : ''}
       </div>
-      <div class="choice-row" style="margin-top:12px;"><button class="choice-btn ${state.answers.silent?'selected':''}" data-ritual-silent>Режим молчания</button></div>
-      <button type="button" class="btn-ghost" data-note-toggle="ritual" style="margin-top:20px; padding:11px;">${noteOpen3 ? 'Скрыть описание' : '+ Добавить описание'}</button>
-      ${noteOpen3 ? `<textarea id="note-ritual" placeholder="Подробности, если нужно..." style="margin-top:10px;">${esc(noteVal3)}</textarea>` : ''}
+      ${isRitual ? `
+        <div class="choice-row" style="margin-top:12px;"><button class="choice-btn ${state.answers.silent?'selected':''}" data-ritual-silent>Режим молчания</button></div>
+        <button type="button" class="btn-ghost" data-note-toggle="ritual" style="margin-top:20px; padding:11px;">${noteOpen3 ? 'Скрыть описание' : '+ Добавить описание'}</button>
+        ${noteOpen3 ? `<textarea id="note-ritual" placeholder="Подробности, если нужно..." style="margin-top:10px;">${esc(noteVal3)}</textarea>` : ''}` : ''}
     `;
+  } else if(q.type === 'fthard'){
+    const sel = state.answers.hardSel || [];
+    const customs = state.answers.hardOther || [];
+    const otherOpen = !!(state.wizOtherOpen && state.wizOtherOpen.hardOther);
+    const keys = FT_LIST_KEYS.filter(k=> !(state.answers.silent && FT_SPEECH_KEYS.includes(k)));
+    control = `<div class="choice-list">
+      ${keys.map(k=>`<div class="ft-group">${esc(FT_LISTS[k].label)}</div>
+        ${FT_LISTS[k].items.map(it=>`<button class="choice-list-btn ${sel.includes(it.id)?'selected':''}" data-ft-hard="${it.id}">${esc(it.t)}</button>`).join('')}`).join('')}
+      <div class="ft-group">Своё</div>
+      ${customs.map(o=>`<button class="choice-list-btn selected" data-ft-hard-custom="${esc(o)}">${esc(o)} <span style="opacity:.7;">×</span></button>`).join('')}
+      <button class="choice-list-btn ${otherOpen?'selected':''}" data-wiz-other="hardOther">${otherOpen ? 'Другое' : '+ Другое'}</button>
+      ${otherOpen ? `<div style="display:flex; gap:8px; margin-top:10px;">
+        <input type="text" id="wiz-other-hardOther" placeholder="Что было трудно" style="flex:1; min-width:0;">
+        <button type="button" class="btn-ghost" data-wiz-other-add="hardOther" style="width:auto; padding:0 18px;">Добавить</button>
+      </div>` : ''}</div>`;
   } else if(q.type === 'choice_other'){
     const val = state.answers[q.id];
     const customVal = state.answers[q.id + 'Custom'] || '';
@@ -1871,14 +2044,20 @@ function renderJournalHistory(){
 
 /* ---------- read-only beautiful view ---------- */
 function renderJournalRead(entry){
-  const rowsHtml = JOURNAL_STEPS.map(f=>{
+  const rowsHtml = JOURNAL_STEPS.concat(JOURNAL_LEGACY_FIELDS.map(([id,label])=>({id, label, type:'textarea'}))).map(f=>{
     if(f.id === 'mood') return '';
     const v = entry[f.id];
     const hasV = v !== undefined && v !== null && v !== '';
-    const noteVal = f.type === 'number_note' ? entry[f.id + 'Note'] : null;
+    const noteVal = (f.type === 'number_note' || f.type === 'sleep') ? entry[f.id + 'Note'] : null;
     const hasNote = noteVal !== undefined && noteVal !== null && noteVal !== '';
-    if(!hasV && !hasNote) return '';
+    if(!hasV && !hasNote && !(f.type === 'sleep' && entry.sleepQuality)) return '';
 
+    if(f.type === 'sleep'){
+      const q2 = entry.sleepQuality;
+      const parts = [hasV ? fmtNum(v) + ' ч' : '', hasNote ? noteVal : ''].filter(Boolean).join(' — ');
+      const text = [q2, parts].filter(Boolean).join(' · ');
+      return text ? readRow(JOURNAL_ICONS.sleepHours, null, text, 'Сон') : '';
+    }
     if(f.type === 'number' || f.type === 'number_note'){
       const unit = f.id === 'sleepHours' ? 'сон, часов' : f.label;
       if(hasV) return readRow(JOURNAL_ICONS[f.id]||'🔹', v, hasNote ? `${unit} — ${noteVal}` : unit);
@@ -1967,7 +2146,7 @@ function renderJournalWizardStep(){
     }).join('')}
     ${selId === 'other' ? `<input type="text" id="jw-text-${q.id}Custom" value="${esc(customVal)}" placeholder="Напишите свой вариант" style="margin-top:10px;">` : ''}
     </div>`;
-    if(q.describe && selId !== 'other'){
+    if(q.describe && selId !== 'other' && (q.describe === true || q.describe.includes(selId))){
       const dKey = q.id + 'Note';
       const dVal = state.journalDraft[dKey] || '';
       const dOpen = (state.journalNoteOpen && state.journalNoteOpen[q.id]) || !!dVal;
@@ -1991,6 +2170,20 @@ function renderJournalWizardStep(){
       <input type="number" inputmode="decimal" id="jw-number-${q.id}" value="${val ?? ''}" style="text-align:center; font-size:30px; padding:16px; font-family:Georgia,serif;">
       <button type="button" class="btn-ghost" data-jw-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen ? 'Скрыть текст' : '+ Написать словами'}</button>
       ${noteOpen ? `<textarea id="jw-text-${noteKey}" placeholder="Можно написать словами, а не только цифрой..." style="margin-top:10px;">${esc(noteVal)}</textarea>` : ''}
+    `;
+  } else if(q.type === 'sleep'){
+    const sq = state.journalDraft.sleepQuality;
+    const noteKey = q.id + 'Note';
+    const noteVal = state.journalDraft[noteKey] || '';
+    const noteOpen = (state.journalNoteOpen && state.journalNoteOpen[q.id]) || !!noteVal;
+    control = `
+      <div class="choice-row">
+        ${['Высыпаюсь','Не высыпаюсь'].map(o=>`<button class="choice-btn ${sq===o?'selected':''}" data-jw-sleepq="${o}">${o}</button>`).join('')}
+      </div>
+      <div class="q-hint" style="margin:18px 0 6px;">Сколько часов</div>
+      <input type="number" inputmode="decimal" id="jw-number-${q.id}" value="${val ?? ''}" style="text-align:center; font-size:30px; padding:16px; font-family:Georgia,serif;">
+      <button type="button" class="btn-ghost" data-jw-note-toggle="${q.id}" style="margin-top:20px; padding:11px;">${noteOpen ? 'Скрыть текст' : '+ Написать словами'}</button>
+      ${noteOpen ? `<textarea id="jw-text-${noteKey}" placeholder="Можно написать словами..." style="margin-top:10px;">${esc(noteVal)}</textarea>` : ''}
     `;
   } else if(q.type === 'text'){
     control = `<input type="text" id="jw-text-${q.id}" value="${esc(val)}" placeholder="Коротко, по сути...">`;
@@ -2048,7 +2241,7 @@ function renderDayAttempts(){
           ${confirming ? `
           <button class="attempt-mini" data-action="cancel-delete-attempt">Отмена</button>
           <button class="attempt-mini danger" data-action="confirm-delete-attempt" data-aid="${esc(a.id)}">Удалить?</button>` : `
-          ${(a.scrubbed || a.pending) ? '' : `<button class="attempt-mini" data-action="edit-attempt" data-aid="${esc(a.id)}" aria-label="Изменить">✏️</button>`}
+          ${(a.scrubbed || a.pending || !a.ft) ? '' : `<button class="attempt-mini" data-action="edit-attempt" data-aid="${esc(a.id)}" aria-label="Изменить">✏️</button>`}
           <button class="attempt-mini" data-action="ask-delete-attempt" data-aid="${esc(a.id)}" aria-label="Удалить">🗑</button>`}
         </div>
       </div>`;
@@ -2264,13 +2457,48 @@ function attachHandlers(){
       if(valEl) valEl.textContent = e.target.value;
     });
   });
-  app.querySelectorAll('[data-ritual-item]').forEach(el=>{
+  app.querySelectorAll('[data-ft-item]').forEach(el=>{
     el.addEventListener('click', (e)=>{
-      const o = e.currentTarget.getAttribute('data-ritual-item');
-      const cur = new Set(state.answers.ritualItems || []);
-      if(cur.has(o)) cur.delete(o); else cur.add(o);
-      state.answers.ritualItems = RITUAL_ITEMS.filter(x=>cur.has(x));
+      const [k, id] = e.currentTarget.getAttribute('data-ft-item').split(':');
+      const cur = new Set(state.answers[k + 'Sel'] || []);
+      if(cur.has(id)) cur.delete(id); else cur.add(id);
+      state.answers[k + 'Sel'] = FT_LISTS[k].items.map(it=>it.id).filter(x=>cur.has(x));
       render();
+    });
+  });
+  app.querySelectorAll('[data-ft-all]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const k = e.currentTarget.getAttribute('data-ft-all');
+      const ids = FT_LISTS[k].items.map(it=>it.id);
+      const cur = state.answers[k + 'Sel'] || [];
+      state.answers[k + 'Sel'] = ids.every(x=>cur.includes(x)) ? [] : ids;
+      render();
+    });
+  });
+  app.querySelectorAll('[data-ft-hard]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const id = e.currentTarget.getAttribute('data-ft-hard');
+      commitWizOther();
+      const cur = new Set(state.answers.hardSel || []);
+      if(cur.has(id)) cur.delete(id); else cur.add(id);
+      state.answers.hardSel = FT_LIST_KEYS.flatMap(k=>FT_LISTS[k].items.map(it=>it.id)).filter(x=>cur.has(x));
+      render();
+    });
+  });
+  app.querySelectorAll('[data-ft-hard-custom]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const o = e.currentTarget.getAttribute('data-ft-hard-custom');
+      state.answers.hardOther = (state.answers.hardOther || []).filter(x=>x !== o);
+      render();
+    });
+  });
+  app.querySelectorAll('[data-ft-detail]').forEach(el=>{
+    el.addEventListener('input', (e)=>{
+      const i = parseInt(e.target.getAttribute('data-ft-detail'),10);
+      const d = (state.answers.detail || []).slice();
+      while(d.length < 3) d.push('');
+      d[i] = e.target.value;
+      state.answers.detail = d;
     });
   });
   app.querySelectorAll('[data-wiz-other]').forEach(el=>{
@@ -2387,6 +2615,14 @@ function attachHandlers(){
       }, 260);
     });
   });
+  app.querySelectorAll('[data-jw-sleepq]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      const v = e.currentTarget.getAttribute('data-jw-sleepq');
+      state.journalDraft.sleepQuality = state.journalDraft.sleepQuality === v ? null : v;
+      scheduleJournalSave();
+      render();
+    });
+  });
   app.querySelectorAll('[data-jw-choice]').forEach(el=>{
     el.addEventListener('click', (e)=>{
       const id = e.currentTarget.getAttribute('data-jw-choice');
@@ -2398,7 +2634,7 @@ function attachHandlers(){
       // past it before the person has had a chance to type anything.
       if(val === 'other') return;
       const jq = JOURNAL_STEPS.find(x=>x.id===id);
-      if(jq && jq.describe && ((state.journalNoteOpen && state.journalNoteOpen[id]) || state.journalDraft[id + 'Note'])) return;
+      if(jq && jq.describe && (jq.describe === true || jq.describe.includes(val)) && ((state.journalNoteOpen && state.journalNoteOpen[id]) || state.journalDraft[id + 'Note'])) return;
       const targetIndex = state.journalStepIndex;
       setTimeout(()=>{
         if(state.journalStepIndex === targetIndex && state.journalStepIndex < JOURNAL_STEPS.length - 1){
@@ -2613,6 +2849,19 @@ async function onAction(e){
     state.editingAttemptId = null;
     state.practiceActive = true; state.qIndex = 0; state.answers = {}; state.noteOpen = {}; state.wizOtherOpen = {};
     ALL_QUESTIONS.forEach(q => { if(q.type==='scale' || q.type==='scale_note') state.answers[q.id] = 5; });
+  } else if(action === 'edit-goal'){
+    state.goalEditing = true;
+  } else if(action === 'cancel-goal'){
+    state.goalEditing = false;
+  } else if(action === 'save-goal'){
+    const gt = (document.getElementById('goal-text') || {}).value || '';
+    const gd = (document.getElementById('goal-desc') || {}).value || '';
+    state.goalEditing = false;
+    render();
+    await saveDayGoal(todayKey(), gt.trim(), gd.trim());
+  } else if(action === 'use-goal-hint'){
+    const yj = journalEntryOnDate(prevDateKey(todayKey()));
+    if(yj && yj.intentions){ await saveDayGoal(todayKey(), String(yj.intentions).trim().slice(0,200), ''); }
   } else if(action === 'toggle-edit-list'){
     state.editListOpen = !state.editListOpen;
     state.confirmDeleteAttemptId = null;
@@ -2681,6 +2930,10 @@ async function onAction(e){
     JOURNAL_STEPS.filter(q=>q.type==='multi_other' && q.legacy).forEach(q=>{
       if(entry[q.id]) entry[q.id] = buildMulti(...(m=>[m.sel, m.others.filter(o=>!q.legacy.includes(o)), q.options])(parseMulti(entry[q.id], q.options)));
     });
+    if(entry.questions){ // «Вопросы» объединены с «Откровениями»
+      entry.reflections = [entry.reflections, entry.questions].filter(Boolean).join('\n\n');
+      entry.questions = null;
+    }
     state.journalDraft = entry;
     state.journalEditId = entry.entryDate;
     state.journalStepIndex = 0;
@@ -2790,7 +3043,7 @@ function ruFileDate(dateStr){
 // Portrait page (journal: Q&A table)
 const PDF_P_W = 1060, PDF_P_H = 1500, PDF_P_MARGIN = 64;
 // Landscape page (attempts: wide multi-column table)
-const PDF_L_W = 1500, PDF_L_H = 1060, PDF_L_MARGIN = 56;
+const PDF_L_W = 1800, PDF_L_H = 1272, PDF_L_MARGIN = 56;
 
 function newReportPage(pages, w, h){
   const canvas = document.createElement('canvas');
@@ -2930,16 +3183,33 @@ function downloadCanvasFallback(canvas){
 
 /* ---- Attempts: wide multi-column table, landscape, one day at a time ---- */
 const ATT_COLS = [
-  { id:'num',      label:'№',                  w:36  },
-  { id:'title',    label:'Тип',                w:150 },
-  { id:'mindset',  label:'Мой настрой',        w:135 },
+  { id:'num',      label:'№',                   w:36  },
+  { id:'title',    label:'Название ФТ',         w:150 },
+  { id:'mindset',  label:'Мой настрой',         w:140 },
   { id:'reaction', label:'Реакция собеседника', w:205 },
-  { id:'voice',    label:'Речь',               w:100, note:'voiceNote'   },
-  { id:'hand',     label:'Рука',               w:100, note:'handNote'    },
-  { id:'anxiety',  label:'Волнение',           w:110, note:'anxietyNote' },
-  { id:'ritual',   label:'Ритуал',             w:250, note:'ritualNote' },
-  { id:'start',    label:'Начало речи',        w:174 },
+  { id:'ritual',   label:'Ритуал речи',         w:190 },
+  { id:'start',    label:'Начало речи',         w:150 },
+  { id:'method',   label:'Речь по методике',    w:180 },
+  { id:'voice',    label:'Голос',               w:160 },
+  { id:'anxiety',  label:'Волнение',            w:100 },
+  { id:'hard',     label:'Что было трудно',     w:200 },
 ];
+// Короткий текст для ячейки таблицы: что отмечено из списка.
+function ftCell(e, k){
+  const ft = e.ft;
+  if(!ft) return null;
+  if(ft.silent && FT_SPEECH_KEYS.includes(k)) return '—';
+  const L = FT_LISTS[k], sel = ft[k] || [];
+  if(!sel.length) return '—';
+  if(L.items.every(it=>sel.includes(it.id))) return L.allShort;
+  return L.items.filter(it=>sel.includes(it.id)).map(it=>it.s).join(', ');
+}
+function ftHardText(e){
+  const ft = e.ft;
+  if(!ft) return '—';
+  const parts = (ft.hard || []).map(id=>FT_ITEM_SHORT[id]).filter(Boolean).concat(ft.hardOther || []);
+  return parts.join(', ') || '—';
+}
 function attColX(){
   const gap = 16; let x = PDF_L_MARGIN; const map = {};
   ATT_COLS.forEach(c=>{ map[c.id] = x; x += c.w + gap; });
@@ -2971,6 +3241,16 @@ function buildAttemptsPages(){
   let { ctx, y } = newReportPage(pages, PDF_L_W, PDF_L_H);
   y = drawReportHeader(ctx, PDF_L_W, PDF_L_MARGIN, 'Таблица осознанности', dayLabel + ' · подходов за день: ' + entries.length + ' · за всё время: ' + totalAttemptsCount());
 
+  const dg = state.dayGoals && state.dayGoals[dateStr];
+  if(dg && (dg.goal || dg.description)){
+    ctx.fillStyle = RC.text; ctx.font = 'bold 20px ' + REPORT_FONT;
+    wrapLines(ctx, 'Цель всех ФТ на день: ' + (dg.goal || ''), PDF_L_W - 2*PDF_L_MARGIN).forEach(l=>{ ctx.fillText(l, PDF_L_MARGIN, y); y += 28; });
+    if(dg.description){
+      ctx.fillStyle = RC.muted; ctx.font = '18px ' + REPORT_FONT;
+      wrapLines(ctx, dg.description, PDF_L_W - 2*PDF_L_MARGIN).forEach(l=>{ ctx.fillText(l, PDF_L_MARGIN, y); y += 25; });
+    }
+    y += 14;
+  }
   if(entries.some(e=>e.scrubbed)){
     ctx.fillStyle = RC.muted; ctx.font = 'italic 16px ' + REPORT_FONT;
     ctx.fillText('Подробности подходов хранятся 7 дней, потом остаётся только их количество.', PDF_L_MARGIN, y);
@@ -2987,7 +3267,7 @@ function buildAttemptsPages(){
   function drawTableHeader(){
     ctx.fillStyle = RC.headBg;
     ctx.fillRect(PDF_L_MARGIN - 10, y - 22, tableRight - PDF_L_MARGIN + 20, 40);
-    ctx.fillStyle = RC.accent; ctx.font = 'bold 17px ' + REPORT_FONT;
+    ctx.fillStyle = RC.accent; ctx.font = 'bold 18px ' + REPORT_FONT;
     ATT_COLS.forEach(c=> ctx.fillText(c.label, colX[c.id], y));
     y += 32;
   }
@@ -2999,14 +3279,20 @@ function buildAttemptsPages(){
       title: e.title || '—',
       mindset: e.mindsetBefore || '—',
       reaction: e.reactionAfter || '—',
-      voice: fmtNum(e.voice),
-      hand: fmtNum(e.hand),
       anxiety: fmtNum(e.anxiety),
-      ritual: ritualText(e) || '—',
-      start: (e.speechStart || []).join(', ') || '—',
+      ritual: e.ft ? (e.ft.silent ? 'Режим молчания' : ftCell(e, 'ritual')) : (ritualText(e) || '—'),
+      start: e.ft ? ftCell(e, 'start') : ((e.speechStart || []).join(', ') || '—'),
+      method: e.ft ? ftCell(e, 'method') : (e.voice != null ? 'Оценка: ' + fmtNum(e.voice) : '—'),
+      voice: e.ft ? ftCell(e, 'voice') : '—',
+      hard: ftHardText(e),
     };
-    const lineH = 24, noteLineH = 18, noteGap = 7;
-    ctx.font = '17px ' + REPORT_FONT;
+    const noteVals = {
+      title: e.ft ? ftDetailsText(e.title, e.ft.d) : '',
+      ritual: e.ritualNote || '',
+      anxiety: e.anxietyNote || '',
+    };
+    const lineH = 27, noteLineH = 20, noteGap = 7;
+    ctx.font = '20px ' + REPORT_FONT;
     const wrapped = {};
     const noteWrapped = {};
     let maxColH = 0;
@@ -3017,11 +3303,11 @@ function buildAttemptsPages(){
       // A score's comment (e.g. "рука — подробно: ...") is printed as small
       // italic text directly under that same score, in its own column —
       // not bundled into one block under the whole row.
-      if(c.note && e[c.note]){
-        ctx.font = 'italic 14px ' + REPORT_FONT;
-        const nLines = wrapLines(ctx, e[c.note], c.w);
+      if(noteVals[c.id]){
+        ctx.font = 'italic 15px ' + REPORT_FONT;
+        const nLines = wrapLines(ctx, noteVals[c.id], c.w);
         noteWrapped[c.id] = nLines;
-        ctx.font = '17px ' + REPORT_FONT;
+        ctx.font = '20px ' + REPORT_FONT;
         colH += noteGap + nLines.length * noteLineH;
       }
       if(colH > maxColH) maxColH = colH;
@@ -3042,10 +3328,10 @@ function buildAttemptsPages(){
       ctx.fillRect(PDF_L_MARGIN - 10, y - 18, tableRight - PDF_L_MARGIN + 20, rowH);
     }
     ATT_COLS.forEach(c=>{
-      ctx.fillStyle = RC.text; ctx.font = '17px ' + REPORT_FONT;
+      ctx.fillStyle = RC.text; ctx.font = '20px ' + REPORT_FONT;
       wrapped[c.id].forEach((line, li)=> ctx.fillText(line, colX[c.id], y + li*lineH));
       if(noteWrapped[c.id]){
-        ctx.fillStyle = RC.muted; ctx.font = 'italic 14px ' + REPORT_FONT;
+        ctx.fillStyle = RC.muted; ctx.font = 'italic 15px ' + REPORT_FONT;
         const startY = y + wrapped[c.id].length * lineH + 3;
         noteWrapped[c.id].forEach((line, li)=> ctx.fillText(line, colX[c.id], startY + li*noteLineH));
       }
@@ -3085,11 +3371,12 @@ function buildJournalPages(){
   if(!entry || entry.scrubbed) return null;
 
   const fieldLabels = [
-    ['mood','Самочувствие'], ['glad','Радует'], ['worry','Волнует'], ['speechMode','Речевой режим'],
-    ['dailyRoutine','Саморегуляция'], ['sleepHours','Сон, часов'],
-    ['difficulties','Трудная тетрадь'], ['questions','Вопросы'], ['reflections','Откровения'],
-    ['tricks','Уловки'], ['praise','Похвала'], ['intentions','Речевые планы'],
-  ];
+    ['mood','Настрой'], ['speechMode','Речевой режим'], ['glad','Что порадовало'],
+    ['lessons','Логопедические занятия'], ['ftNotes','ФТ'], ['difficulties','Трудная тетрадь'],
+    ['dailyRoutine','Приёмы саморегуляции'], ['sleepHours','Сон'],
+    ['reflections','Вопросы, открытия, откровения'], ['praise','За что себя хвалю'],
+    ['intentions','Цели на следующий день'],
+  ].concat(JOURNAL_LEGACY_FIELDS.filter(([k]) => entry[k]));
   const tableLeft = PDF_P_MARGIN - 10, tableRight = PDF_P_W - PDF_P_MARGIN + 10;
   const textX = PDF_P_MARGIN + 14;
   const valueW = tableRight - textX - 14;
@@ -3108,10 +3395,9 @@ function buildJournalPages(){
   fieldLabels.forEach(([id,lbl])=>{
     let val = entry[id];
     if(id === 'sleepHours'){
-      if(val != null) val = fmtNum(val);
-      const note = entry.sleepHoursNote;
-      if(val != null && note) val = val + ' — ' + note;
-      else if(note) val = note; // text note only, no number entered
+      const hrs = val != null ? fmtNum(val) + ' ч' : '';
+      const parts = [hrs, entry.sleepHoursNote || ''].filter(Boolean).join(' — ');
+      val = [entry.sleepQuality || '', parts].filter(Boolean).join(' · ') || null;
     }
     if(id === 'speechMode' && val && entry.speechModeNote) val = val + ': ' + entry.speechModeNote;
     if(val === null || val === undefined || String(val).trim() === '') val = '—'; // unanswered question: a dash

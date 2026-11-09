@@ -8,6 +8,8 @@
 --
 -- Удаление НЕОБРАТИМО.
 
+-- ВАЖНО: сначала выполните ft-and-journal-v2.sql (колонки ft, lessons, ft_notes, sleep_quality).
+
 -- ШАГ 1. Отметка «подробности удалены» (приложение по ней показывает пометку).
 alter table journal_entries add column if not exists scrubbed_at timestamptz;
 alter table attempts add column if not exists scrubbed_at timestamptz;
@@ -29,6 +31,7 @@ begin
     mood = null, glad = null, worry = null, speech_mode = null, daily_routine = null,
     sleep_hours = null, sleep_note = null, difficulties = null, questions = null,
     reflections = null, tricks = null, praise = null, intentions = null,
+    lessons = null, ft_notes = null, sleep_quality = null,
     scrubbed_at = now()
   where scrubbed_at is null and entry_date <= current_date - journal_days;
 
@@ -36,7 +39,7 @@ begin
     title = null, mindset_before = null, reaction_after = null,
     ritual = null, ritual_note = null,
     voice = null, voice_note = null, hand = null, hand_note = null,
-    anxiety = null, anxiety_note = null, purpose = null,
+    anxiety = null, anxiety_note = null, purpose = null, ft = null,
     scrubbed_at = now()
   where scrubbed_at is null and created_at < now() - make_interval(days => attempt_days);
 end $$;
