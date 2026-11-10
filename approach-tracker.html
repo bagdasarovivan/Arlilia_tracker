@@ -2713,7 +2713,7 @@ function renderSettings(){
       </div>
       ${remind.on ? `
         <div class="autosave-hint" style="margin:0 0 8px;">Напоминать с (нажмите и выберите время):</div>
-        <input id="remind-time" type="time" value="${String(remind.hour).padStart(2,'0')}:${String(remind.min).padStart(2,'0')}" style="width:100%; box-sizing:border-box; padding:14px; font-size:20px; text-align:center; border-radius:14px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit;">
+        <div style="display:flex; justify-content:center;"><input id="remind-time" type="time" value="${String(remind.hour).padStart(2,'0')}:${String(remind.min).padStart(2,'0')}" style="-webkit-appearance:none; appearance:none; display:block; width:100%; max-width:100%; min-width:0; height:56px; box-sizing:border-box; padding:0 14px; margin:0; font-size:20px; line-height:56px; text-align:center; border-radius:14px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit;"></div>
       ` : ''}
     </div>
 
