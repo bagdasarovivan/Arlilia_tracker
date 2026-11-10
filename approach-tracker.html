@@ -1872,31 +1872,33 @@ function renderPracticeHome(){
   const todayCount = state.entries.filter(e => dateKey(e.ts) === todayK).length;
   const need = minAttemptsForKey(todayK);
   const done = Math.min(todayCount, need);
-  // Progress ring: 20 segments (the daily ideal). The first `need` are the
-  // minimum; the colour "levels up" like rarity tiers in games as the count grows.
-  const GOAL = 20;
+  // Progress ring: it grows stage by stage — 3 cells, then 5, 10, 15, 20, 25.
+  // The number of cells is the next target; the colour "levels up" like rarity
+  // tiers in games each time a target is reached.
   const TIERS = [
     { at: 0,    name: '',         c: 'var(--t0)' },
     { at: need, name: 'Норма',    c: 'var(--t1)' },
-    { at: 6,    name: 'Хорошо',   c: 'var(--t2)' },
+    { at: 5,    name: 'Хорошо',   c: 'var(--t2)' },
     { at: 10,   name: 'Отлично',  c: 'var(--t3)' },
     { at: 15,   name: 'Супер',    c: 'var(--t4)' },
-    { at: GOAL, name: 'Цель дня', c: 'var(--t5)' },
+    { at: 20,   name: 'Цель дня', c: 'var(--t5)' },
+    { at: 25,   name: 'Рекорд',   c: 'var(--t5)' },
   ];
   let ti = 0; TIERS.forEach((t,k)=>{ if(todayCount >= t.at) ti = k; });
   const tier = TIERS[ti], nextTier = TIERS[ti+1] || null;
-  const R = 98, C = 2 * Math.PI * R, gap = 9, arcLen = C / GOAL - gap;
-  const filled = Math.min(todayCount, GOAL);
-  const arcs = Array.from({length: GOAL}, (_,i)=>{
-    const dash = `stroke-dasharray="${arcLen.toFixed(1)} ${(C-arcLen).toFixed(1)}" stroke-dashoffset="${(-(C/GOAL)*i - gap/2).toFixed(1)}"`;
+  const CELLS = nextTier ? nextTier.at : TIERS[TIERS.length-1].at;
+  const R = 98, C = 2 * Math.PI * R, gap = CELLS <= 5 ? 18 : (CELLS <= 15 ? 12 : 9), arcLen = C / CELLS - gap;
+  const filled = Math.min(todayCount, CELLS);
+  const arcs = Array.from({length: CELLS}, (_,i)=>{
+    const dash = `stroke-dasharray="${arcLen.toFixed(1)} ${(C-arcLen).toFixed(1)}" stroke-dashoffset="${(-(C/CELLS)*i - gap/2).toFixed(1)}"`;
     if(i < filled) return `<circle class="ring-arc on" style="stroke:${tier.c}" cx="103" cy="103" r="${R}" ${dash}/>`;
-    return `<circle class="ring-arc${i < need ? ' min' : ''}" cx="103" cy="103" r="${R}" ${dash}/>`;
+    return `<circle class="ring-arc${i < need && CELLS > need ? ' min' : ''}" cx="103" cy="103" r="${R}" ${dash}/>`;
   }).join('');
   const caption = todayCount < need
     ? `До нормы: ${need - todayCount} из ${need}`
-    : todayCount >= GOAL
-      ? `<span style="color:${tier.c}">Цель дня выполнена</span> · всего ${todayCount}`
-      : `<span style="color:${tier.c}">${tier.name}</span>${ti === 1 ? ' ✓' : ''} · до «${nextTier.name}» ещё ${nextTier.at - todayCount}`;
+    : !nextTier
+      ? `<span style="color:${tier.c}">Рекорд дня</span> · всего ${todayCount}`
+      : `<span style="color:${tier.c}">${tier.name}</span>${ti === 1 || ti === 5 ? ' ✓' : ''} · до «${nextTier.name}» ещё ${nextTier.at - todayCount}`;
   const numColor = todayCount >= need ? tier.c : 'var(--accent)';
   const hour = new Date().getHours();
   const needJournal = hour >= 19 && !findTodayJournal();
