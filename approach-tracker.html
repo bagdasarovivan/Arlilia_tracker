@@ -2200,7 +2200,7 @@ function renderJournalRead(entry){
         <button class="back-btn" data-action="journal-read-back">‹</button>
         <h2 style="text-transform:capitalize;">${dn0 ? 'День ' + dn0 : weekdayDateLabel(entry.ts)}</h2>
       </div>
-      <div class="empty">В этот день дневник был заполнен.<br>Текст записи хранится 3 дня и потом удаляется — осталась только отметка.</div>
+      <div class="empty">В этот день дневник был заполнен.<br>Текст записи хранится 30 дней и потом удаляется — осталась только отметка.</div>
     </div>`;
   }
   const moodVal = entry.mood;
@@ -3434,7 +3434,7 @@ function buildAttemptsPages(){
   }
   if(entries.some(e=>e.scrubbed)){
     ctx.fillStyle = RC.muted; ctx.font = 'italic 16px ' + REPORT_FONT;
-    ctx.fillText('Подробности подходов хранятся 7 дней, потом остаётся только их количество.', PDF_L_MARGIN, y);
+    ctx.fillText('Подробности подходов хранятся 14 дней, потом остаётся только их количество.', PDF_L_MARGIN, y);
     y += 40;
   }
 
@@ -3623,7 +3623,7 @@ function buildJournalPages(){
 }
 async function generateJournalPdf(){
   const built = buildJournalPages();
-  if(!built){ showToast(journalScrubbedOn(state.reportDate || todayKey()) ? 'Текст этого дневника уже удалён — хранится 3 дня' : 'За этот день нет записи дневника'); return; }
+  if(!built){ showToast(journalScrubbedOn(state.reportDate || todayKey()) ? 'Текст этого дневника уже удалён — хранится 30 дней' : 'За этот день нет записи дневника'); return; }
   if(!window.jspdf) showToast('Готовим PDF…');
   const ok = await ensureJsPDF();
   if(!ok){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
@@ -3631,7 +3631,7 @@ async function generateJournalPdf(){
 }
 function copyJournalImage(){
   const built = buildJournalPages();
-  if(!built){ showToast(journalScrubbedOn(state.reportDate || todayKey()) ? 'Текст этого дневника уже удалён — хранится 3 дня' : 'За этот день нет записи дневника'); return; }
+  if(!built){ showToast(journalScrubbedOn(state.reportDate || todayKey()) ? 'Текст этого дневника уже удалён — хранится 30 дней' : 'За этот день нет записи дневника'); return; }
   copyCanvasImage(mergeCanvasesVertically(built.pages, built.pageBottoms, PDF_P_MARGIN + 24), 0);
 }
 
