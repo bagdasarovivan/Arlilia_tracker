@@ -28,3 +28,6 @@ create policy "own rows" on day_goals for all using (user_id = auth.uid()) with 
 -- 4) Чтобы автоочистка (auto-scrub-old-data.sql) тоже стирала новые поля —
 --    если вы её уже включали, выполните этот файл ещё раз после
 --    обновлённого auto-scrub-old-data.sql.
+
+-- Обновить кэш схемы (иначе приложение может не видеть новые колонки)
+notify pgrst, 'reload schema';
