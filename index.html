@@ -3194,7 +3194,9 @@ function ruFileDate(dateStr){
 }
 
 // Portrait page (journal: Q&A table)
-const PDF_P_W = 1060, PDF_P_H = 1500, PDF_P_MARGIN = 64;
+// Journal report: a narrow, single tall page (phone-width) with large text, so a
+// viewer that fits the page to the screen width shows it readable without panning.
+const PDF_P_W = 720, PDF_P_H = 14000, PDF_P_MARGIN = 36;
 // Landscape page (attempts: wide multi-column table)
 const PDF_L_W = 1800, PDF_L_H = 1272, PDF_L_MARGIN = 56;
 
@@ -3237,13 +3239,18 @@ function drawReportHeader(ctx, w, margin, title, subtitle){
   ctx.beginPath(); ctx.moveTo(margin, y + 14); ctx.lineTo(w - margin, y + 14); ctx.stroke();
   return y + 40;
 }
-function savePdfFromPages(pages, filename, landscape){
+function savePdfFromPages(pages, filename, landscape, fitPage){
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:'pt', format:'a4', orientation: landscape ? 'landscape' : 'portrait' });
+  // fitPage: page size follows the canvas (phone-width, any height) instead of A4.
+  const k = 0.5;
+  const doc = fitPage
+    ? new jsPDF({ unit:'pt', format:[pages[0].width*k, pages[0].height*k], orientation:'portrait', compress:true })
+    : new jsPDF({ unit:'pt', format:'a4', orientation: landscape ? 'landscape' : 'portrait' });
   const pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
   pages.forEach((pg,i)=>{
-    if(i>0) doc.addPage();
-    doc.addImage(pg.toDataURL('image/png'), 'PNG', 0, 0, pw, ph);
+    if(i>0) fitPage ? doc.addPage([pg.width*k, pg.height*k]) : doc.addPage();
+    const w2 = fitPage ? pg.width*k : pw, h2 = fitPage ? pg.height*k : ph;
+    doc.addImage(pg.toDataURL('image/png'), 'PNG', 0, 0, w2, h2);
   });
   doc.save(filename);
 }
@@ -3555,9 +3562,9 @@ function buildJournalPages(){
     if(id === 'speechMode' && val && entry.speechModeNote) val = val + ': ' + entry.speechModeNote;
     if(val === null || val === undefined || String(val).trim() === '') val = '—'; // unanswered question: a dash
 
-    ctx.font = '17px ' + REPORT_FONT;
+    ctx.font = '26px ' + REPORT_FONT;
     const valLines = wrapLines(ctx, String(val), valueW);
-    const padTop = 16, padBottom = 18, labelH = 24, lineH = 24;
+    const padTop = 18, padBottom = 20, labelH = 34, lineH = 36;
     const cardH = padTop + labelH + valLines.length * lineH + padBottom;
 
     if(y + cardH > PDF_P_H - 70){
@@ -3573,16 +3580,23 @@ function buildJournalPages(){
     ctx.fillRect(tableLeft, y, 4, cardH);
 
     let ty = y + padTop + 14;
-    ctx.fillStyle = RC.accent; ctx.font = 'bold 15px ' + REPORT_FONT;
-    ctx.fillText(lbl.toUpperCase(), textX, ty);
+    ctx.fillStyle = RC.accent; ctx.font = 'bold 21px ' + REPORT_FONT;
+    ctx.fillText(lbl.toUpperCase(), textX, ty + 4);
     ty += labelH;
-    ctx.fillStyle = RC.text; ctx.font = '17px ' + REPORT_FONT;
+    ctx.fillStyle = RC.text; ctx.font = '26px ' + REPORT_FONT;
     valLines.forEach((l,li)=> ctx.fillText(l, textX, ty + li*lineH));
 
     y += cardH + 10;
     idx++;
   });
   pageBottoms.push(y);
+  // Crop the single tall page to its content.
+  if(pages.length === 1){
+    const full = pages[0], h = Math.min(Math.ceil(y + 30), full.height);
+    const c = document.createElement('canvas'); c.width = full.width; c.height = h;
+    const cx = c.getContext('2d'); cx.fillStyle = RC.bg; cx.fillRect(0,0,c.width,h); cx.drawImage(full,0,0);
+    pages[0] = c; pageBottoms[0] = h;
+  }
 
   return { pages, pageBottoms, filename: 'Дневник ' + ruFileDate(dateStr) + '.pdf' };
 }
@@ -3592,7 +3606,7 @@ async function generateJournalPdf(){
   if(!window.jspdf) showToast('Готовим PDF…');
   const ok = await ensureJsPDF();
   if(!ok){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
-  savePdfFromPages(built.pages, built.filename, false);
+  savePdfFromPages(built.pages, built.filename, false, true);
 }
 function copyJournalImage(){
   const built = buildJournalPages();
