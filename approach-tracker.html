@@ -181,8 +181,6 @@
   .remind-card .remind-text{ flex:1; font-size:14px; line-height:1.4; }
   .remind-card .btn{ padding:9px 14px; font-size:14px; flex:none; width:auto; }
   .pw-form{ display:flex; flex-direction:column; gap:10px; margin-bottom:12px; }
-  .view-switch{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; align-items:center; font-size:13px; color: var(--text-muted); }
-  .view-switch .attempt-mini{ flex:none; }
   .update-bar{ position:fixed; left:12px; right:12px; top:calc(env(safe-area-inset-top, 0px) + 10px); z-index:9998; display:flex; align-items:center; gap:10px; background:#1f6f68; color:#fff; border-radius:14px; padding:11px 14px; box-shadow:0 8px 24px -8px rgba(0,0,0,.4); font-size:14px; }
   .update-bar span{ flex:1; }
   .update-bar button{ background:#fff; color:#1f6f68; border:none; border-radius:10px; padding:8px 14px; font-size:14px; font-weight:600; }
@@ -893,7 +891,7 @@ let state = {
 
   progressMonth: (function(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
   pwOpen: false, pwBusy: false, ftDescOpen: {},
-  reportView: (lsGet('arlilia_report_view','table') === 'cards') ? 'cards' : 'table', // attempts report layout
+  reportView: 'table', // attempts report layout (the card view was removed)
   reportDate: todayKey(), // which single day the PDF/copy exports cover
   lastTab: 'practice', // which bottom-nav tab to return to when leaving Настройки
   streakInfoOpen: false,
@@ -2496,10 +2494,6 @@ function renderProgress(){
           <span class="report-card-title">🚶 Подходы</span>
           <button class="attempt-mini${state.editListOpen?' active':''}" data-action="toggle-edit-list" aria-label="Изменить или удалить подходы">✏️ Изменить</button>
         </div>
-        <div class="view-switch"><span>Вид:</span>
-          <button class="attempt-mini${state.reportView==='table'?' active':''}" data-action="set-report-view" data-view="table">Таблица</button>
-          <button class="attempt-mini${state.reportView==='cards'?' active':''}" data-action="set-report-view" data-view="cards">Карточки для телефона</button>
-        </div>
         <div class="report-btns">
           <button class="btn btn-primary" data-action="export-attempts-pdf">Скачать PDF</button>
           <button class="btn btn-ghost" data-action="copy-attempts-image" title="Скопировать картинкой">Копировать</button>
@@ -3345,9 +3339,6 @@ async function onAction(e){
     lsSet('arlilia_remind', { on: false, hour: getRemind().hour });
   } else if(action === 'remind-hour'){
     lsSet('arlilia_remind', { on: true, hour: parseInt(e.currentTarget.getAttribute('data-hour'), 10) || 19 });
-  } else if(action === 'set-report-view'){
-    state.reportView = e.currentTarget.getAttribute('data-view') === 'cards' ? 'cards' : 'table';
-    lsSet('arlilia_report_view', state.reportView);
   } else if(action === 'export-attempts-pdf'){
     generateAttemptsPdf(); return;
   } else if(action === 'export-journal-pdf'){
