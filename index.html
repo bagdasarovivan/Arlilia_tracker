@@ -1308,7 +1308,7 @@ async function fetchAllRows(url){
   return { res, rows: all };
 }
 // Понятное сообщение: чаще всего причина — в базе ещё не выполнен SQL с новыми колонками.
-const APP_VERSION = 'v61';
+const APP_VERSION = 'v62';
 function saveErrorText(status, errText){
   const t = saveErrorText0(status, errText);
   state.lastSaveError = t + ' (код ' + status + ')';
@@ -2534,7 +2534,18 @@ function renderSettings(){
 }
 
 /* ---------- events ---------- */
+// Проверка орфографии: телефон подчёркивает слова с ошибками во всех текстовых полях (русский словарь).
+function applySpellcheck(){
+  document.querySelectorAll('textarea, input[type="text"], input:not([type])').forEach(el=>{
+    if(el.id === 'login-email') return;
+    el.setAttribute('spellcheck', 'true');
+    el.setAttribute('lang', 'ru');
+    el.setAttribute('autocorrect', 'on');
+    el.setAttribute('autocapitalize', 'sentences');
+  });
+}
 function attachHandlers(){
+  applySpellcheck();
   const app = document.getElementById('app');
   app.querySelectorAll('[data-action]').forEach(el=> el.addEventListener('click', onAction));
   const streakModalCard = app.querySelector('.modal-card');
