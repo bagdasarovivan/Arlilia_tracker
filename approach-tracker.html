@@ -1072,9 +1072,12 @@ function mergeOutboxIntoEntries(){
   state.entries.sort((a,b)=>a.ts-b.ts);
 }
 let flushing = false;
+let flushQueued = false;
 async function flushOutbox(){
-  if(flushing || !auth.userId || !state.loggedIn) return;
+  if(!auth.userId || !state.loggedIn) return;
+  if(flushing){ flushQueued = true; return; }
   flushing = true;
+  state.flushError = null;
   try{
     let changed = false;
     // 1) attempts made offline
@@ -1090,13 +1093,14 @@ async function flushOutbox(){
           const idx = state.entries.findIndex(x=>x.id === it.tempId);
           const real = rowToAttempt(rows[0]);
           if(idx >= 0) state.entries[idx] = real; else state.entries.push(real);
-        } else if(res.status >= 400 && res.status < 500){
+        } else {
+          // Сервер отказал: запись остаётся на телефоне (⏳) и не теряется.
           const et = await res.text().catch(()=>'');
-          // В базе не хватает колонок (SQL ещё не выполнен) — запись не теряем, повторим позже.
-          if(/PGRST204|42703|column|schema cache/i.test(et)) break;
-          console.error('outbox item rejected', res.status); // will never succeed — drop it
-          state.entries = state.entries.filter(x=>x.id !== it.tempId);
-        } else break;
+          state.flushError = saveErrorText0(res.status, et) + ' (код ' + res.status + ')';
+          console.error('outbox item not accepted', res.status, et);
+          if(res.status >= 500 || /PGRST204|42703|column|schema cache/i.test(et)) break;
+          continue; // другая запись может пройти
+        }
         lsSet(outboxKey(), lsGet(outboxKey(), []).filter(x=>x.tempId !== it.tempId));
         changed = true;
       }catch(e){ break; } // still offline
@@ -1126,7 +1130,10 @@ async function flushOutbox(){
       }catch(e){ break; }
     }
     if(changed){ saveCache(); if(!state.practiceActive && !state.journalFormActive) render(); }
-  } finally { flushing = false; }
+  } finally {
+    flushing = false;
+    if(flushQueued){ flushQueued = false; flushOutbox(); }
+  }
 }
 
 // Adds whatever is typed in a wizard «Другое» field to that answer. Returns true if something was added.
@@ -1146,23 +1153,35 @@ function commitWizOther(){
 async function loadAll(){
   auth.sessionInvalid = false;
   state.loadOffline = false;
+  const loadStartedAt = Date.now();
   await ensureFreshToken();
+  // Все запросы стартуют одновременно, а не по очереди — загрузка в разы быстрее.
+  const pAttempts = fetchAllRows(`${SUPABASE_URL}/rest/v1/attempts?select=*&user_id=eq.${auth.userId}&order=created_at.asc`);
+  const pJournal = fetchAllRows(`${SUPABASE_URL}/rest/v1/journal_entries?select=*&user_id=eq.${auth.userId}&order=entry_date.asc`);
+  const pGoals = sbFetch(`${SUPABASE_URL}/rest/v1/day_goals?select=goal_date,goal,description&user_id=eq.${auth.userId}`).then(r=>r.json());
+  const pSettings = sbFetch(`${SUPABASE_URL}/rest/v1/app_settings?select=*&user_id=eq.${auth.userId}&limit=1`).then(r=>r.json());
+  [pAttempts, pJournal, pGoals, pSettings].forEach(pr=>pr.catch(()=>{}));
   try{
-    const { res, rows } = await fetchAllRows(`${SUPABASE_URL}/rest/v1/attempts?select=*&user_id=eq.${auth.userId}&order=created_at.asc`);
+    const { res, rows } = await pAttempts;
     if(res.status === 401){
       if(auth.sessionInvalid) return false; // Supabase really did reject the session
       state.loadOffline = true; loadCache(); state.loaded = true; mergeOutboxIntoEntries(); applyTheme(); return true; // just a connectivity blip — stay logged in
     }
-    if(Array.isArray(rows)) state.entries = rows.map(rowToAttempt); else state.loadOffline = true;
+    if(Array.isArray(rows)){
+      // Записи, сделанные пока шла загрузка, не должны пропасть из списка.
+      const fresh = state.entries.filter(e=> e.ts >= loadStartedAt - 5000 && !String(e.id).startsWith('local-'));
+      state.entries = rows.map(rowToAttempt);
+      fresh.forEach(e=>{ if(!state.entries.some(x=>String(x.id) === String(e.id))) state.entries.push(e); });
+      state.entries.sort((a,b)=>a.ts-b.ts);
+    } else state.loadOffline = true;
   }catch(e){ console.error(e); state.loadOffline = true; }
   if(state.loadOffline){ loadCache(); }
   try{
-    const { rows: rows2 } = await fetchAllRows(`${SUPABASE_URL}/rest/v1/journal_entries?select=*&user_id=eq.${auth.userId}&order=entry_date.asc`);
+    const { rows: rows2 } = await pJournal;
     state.journalEntries = Array.isArray(rows2) ? rows2.map(rowToJournal) : [];
   }catch(e){ console.error(e); }
   try{
-    const resG = await sbFetch(`${SUPABASE_URL}/rest/v1/day_goals?select=goal_date,goal,description&user_id=eq.${auth.userId}`);
-    const rowsG = await resG.json();
+    const rowsG = await pGoals;
     if(Array.isArray(rowsG)){
       const prev = state.dayGoals || {};
       state.dayGoals = {};
@@ -1171,8 +1190,7 @@ async function loadAll(){
     }
   }catch(e){ console.error(e); }
   try{
-    const res3 = await sbFetch(`${SUPABASE_URL}/rest/v1/app_settings?select=*&user_id=eq.${auth.userId}&limit=1`);
-    const rows3 = await res3.json();
+    const rows3 = await pSettings;
     if(Array.isArray(rows3) && rows3[0]){
       state.settings.startDate = rows3[0].start_date || null;
     }
@@ -1308,16 +1326,16 @@ async function fetchAllRows(url){
   return { res, rows: all };
 }
 // Понятное сообщение: чаще всего причина — в базе ещё не выполнен SQL с новыми колонками.
-const APP_VERSION = 'v62';
+const APP_VERSION = 'v63';
 function saveErrorText(status, errText){
-  const t = saveErrorText0(status, errText);
+  const t = saveErrorText0(status, errText) + ' Введённое не потеряно — нажмите «Сохранить» ещё раз.';
   state.lastSaveError = t + ' (код ' + status + ')';
   return t;
 }
 function saveErrorText0(status, errText){
-  if(/PGRST204|42703|column|schema cache/i.test(errText || '') ) return 'Не сохранилось: в базе нет новых колонок. Выполните SQL «ft-and-journal-v2» в Supabase. Введённое не потеряно — нажмите «Сохранить» ещё раз.';
-  if(status === 401 || status === 403) return 'Не сохранилось: нужно заново войти (код ' + status + '). Введённое не потеряно.';
-  return 'Не сохранилось (' + status + '). Введённое не потеряно — нажмите «Сохранить» ещё раз.';
+  if(/PGRST204|42703|column|schema cache/i.test(errText || '')) return 'в базе нет новых колонок — выполните SQL «ft-and-journal-v2» в Supabase.';
+  if(status === 401 || status === 403) return 'нужно заново войти.';
+  return 'сервер ответил ошибкой (' + status + ').';
 }
 async function insertAttempt(answers){
   try{
@@ -3017,24 +3035,39 @@ async function onAction(e){
       render();
     };
     if(state.editingAttemptId){
+      // Правка: сразу показываем изменения, на сервер отправляем в фоне.
       const editId = state.editingAttemptId;
       state.editingAttemptId = null;
-      const updated = await updateAttempt(editId, state.answers);
-      if(!updated){ restoreWizard(); return; }
-      if(updated){
-        const idx = state.entries.findIndex(x=> String(x.id) === String(editId));
-        if(idx >= 0) state.entries[idx] = updated; else state.entries.push(updated);
+      const idx = state.entries.findIndex(x=> String(x.id) === String(editId));
+      const before = idx >= 0 ? state.entries[idx] : null;
+      if(before){
+        state.entries[idx] = { ...rowToAttempt({ ...attemptToRow(keepAnswers), id: editId, created_at: new Date(before.ts).toISOString() }) };
         saveCache();
-        showToast('Изменения сохранены');
       }
       render();
+      showToast('Изменения сохранены');
+      updateAttempt(editId, keepAnswers).then(updated=>{
+        const i2 = state.entries.findIndex(x=> String(x.id) === String(editId));
+        if(updated){ if(i2 >= 0) state.entries[i2] = updated; saveCache(); }
+        else if(before && i2 >= 0){ state.entries[i2] = before; saveCache(); showToast('Изменения не сохранились на сервере и отменены'); }
+        render();
+      });
       return;
     }
-    const saved = await insertAttempt(state.answers);
-    if(!saved){ restoreWizard(); return; }
-    state.entries.push(saved); saveCache();
+    // Новая ФТ: сразу кладём на телефон и показываем, отправляем на сервер в фоне —
+    // не нужно ждать ответа, даже при медленном интернете.
+    const row = { ...attemptToRow(keepAnswers), created_at: new Date().toISOString() };
+    const tempId = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    lsSet(outboxKey(), lsGet(outboxKey(), []).concat([{ tempId, row }]));
+    state.entries.push({ ...rowToAttempt({ ...row, id: tempId }), pending: true });
+    saveCache();
     render();
-    showToast(saved.pending ? 'Сохранено на телефоне, отправится при появлении сети' : 'Записано ✓');
+    showToast('Записано ✓');
+    flushOutbox().then(()=>{
+      if(lsGet(outboxKey(), []).some(x=>x.tempId === tempId)){
+        showToast(state.flushError ? ('Запись на телефоне, пока не отправилась: ' + state.flushError) : 'Нет сети — запись сохранена на телефоне и отправится позже');
+      }
+    });
     return;
 
   } else if(action === 'new-journal'){
@@ -3580,6 +3613,8 @@ async function boot(){
     return;
   }
   state.loggedIn = true;
+  // Если на телефоне уже есть сохранённые данные — показываем их сразу, а свежие подгружаем в фоне.
+  if(loadCache()){ state.loaded = true; mergeOutboxIntoEntries(); }
   render();
   const ok = await loadAll();
   if(ok === false){
