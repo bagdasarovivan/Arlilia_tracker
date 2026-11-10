@@ -1042,6 +1042,9 @@ async function flushOutbox(){
           const real = rowToAttempt(rows[0]);
           if(idx >= 0) state.entries[idx] = real; else state.entries.push(real);
         } else if(res.status >= 400 && res.status < 500){
+          const et = await res.text().catch(()=>'');
+          // В базе не хватает колонок (SQL ещё не выполнен) — запись не теряем, повторим позже.
+          if(/PGRST204|42703|column|schema cache/i.test(et)) break;
           console.error('outbox item rejected', res.status); // will never succeed — drop it
           state.entries = state.entries.filter(x=>x.id !== it.tempId);
         } else break;
@@ -1065,7 +1068,10 @@ async function flushOutbox(){
             if(idx >= 0) state.journalEntries[idx] = updated; else state.journalEntries.push(updated);
             if(state.journalDraft && state.journalDraft.entryDate === updated.entryDate && !state.journalFormActive) state.journalDraft = updated;
           }
-        } else if(!(res.status >= 400 && res.status < 500)) break;
+        } else {
+          const et = await res.text().catch(()=>'');
+          if(!(res.status >= 400 && res.status < 500) || /PGRST204|42703|column|schema cache/i.test(et)) break;
+        }
         const left = lsGet(jPendKey(), {}); delete left[date]; lsSet(jPendKey(), left);
         changed = true;
       }catch(e){ break; }
@@ -1205,7 +1211,7 @@ async function updateAttempt(id, answers){
     if(!res.ok){
       const errText = await res.text();
       console.error('updateAttempt failed', res.status, errText);
-      showToast('Не сохранилось: ' + res.status);
+      showToast(saveErrorText(res.status, errText));
       return null;
     }
     const rows = await res.json();
@@ -1252,6 +1258,12 @@ async function fetchAllRows(url){
   }
   return { res, rows: all };
 }
+// Понятное сообщение: чаще всего причина — в базе ещё не выполнен SQL с новыми колонками.
+function saveErrorText(status, errText){
+  if(/PGRST204|42703|column|schema cache/i.test(errText || '') ) return 'Не сохранилось: в базе нет новых колонок. Выполните SQL «ft-and-journal-v2» в Supabase. Введённое не потеряно — нажмите «Сохранить» ещё раз.';
+  if(status === 401 || status === 403) return 'Не сохранилось: нужно заново войти (код ' + status + '). Введённое не потеряно.';
+  return 'Не сохранилось (' + status + '). Введённое не потеряно — нажмите «Сохранить» ещё раз.';
+}
 async function insertAttempt(answers){
   try{
     const res = await sbFetch(`${SUPABASE_URL}/rest/v1/attempts`, {
@@ -1262,7 +1274,7 @@ async function insertAttempt(answers){
     if(!res.ok){
       const errText = await res.text();
       console.error('insertAttempt failed', res.status, errText);
-      showToast('Не сохранилось: ' + res.status + ' ' + errText.slice(0,80));
+      showToast(saveErrorText(res.status, errText));
       return null;
     }
     const rows = await res.json();
@@ -2899,10 +2911,18 @@ async function onAction(e){
     commitWizOther();
     state.practiceActive = false;
     render();
+    const keepAnswers = state.answers, keepEditId = state.editingAttemptId;
+    // Если сервер отказал — возвращаем в мастер с теми же ответами, ничего не теряется.
+    const restoreWizard = ()=>{
+      state.answers = keepAnswers; state.editingAttemptId = keepEditId;
+      state.practiceActive = true; state.qIndex = activeQuestions().length - 1;
+      render();
+    };
     if(state.editingAttemptId){
       const editId = state.editingAttemptId;
       state.editingAttemptId = null;
       const updated = await updateAttempt(editId, state.answers);
+      if(!updated){ restoreWizard(); return; }
       if(updated){
         const idx = state.entries.findIndex(x=> String(x.id) === String(editId));
         if(idx >= 0) state.entries[idx] = updated; else state.entries.push(updated);
@@ -2913,7 +2933,8 @@ async function onAction(e){
       return;
     }
     const saved = await insertAttempt(state.answers);
-    if(saved){ state.entries.push(saved); saveCache(); }
+    if(!saved){ restoreWizard(); return; }
+    state.entries.push(saved); saveCache();
     render();
     return;
 
@@ -3014,7 +3035,7 @@ function showToast(msg){
   setTimeout(()=>{
     t.style.opacity = '0';
     setTimeout(()=> t.remove(), 250);
-  }, 2600);
+  }, Math.min(9000, 2600 + String(msg).length * 45));
 }
 
 /* ---------- PDF / image reports ----------
