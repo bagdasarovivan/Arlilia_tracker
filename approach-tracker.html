@@ -1563,9 +1563,9 @@ function allTimeJournalDayKeys(){
   state.journalEntries.forEach(e=>{ if(!isJournalEntryEmpty(e)) set.add(dateKey(e.ts)); });
   return set;
 }
-/* Minimum attempts for a day to count: 3 from MIN3_FROM on, 1 for earlier days. */
-const MIN3_FROM = '2026-11-10';
-function minAttemptsForKey(key){ return key >= MIN3_FROM ? 3 : 1; }
+/* Minimum attempts for a day to count: 5 from MIN_ATTEMPTS_FROM on, 1 for earlier days. */
+const MIN_ATTEMPTS_FROM = '2026-11-10';
+function minAttemptsForKey(key){ return key >= MIN_ATTEMPTS_FROM ? 5 : 1; }
 function dayIsComplete(key, count, hasJournal){ return !!hasJournal && count >= minAttemptsForKey(key); }
 function allTimeAttemptCounts(){
   const m = {};
@@ -1759,8 +1759,8 @@ function renderStreakInfo(){
     <div class="modal-backdrop" data-action="close-streak-info">
       <div class="modal-card">
         <div class="modal-title">🔥 Серия дней</div>
-        <div class="modal-text">День засчитывается, когда за него записано минимум 3 подхода и заполнен дневник. ${(()=>{ const k=todayKey(), c=todayAttemptsCount(); return c>=minAttemptsForKey(k) ? 'Сегодня норма по подходам выполнена ✓.' : 'Сегодня записано ' + c + ' из ' + minAttemptsForKey(k) + '.'; })()}</div>
-        <div class="modal-text" style="margin-top:10px;">🔥 Серия растёт на 1 за каждый выполненный день (3 подхода и дневник). За каждый пропущенный день она уменьшается на 1, но не ниже нуля.</div>
+        <div class="modal-text">День засчитывается, когда за него записано минимум 5 подходов и заполнен дневник. ${(()=>{ const k=todayKey(), c=todayAttemptsCount(); return c>=minAttemptsForKey(k) ? 'Сегодня норма по подходам выполнена ✓.' : 'Сегодня записано ' + c + ' из ' + minAttemptsForKey(k) + '.'; })()}</div>
+        <div class="modal-text" style="margin-top:10px;">🔥 Серия растёт на 1 за каждый выполненный день (5 подходов и дневник). За каждый пропущенный день она уменьшается на 1, но не ниже нуля.</div>
         <button class="btn btn-primary" data-action="close-streak-info" style="margin-top:18px;">Понятно</button>
       </div>
     </div>
@@ -1885,16 +1885,15 @@ function renderPracticeHome(){
   const todayCount = state.entries.filter(e => dateKey(e.ts) === todayK).length;
   const need = minAttemptsForKey(todayK);
   const done = Math.min(todayCount, need);
-  // Progress ring: it grows stage by stage — 3 cells, then 5, 10, 15, 20, 25.
+  // Progress ring: it grows stage by stage — 5 cells, then 10, 15, 20, 25.
   // The number of cells is the next target; the colour "levels up" like rarity
   // tiers in games each time a target is reached.
   const TIERS = [
     { at: 0,    name: '',         c: 'var(--t0)' },
     { at: need, name: 'Норма',    c: 'var(--t1)' },
-    { at: 5,    name: 'Хорошо',   c: 'var(--t2)' },
-    { at: 10,   name: 'Отлично',  c: 'var(--t3)' },
-    { at: 15,   name: 'Супер',    c: 'var(--t4)' },
-    { at: 20,   name: 'Цель дня', c: 'var(--t5)' },
+    { at: 10,   name: 'Хорошо',   c: 'var(--t2)' },
+    { at: 15,   name: 'Отлично',  c: 'var(--t3)' },
+    { at: 20,   name: 'Цель дня', c: 'var(--t4)' },
     { at: 25,   name: 'Рекорд',   c: 'var(--t5)' },
   ];
   let ti = 0; TIERS.forEach((t,k)=>{ if(todayCount >= t.at) ti = k; });
@@ -1911,7 +1910,7 @@ function renderPracticeHome(){
     ? `До нормы: ${need - todayCount} из ${need}`
     : !nextTier
       ? `<span style="color:${tier.c}">Рекорд дня</span> · всего ${todayCount}`
-      : `<span style="color:${tier.c}">${tier.name}</span>${ti === 1 || ti === 5 ? ' ✓' : ''} · до «${nextTier.name}» ещё ${nextTier.at - todayCount}`;
+      : `<span style="color:${tier.c}">${tier.name}</span>${ti === 1 || ti === 4 ? ' ✓' : ''} · до «${nextTier.name}» ещё ${nextTier.at - todayCount}`;
   const numColor = todayCount >= need ? tier.c : 'var(--accent)';
   const remind = getRemind();
   const needJournal = remind.on && new Date().getHours() >= remind.hour && !findTodayJournal();
@@ -2565,7 +2564,7 @@ function renderCalendar(monthDate){
     <div class="cal-legend">
       <span>📓 дневник</span>
       <span>🚶 подход</span>
-      <span>×N — подходов за день (нужно 3+)</span>
+      <span>×N — подходов за день (нужно 5+)</span>
       <span style="color:var(--good);">↑ день выполнен</span>
       <span style="color:var(--warn);">↓ день пропущен</span>
     </div>
@@ -2718,7 +2717,7 @@ function renderSettings(){
 
     <div class="card" style="margin-bottom:16px;">
       <div class="jc-title">О приложении</div>
-      <div class="autosave-hint" style="margin:0 0 8px;"><b>Как засчитывается день.</b> Нужно минимум 3 подхода и заполненный дневник. Серия растёт на 1 за каждый такой день и уменьшается на 1 за каждый пропущенный (не ниже нуля).</div>
+      <div class="autosave-hint" style="margin:0 0 8px;"><b>Как засчитывается день.</b> Нужно минимум 5 подходов и заполненный дневник. Серия растёт на 1 за каждый такой день и уменьшается на 1 за каждый пропущенный (не ниже нуля).</div>
       <div class="autosave-hint" style="margin:0 0 8px;"><b>Сколько хранятся записи.</b> Подробности подходов 14 дней, дневника 30 дней. Потом остаются только отметки и число подходов, поэтому календарь и серия не пропадают.</div>
       <div class="autosave-hint" style="margin:0;">Версия: ${esc(appVersionLabel())}</div>
     </div>
