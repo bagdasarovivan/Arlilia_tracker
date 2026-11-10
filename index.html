@@ -411,6 +411,12 @@
 
 /* ---- ФТ: мастер и карточка цели дня (общий стиль с остальным приложением) ---- */
 .ft-item{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; text-align:left; line-height:1.3; }
+.ft-row{ display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; }
+.ft-row .ft-item{ flex:1; min-width:0; }
+.ft-i{ flex:none; width:44px; border-radius: var(--radius-sm); border:1px solid var(--border); background: var(--surface); color: var(--text-muted); font-family: var(--serif); font-style:italic; font-size:18px; padding:0; }
+.ft-i.on{ color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.ft-desc-open{ flex-basis:100%; font-size:14px; line-height:1.5; color: var(--text-muted); background: var(--surface-2); border-radius: var(--radius-sm); padding:12px 14px; }
+.sync-pill{ display:inline-flex; align-items:center; gap:4px; height:36px; padding:0 12px; border-radius:18px; border:1px solid var(--warn); background: var(--warn-soft); color: var(--warn); font-size:14px; }
 .ft-desc{ font-size:13px; font-weight:400; line-height:1.45; color: var(--text-muted); }
 .choice-list-btn.selected .ft-desc{ color: var(--text); opacity:.8; }
 .ft-all{ margin-top:6px; font-weight:600; text-align:center; border-style:dashed; border-color: var(--accent); color: var(--accent); background: transparent; }
@@ -885,7 +891,7 @@ let state = {
   exerciseExpanded: {},       // { [exerciseId]: true } — which rows are expanded
 
   progressMonth: (function(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
-  pwOpen: false, pwBusy: false,
+  pwOpen: false, pwBusy: false, ftDescOpen: {},
   reportView: (lsGet('arlilia_report_view','table') === 'cards') ? 'cards' : 'table', // attempts report layout
   reportDate: todayKey(), // which single day the PDF/copy exports cover
   lastTab: 'practice', // which bottom-nav tab to return to when leaving Настройки
@@ -1739,6 +1745,7 @@ function renderAppBar(){
         <span class="brand-text">Arlilia</span>
       </div>
       <div class="app-bar-right">
+        ${pendingSyncCount() ? `<button class="sync-pill" data-action="retry-sync" aria-label="Ждёт отправки">⏳ ${pendingSyncCount()}</button>` : ''}
         <button class="streak-pill" data-action="toggle-streak-info">🔥 ${streak}</button>
         <button class="gear-btn ${state.tab==='settings'?'active':''}" data-action="toggle-settings" aria-label="Настройки">⚙</button>
       </div>
@@ -1864,6 +1871,10 @@ function renderTabbar(){
 }
 
 /* ---------- Practice tab ---------- */
+function pendingSyncCount(){
+  if(!auth.userId) return 0;
+  return (lsGet(outboxKey(), []) || []).length + Object.keys(lsGet(jPendKey(), {}) || {}).length;
+}
 function lastRepeatableAttempt(){
   let best = null;
   state.entries.forEach(e=>{ if(e.ft && !e.scrubbed && !e.pending && (!best || e.ts > best.ts)) best = e; });
@@ -2041,8 +2052,14 @@ function renderPracticeWizard(){
     const noteOpen3 = (state.noteOpen && state.noteOpen.ritual) || !!noteVal3;
     control = `
       <div class="choice-list">
-        ${L.items.map(it=>`<button class="choice-list-btn ft-item ${sel.includes(it.id)?'selected':''}" data-ft-item="${q.id}:${it.id}">
-          <span>${esc(it.t)}</span>${it.desc ? `<span class="ft-desc">${esc(it.desc)}</span>` : ''}</button>`).join('')}
+        ${L.items.map(it=>{
+          const did = q.id + ':' + it.id, open = !!state.ftDescOpen[did];
+          return `<div class="ft-row">
+            <button class="choice-list-btn ft-item ${sel.includes(it.id)?'selected':''}" data-ft-item="${did}"><span>${esc(it.t)}</span></button>
+            ${it.desc ? `<button type="button" class="ft-i${open?' on':''}" data-action="toggle-ft-desc" data-did="${did}" aria-label="Пояснение">i</button>` : ''}
+            ${it.desc && open ? `<div class="ft-desc-open">${esc(it.desc)}</div>` : ''}
+          </div>`;
+        }).join('')}
         ${L.all ? `<button class="choice-list-btn ft-all ${allOn?'selected':''}" data-ft-all="${q.id}">${esc(L.all)}</button>` : ''}
       </div>
       ${isRitual ? `
@@ -3313,6 +3330,13 @@ async function onAction(e){
     render();
     return;
 
+  } else if(action === 'toggle-ft-desc'){
+    const did = e.currentTarget.getAttribute('data-did');
+    state.ftDescOpen[did] = !state.ftDescOpen[did];
+  } else if(action === 'retry-sync'){
+    showToast('Отправляем…');
+    await ensureFreshToken(); await flushOutbox();
+    showToast(pendingSyncCount() ? 'Пока не получилось — записи остаются на телефоне' : 'Всё отправлено ✓');
   } else if(action === 'toggle-pw-form'){
     state.pwOpen = !state.pwOpen;
   } else if(action === 'save-password'){
