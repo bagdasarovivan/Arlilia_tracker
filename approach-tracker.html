@@ -25,6 +25,7 @@
     --good-soft: rgba(95,168,127,0.15);
     --warn: #D9695A;
     --warn-soft: rgba(217,105,90,0.14);
+    --t0:#B7C6C4; --t1:#5FA87F; --t2:#5C8FBF; --t3:#8C78B8; --t4:#C9A24E; --t5:#C46A63;
     --radius: 18px;
     --radius-sm: 10px;
     --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
@@ -44,6 +45,7 @@
     --good-soft: rgba(123,199,154,0.16);
     --warn: #E08673;
     --warn-soft: rgba(224,134,115,0.16);
+    --t0:#D5E2E0; --t1:#7BC79A; --t2:#7AA9D6; --t3:#A592D0; --t4:#DDB964; --t5:#DB827B;
   }
   *{ box-sizing: border-box; }
   html,body{ height:100%; }
@@ -172,10 +174,10 @@
   .ring-wrap{ position:relative; width:206px; height:206px; display:flex; align-items:center; justify-content:center; }
   .ring-wrap svg{ position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); }
   .ring-arc{ fill:none; stroke-width:7; stroke-linecap:round; stroke: var(--border); }
-  .ring-arc.on{ stroke: var(--accent); }
+  .ring-arc.min{ stroke: var(--text-muted); opacity:.4; }
+  .ring-arc.on{ opacity:1; }
   .ring-caption{ text-align:center; font-size:14px; color: var(--text-muted); margin:-14px 0 24px; }
-  .ring-caption.done{ color: var(--accent); font-weight:600; }
-  .remind-card{ display:flex; align-items:center; gap:12px; background: var(--accent-soft); border:1px solid var(--border); border-radius:14px; padding:12px 14px; margin:0 0 16px; }
+    .remind-card{ display:flex; align-items:center; gap:12px; background: var(--accent-soft); border:1px solid var(--border); border-radius:14px; padding:12px 14px; margin:0 0 16px; }
   .remind-card .remind-text{ flex:1; font-size:14px; line-height:1.4; }
   .remind-card .btn{ padding:9px 14px; font-size:14px; flex:none; width:auto; }
   .view-switch{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; align-items:center; font-size:13px; color: var(--text-muted); }
@@ -1870,13 +1872,32 @@ function renderPracticeHome(){
   const todayCount = state.entries.filter(e => dateKey(e.ts) === todayK).length;
   const need = minAttemptsForKey(todayK);
   const done = Math.min(todayCount, need);
-  // Progress ring: one arc per required attempt, filled as they are recorded.
-  const R = 98, C = 2 * Math.PI * R, gap = 14, arcLen = C / need - gap;
-  const arcs = Array.from({length: need}, (_,i)=>
-    `<circle class="ring-arc${i < done ? ' on' : ''}" cx="103" cy="103" r="${R}" stroke-dasharray="${arcLen.toFixed(1)} ${(C-arcLen).toFixed(1)}" stroke-dashoffset="${(-(C/need)*i - gap/2).toFixed(1)}"/>`).join('');
-  const caption = todayCount >= need
-    ? `Норма на сегодня выполнена ✓${todayCount > need ? ' · всего ' + todayCount : ''}`
-    : `До нормы: ${need - todayCount} из ${need}`;
+  // Progress ring: 20 segments (the daily ideal). The first `need` are the
+  // minimum; the colour "levels up" like rarity tiers in games as the count grows.
+  const GOAL = 20;
+  const TIERS = [
+    { at: 0,    name: '',         c: 'var(--t0)' },
+    { at: need, name: 'Норма',    c: 'var(--t1)' },
+    { at: 6,    name: 'Хорошо',   c: 'var(--t2)' },
+    { at: 10,   name: 'Отлично',  c: 'var(--t3)' },
+    { at: 15,   name: 'Супер',    c: 'var(--t4)' },
+    { at: GOAL, name: 'Цель дня', c: 'var(--t5)' },
+  ];
+  let ti = 0; TIERS.forEach((t,k)=>{ if(todayCount >= t.at) ti = k; });
+  const tier = TIERS[ti], nextTier = TIERS[ti+1] || null;
+  const R = 98, C = 2 * Math.PI * R, gap = 9, arcLen = C / GOAL - gap;
+  const filled = Math.min(todayCount, GOAL);
+  const arcs = Array.from({length: GOAL}, (_,i)=>{
+    const dash = `stroke-dasharray="${arcLen.toFixed(1)} ${(C-arcLen).toFixed(1)}" stroke-dashoffset="${(-(C/GOAL)*i - gap/2).toFixed(1)}"`;
+    if(i < filled) return `<circle class="ring-arc on" style="stroke:${tier.c}" cx="103" cy="103" r="${R}" ${dash}/>`;
+    return `<circle class="ring-arc${i < need ? ' min' : ''}" cx="103" cy="103" r="${R}" ${dash}/>`;
+  }).join('');
+  const caption = todayCount < need
+    ? `До нормы: ${need - todayCount} из ${need}`
+    : todayCount >= GOAL
+      ? `<span style="color:${tier.c}">Цель дня выполнена</span> · всего ${todayCount}`
+      : `<span style="color:${tier.c}">${tier.name}</span>${ti === 1 ? ' ✓' : ''} · до «${nextTier.name}» ещё ${nextTier.at - todayCount}`;
+  const numColor = todayCount >= need ? tier.c : 'var(--accent)';
   const hour = new Date().getHours();
   const needJournal = hour >= 19 && !findTodayJournal();
   const last = lastRepeatableAttempt();
@@ -1889,12 +1910,12 @@ function renderPracticeHome(){
       <div class="ring-wrap">
         <svg viewBox="0 0 206 206" aria-hidden="true">${arcs}</svg>
         <div class="today-badge">
-          <div class="today-badge-num">${todayCount}</div>
+          <div class="today-badge-num" style="color:${numColor}">${todayCount}</div>
           <div class="today-badge-lbl">подход${todayCount===1?'':(todayCount>=2&&todayCount<=4?'а':'ов')} сегодня</div>
         </div>
       </div>
     </div>
-    <div class="ring-caption${todayCount >= need ? ' done' : ''}">${caption}</div>
+    <div class="ring-caption">${caption}</div>
     ${renderDayGoal(todayK)}
     <button class="btn btn-primary" data-action="start-practice">Записать подход</button>
     ${last ? `<button class="btn btn-ghost" style="margin-top:10px;" data-action="start-practice-repeat">↻ Как в прошлый раз</button>` : ''}
