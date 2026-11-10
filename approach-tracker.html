@@ -436,7 +436,6 @@
 .db-check .bad{ color: var(--warn); }
 .db-check .good{ color: var(--accent); }
 .goal-form .nav-row{ margin-top:14px; padding-bottom:0; }
-.info-btn{font-family:var(--serif); font-style:italic; font-weight:600; font-size:16px;}
 </style>
 </head>
 <body>
@@ -1707,8 +1706,7 @@ function renderAppBar(){
         <span class="brand-text">Arlilia</span>
       </div>
       <div class="app-bar-right">
-        ${streak ? `<button class="streak-pill" data-action="toggle-streak-info">🔥 ${streak}</button>` : ''}
-        <button class="gear-btn info-btn" data-action="toggle-streak-info" aria-label="Как засчитывается день">i</button>
+        <button class="streak-pill" data-action="toggle-streak-info">🔥 ${streak}</button>
         <button class="gear-btn ${state.tab==='settings'?'active':''}" data-action="toggle-settings" aria-label="Настройки">⚙</button>
       </div>
     </div>
@@ -1720,8 +1718,8 @@ function renderStreakInfo(){
   return `
     <div class="modal-backdrop" data-action="close-streak-info">
       <div class="modal-card">
-        <div class="modal-title">Как засчитывается день</div>
-        <div class="modal-text">День засчитывается, когда за него записано минимум 3 подхода и заполнен дневник (для дней до 10 ноября хватало одного подхода). ${(()=>{ const k=todayKey(), c=todayAttemptsCount(); return c>=minAttemptsForKey(k) ? 'Сегодня норма по подходам выполнена ✓.' : 'Сегодня записано ' + c + ' из ' + minAttemptsForKey(k) + '.'; })()}</div>
+        <div class="modal-title">🔥 Серия дней</div>
+        <div class="modal-text">День засчитывается, когда за него записано минимум 3 подхода и заполнен дневник. ${(()=>{ const k=todayKey(), c=todayAttemptsCount(); return c>=minAttemptsForKey(k) ? 'Сегодня норма по подходам выполнена ✓.' : 'Сегодня записано ' + c + ' из ' + minAttemptsForKey(k) + '.'; })()}</div>
         <div class="modal-text" style="margin-top:10px;">🔥 Серия — это дни подряд, когда выполнены оба задания. Если полностью пропустить день, серия сбрасывается.</div>
         <button class="btn btn-primary" data-action="close-streak-info" style="margin-top:18px;">Понятно</button>
       </div>
