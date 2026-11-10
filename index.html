@@ -377,16 +377,57 @@
   @keyframes splash-out{ to{ opacity:0; visibility:hidden; } }
   @media (prefers-reduced-motion: reduce){ #splash svg{ animation:none; opacity:1; transform:none; } }
 
-.ft-item{ display:flex; flex-direction:column; align-items:flex-start; gap:4px; text-align:left; }
-.ft-desc{ font-size:13px; font-weight:400; line-height:1.4; opacity:.7; }
-.ft-all{ margin-top:6px; font-weight:600; }
-.ft-group{ margin:14px 0 2px; font-size:12px; letter-spacing:.06em; text-transform:uppercase; opacity:.6; }
-.ft-details{ display:flex; flex-direction:column; gap:6px; }
-.goal-card{ margin:18px 0 6px; padding:14px 16px; border:1px solid var(--border, rgba(128,128,128,.3)); border-radius:14px; }
-.goal-title{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; opacity:.6; margin-bottom:6px; }
-.goal-text{ font-size:17px; font-weight:600; }
-.goal-desc{ font-size:14px; opacity:.75; margin-top:4px; }
-.ft-detail-label{ font-size:14px; opacity:.75; margin-top:8px; }
+/* ---- ФТ: мастер и карточка цели дня (общий стиль с остальным приложением) ---- */
+.ft-item{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; text-align:left; line-height:1.3; }
+.ft-desc{ font-size:13px; font-weight:400; line-height:1.45; color: var(--text-muted); }
+.choice-list-btn.selected .ft-desc{ color: var(--text); opacity:.8; }
+.ft-all{ margin-top:6px; font-weight:600; text-align:center; border-style:dashed; border-color: var(--accent); color: var(--accent); background: transparent; }
+.ft-all.selected{ border-style:solid; background: var(--accent); color: var(--accent-text); }
+.ft-group{ display:flex; align-items:center; gap:10px; margin:18px 2px 4px; font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color: var(--accent); }
+.ft-group::after{ content:''; flex:1; height:1px; background: var(--border); }
+.ft-group:first-child{ margin-top:0; }
+.ft-details{ display:flex; flex-direction:column; gap:4px; }
+.ft-detail-label{ font-family: var(--serif); font-size:17px; color: var(--text); margin:12px 2px 2px; }
+
+.goal-card{
+  position:relative; margin:0 0 20px; padding:18px 18px 16px 22px; overflow:hidden;
+  background: linear-gradient(160deg, var(--surface) 0%, var(--accent-soft) 140%);
+  border:1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 10px 26px -16px var(--accent);
+}
+.goal-card::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:5px; background: var(--accent); }
+.goal-head{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.goal-icon{
+  flex:none; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background: var(--accent-soft); border:1px solid var(--accent); font-size:17px; line-height:1;
+}
+.goal-title{ flex:1; font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color: var(--accent); }
+.goal-edit{
+  flex:none; width:34px; height:34px; border-radius:50%; padding:0; cursor:pointer;
+  background: var(--surface); border:1px solid var(--border); color: var(--text-muted); font-size:15px;
+  display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color: transparent;
+}
+.goal-text{ font-family: var(--serif); font-size:23px; line-height:1.3; color: var(--text); overflow-wrap:anywhere; }
+.goal-desc{ font-size:15px; line-height:1.5; color: var(--text-muted); margin-top:8px; overflow-wrap:anywhere; }
+.goal-empty{ text-align:center; }
+.goal-empty .goal-head{ justify-content:center; }
+.goal-empty .goal-title{ flex:none; }
+.goal-add{
+  width:100%; margin-top:2px; padding:13px; border-radius: var(--radius-sm); cursor:pointer;
+  background: transparent; border:1px dashed var(--accent); color: var(--accent); font-size:16px; font-weight:600; font-family: var(--sans);
+}
+.goal-hint{
+  margin-top:12px; padding:12px 14px; border-radius: var(--radius-sm); text-align:left;
+  background: var(--accent-soft); font-size:14px; line-height:1.45; color: var(--text);
+}
+.goal-hint-btn{
+  margin-top:10px; background: var(--accent); color: var(--accent-text); border:none; border-radius:999px;
+  padding:8px 16px; font-size:13px; font-weight:600; font-family: var(--sans); cursor:pointer;
+}
+.goal-form .field-label{ margin-top:12px; }
+.goal-form textarea{ min-height:90px; font-size:16px; }
+.goal-form input[type=text]{ font-size:17px; }
+.goal-form .nav-row{ margin-top:14px; padding-bottom:0; }
 </style>
 </head>
 <body>
@@ -706,7 +747,7 @@ function ftDetailsText(title, d){
 
 const ALL_QUESTIONS = [
   { id:'title', type:'choice_other', label:'Название ФТ', options: TITLE_OPTIONS, hint:'Какая это ФТ' },
-  { id:'details', type:'ftdetails', label:'Подробности', hint:'' },
+  { id:'details', type:'ftdetails', label:'Подробности', hint:'Коротко — можно оставить пустым' },
   { id:'mindsetBefore', type:'choice_other', label:'Мой настрой', options: MINDSET_OPTIONS, hint:'Каким было моё состояние перед ФТ' },
   { id:'reactionAfter', type:'choice_other', label:'Реакция собеседника', options: REACTION_OPTIONS, hint:'Как собеседник отреагировал' },
   { id:'ritual', type:'ftlist', label:'Ритуал речи', hint: FT_LISTS.ritual.hint },
@@ -1753,13 +1794,15 @@ function prevDateKey(k){
 }
 function renderDayGoal(dk){
   const g = (state.dayGoals && state.dayGoals[dk]) || null;
+  const head = (extra)=>`<div class="goal-head"><span class="goal-icon">🎯</span><span class="goal-title">Цель всех ФТ на день</span>${extra || ''}</div>`;
   if(state.goalEditing){
-    return `<div class="goal-card">
-      <div class="goal-title">Цель всех ФТ на день</div>
-      <input type="text" id="goal-text" value="${esc(g ? g.goal : '')}" placeholder="Например: начало речи на щелинке">
-      <div class="goal-title" style="margin-top:12px;">Описание цели</div>
+    return `<div class="goal-card goal-form">
+      ${head()}
+      <div class="field-label">Цель</div>
+      <input type="text" id="goal-text" value="${esc(g ? g.goal : '')}" placeholder="Например: начало речи на «щелинке»">
+      <div class="field-label">Описание цели</div>
       <textarea id="goal-desc" placeholder="Что будем тренировать (из трудной тетради)">${esc(g ? g.description : '')}</textarea>
-      <div class="nav-row" style="margin-top:12px;">
+      <div class="nav-row">
         <button class="btn btn-ghost" data-action="cancel-goal">Отмена</button>
         <button class="btn btn-primary" data-action="save-goal">Сохранить</button>
       </div>
@@ -1767,19 +1810,18 @@ function renderDayGoal(dk){
   }
   if(g && (g.goal || g.description)){
     return `<div class="goal-card">
-      <div class="goal-title">Цель всех ФТ на день</div>
-      <div class="goal-text">${esc(g.goal)}</div>
+      ${head(`<button class="goal-edit" data-action="edit-goal" aria-label="Изменить цель">✏️</button>`)}
+      ${g.goal ? `<div class="goal-text">${esc(g.goal)}</div>` : ''}
       ${g.description ? `<div class="goal-desc">${esc(g.description)}</div>` : ''}
-      <button class="attempt-mini" data-action="edit-goal" style="margin-top:10px;">✏️ Изменить</button>
     </div>`;
   }
   const yj = journalEntryOnDate(prevDateKey(dk));
   const hint = yj && !yj.scrubbed && yj.intentions ? String(yj.intentions).trim() : '';
-  return `<div class="goal-card">
-    <div class="goal-title">Цель всех ФТ на день</div>
-    <button class="btn-ghost" data-action="edit-goal" style="padding:11px;">+ Поставить цель</button>
-    ${hint ? `<div class="goal-desc" style="margin-top:10px;">Из вчерашнего дневника: «${esc(hint.length > 120 ? hint.slice(0,120) + '…' : hint)}»</div>
-    <button class="attempt-mini" data-action="use-goal-hint" style="margin-top:6px;">Взять как цель</button>` : ''}
+  return `<div class="goal-card goal-empty">
+    ${head()}
+    <button class="goal-add" data-action="edit-goal">+ Поставить цель</button>
+    ${hint ? `<div class="goal-hint">Из вчерашнего дневника: «${esc(hint.length > 120 ? hint.slice(0,120) + '…' : hint)}»
+      <div><button class="goal-hint-btn" data-action="use-goal-hint">Взять как цель</button></div></div>` : ''}
   </div>`;
 }
 async function saveDayGoal(dk, goal, description){
