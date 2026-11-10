@@ -147,11 +147,9 @@
   }
   .tab-btn{ min-width:0; padding-left:2px; padding-right:2px; }
   .tab-btn span{ white-space:nowrap; }
-  @media (max-width: 370px){ .tab-btn{ font-size:10.5px; } .tab-btn .ic{ width:38px; } }
-  .tab-btn .ic{ display:flex; align-items:center; justify-content:center; width:46px; height:28px; border-radius:14px; transition: background .2s ease; }
-  .tab-btn .ic svg{ width:22px; height:22px; display:block; }
-  .tab-btn.active{ color: var(--accent); font-weight:600; }
-  .tab-btn.active .ic{ background: var(--accent-soft); }
+  @media (max-width: 370px){ .tab-btn{ font-size:10.5px; } .tab-btn .ic{ font-size:18px; } }
+  .tab-btn .ic{ font-size:19px; }
+  .tab-btn.active{ color: var(--accent); }
 
   /* ---- Home / Practice tab ---- */
   .home-hero{ margin-top: 4px; margin-bottom: 28px; }
@@ -1758,13 +1756,6 @@ function renderLogin(){
 
 /* ---- Иконки вкладок (одинаковые на iPhone и Android) и картинки для пустых экранов ---- */
 const SVG_OPEN = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
-const TAB_ICONS = {
-  practice:  SVG_OPEN + '<path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M8 10h8M8 13h5"/></svg>',
-  journal:   SVG_OPEN + '<path d="M12 6.5C10.3 5.2 8 4.7 4.5 4.7v13c3.5 0 5.8.5 7.5 1.8 1.7-1.3 4-1.8 7.5-1.8v-13c-3.5 0-5.8.5-7.5 1.8z"/><path d="M12 6.5v13"/></svg>',
-  exercises: SVG_OPEN + '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 11l1.6 1.6L13 9.7M8.5 17h7"/></svg>',
-  reference: SVG_OPEN + '<path d="M5 4h10a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M17 8h2v12h-2M9 8h4M9 11.5h4"/></svg>',
-  progress:  SVG_OPEN + '<path d="M4 4v16h16"/><path d="M7.5 15l3.5-4 3 2.5L19 7.5"/><path d="M15.5 7.5H19V11"/></svg>',
-};
 const EMPTY_ART = {
   journal:  '<svg viewBox="0 0 96 80" width="96" height="80" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="22" y="10" width="52" height="62" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><path d="M32 10v62" stroke="var(--accent)"/><path d="M42 26h22M42 36h22M42 46h14" stroke="var(--text-muted)"/><path d="M70 52l8-8 6 6-8 8-8 2z" fill="var(--surface)" stroke="var(--accent)"/></svg>',
   attempts: '<svg viewBox="0 0 96 80" width="96" height="80" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 14h46a6 6 0 0 1 6 6v22a6 6 0 0 1-6 6H44l-12 10V48h-14a6 6 0 0 1-6-6V20a6 6 0 0 1 6-6z" fill="var(--accent-soft)" stroke="var(--accent)"/><path d="M26 28h30M26 36h18" stroke="var(--text-muted)"/><circle cx="78" cy="58" r="7" stroke="var(--accent)"/><path d="M78 54v4l3 2" stroke="var(--accent)"/></svg>',
@@ -1783,11 +1774,11 @@ document.addEventListener('click', (e)=>{
 
 function renderTabbar(){
   const tabs = [
-    {id:'practice', ic:TAB_ICONS.practice, label:'Подходы'},
-    {id:'journal', ic:TAB_ICONS.journal, label:'Дневник'},
-    {id:'exercises', ic:TAB_ICONS.exercises, label:'Упражнения'},
-    {id:'reference', ic:TAB_ICONS.reference, label:'Справочник'},
-    {id:'progress', ic:TAB_ICONS.progress, label:'Прогресс'},
+    {id:'practice', ic:'🚶', label:'Подходы'},
+    {id:'journal', ic:'📓', label:'Дневник'},
+    {id:'exercises', ic:'📋', label:'Упражнения'},
+    {id:'reference', ic:'📚', label:'Справочник'},
+    {id:'progress', ic:'📈', label:'Прогресс'},
   ];
   return `<div class="tabbar">
     ${tabs.map(t=>`
