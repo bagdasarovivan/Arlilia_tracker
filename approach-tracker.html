@@ -1912,7 +1912,7 @@ function renderPracticeHome(){
       : `<span style="color:${tier.c}">${tier.name}</span>${ti === 1 || ti === 4 ? ' ✓' : ''} · до «${nextTier.name}» ещё ${nextTier.at - todayCount}`;
   const numColor = todayCount >= need ? tier.c : 'var(--accent)';
   const remind = getRemind();
-  const needJournal = remind.on && new Date().getHours() >= remind.hour && !findTodayJournal();
+  const needJournal = remind.on && (new Date().getHours()*60 + new Date().getMinutes()) >= remind.hour*60 + remind.min && !findTodayJournal();
   const last = lastRepeatableAttempt();
   return `
     <div class="home-hero">
@@ -2604,8 +2604,17 @@ function renderTrendChart(monthDate){
 function getRemind(){
   const v = lsGet('arlilia_remind', null) || {};
   const hour = Number.isInteger(v.hour) && v.hour >= 0 && v.hour <= 23 ? v.hour : 19;
-  return { on: v.on !== false, hour };
+  const min = Number.isInteger(v.min) && v.min >= 0 && v.min <= 59 ? v.min : 0;
+  return { on: v.on !== false, hour, min };
 }
+document.addEventListener('change', (e)=>{
+  if(!e.target || e.target.id !== 'remind-time') return;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(e.target.value || '');
+  if(!m) return;
+  lsSet('arlilia_remind', { on: true, hour: Math.min(23, +m[1]), min: Math.min(59, +m[2]) });
+  showToast('Напоминание с ' + m[1].padStart(2,'0') + ':' + m[2]);
+  render();
+});
 function appVersionLabel(){
   const m = String(shellVersion || '').match(/v(\d+)/);
   return m ? m[1] : '—';
@@ -2703,8 +2712,8 @@ function renderSettings(){
         <button class="choice-btn ${!remind.on?'selected':''}" style="min-width:0; padding-left:6px; padding-right:6px;" data-action="remind-off">Выключено</button>
       </div>
       ${remind.on ? `
-        <div class="autosave-hint" style="margin:0 0 8px;">Напоминать с:</div>
-        <div class="choice-row" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px;">${[17,18,19,20,21,22].map(h=>`<button class="choice-btn ${remind.hour===h?'selected':''}" data-action="remind-hour" data-hour="${h}">${h}:00</button>`).join('')}</div>
+        <div class="autosave-hint" style="margin:0 0 8px;">Напоминать с (нажмите и выберите время):</div>
+        <input id="remind-time" type="time" value="${String(remind.hour).padStart(2,'0')}:${String(remind.min).padStart(2,'0')}" style="width:100%; box-sizing:border-box; padding:14px; font-size:20px; text-align:center; border-radius:14px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit;">
       ` : ''}
     </div>
 
@@ -3334,9 +3343,9 @@ async function onAction(e){
   } else if(action === 'save-password'){
     changePassword(); return;
   } else if(action === 'remind-on'){
-    lsSet('arlilia_remind', { on: true, hour: getRemind().hour });
+    lsSet('arlilia_remind', { ...getRemind(), on: true });
   } else if(action === 'remind-off'){
-    lsSet('arlilia_remind', { on: false, hour: getRemind().hour });
+    lsSet('arlilia_remind', { ...getRemind(), on: false });
   } else if(action === 'remind-hour'){
     lsSet('arlilia_remind', { on: true, hour: parseInt(e.currentTarget.getAttribute('data-hour'), 10) || 19 });
   } else if(action === 'export-attempts-pdf'){
