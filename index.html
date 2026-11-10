@@ -188,13 +188,14 @@
   .update-bar button{ background:#fff; color:#1f6f68; border:none; border-radius:10px; padding:8px 14px; font-size:14px; font-weight:600; }
 
   /* ---- Practice wizard ---- */
-  .progress-dots{ display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin-bottom: 6vh; margin-top: 4px; }
+  .progress-dots{ display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin-bottom: 22px; margin-top: 4px; }
   .dot{ width:7px; height:7px; border-radius:50%; background: var(--border); }
   .dot.done{ background: var(--accent); }
   .dot.current{ background: var(--text); }
-  .q-wrap{ flex:1; display:flex; flex-direction:column; justify-content:center; min-height: 46vh; }
+  .q-wrap{ flex:1; display:flex; flex-direction:column; justify-content:flex-start; padding-top: 2vh; }
+  .wiz-shell{ padding:22px 20px 0; display:flex; flex-direction:column; min-height:100vh; min-height:100dvh; }
   .q-label{ font-size:26px; font-family: var(--serif); text-align:center; margin-bottom: 8px; }
-  .q-hint{ font-size:16px; color: var(--text-muted); text-align:center; margin-bottom: 34px; }
+  .q-hint{ font-size:16px; color: var(--text-muted); text-align:center; margin-bottom: 24px; }
   .scale-value{ font-family: var(--serif); font-size: 64px; text-align:center; margin-bottom: 18px; }
   .scale-slider{ width:100%; -webkit-appearance:none; height:6px; border-radius:3px; background: var(--border); outline:none; }
   .scale-slider::-webkit-slider-thumb{ -webkit-appearance:none; width:26px; height:26px; border-radius:50%; background: var(--accent); border:3px solid var(--bg); box-shadow:0 0 0 1px var(--accent); }
@@ -232,7 +233,7 @@
   input[type=number]{ -moz-appearance: textfield; }
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
-  .nav-row{ display:flex; gap:10px; margin-top: 6vh; padding-bottom: 24px; }
+  .nav-row{ display:flex; gap:10px; margin-top:auto; padding:14px 0 calc(16px + env(safe-area-inset-bottom)); position:sticky; bottom:0; background: linear-gradient(to top, var(--bg) 75%, transparent); }
   .nav-row .btn-ghost{ flex: 0 0 84px; }
 
   /* ---- Top bar (sub-pages) ---- */
@@ -469,7 +470,7 @@
 .db-check{ margin-top:12px; font-size:14px; line-height:1.6; }
 .db-check .bad{ color: var(--warn); }
 .db-check .good{ color: var(--accent); }
-.goal-form .nav-row{ margin-top:14px; padding-bottom:0; }
+.goal-form .nav-row{ margin-top:14px; padding:0; position:static; background:none; }
 </style>
 </head>
 <body>
@@ -2105,7 +2106,7 @@ function renderPracticeWizard(){
   const isLast = state.qIndex === activeQuestions().length - 1;
 
   return `
-    <div style="padding:22px 20px 24px; display:flex; flex-direction:column; min-height:100vh;">
+    <div class="wiz-shell">
       <div class="progress-dots">${dots}</div>
       <div class="q-wrap">
         <div class="q-label">${q.label}</div>
@@ -2418,7 +2419,7 @@ function renderJournalWizardStep(){
   const isLast = idx === JOURNAL_STEPS.length - 1;
 
   return `
-    <div style="padding:22px 20px 24px; display:flex; flex-direction:column; min-height:100vh;">
+    <div class="wiz-shell">
       <div class="progress-dots">${dots}</div>
       <div class="q-wrap">
         <div class="q-label">${q.label}</div>
