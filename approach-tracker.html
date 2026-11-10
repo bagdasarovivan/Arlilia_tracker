@@ -387,6 +387,62 @@
   @keyframes splash-shine{ from{ left:-60%; } to{ left:130%; } }
   @keyframes splash-out{ to{ opacity:0; visibility:hidden; } }
   @media (prefers-reduced-motion: reduce){ #splash .splash-in, #splash .splash-logo, #splash .splash-logo::after{ animation:none; } #splash .splash-in{ opacity:1; transform:none; } #splash .splash-logo::after{ display:none; } }
+
+/* ---- ФТ: мастер и карточка цели дня (общий стиль с остальным приложением) ---- */
+.ft-item{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; text-align:left; line-height:1.3; }
+.ft-desc{ font-size:13px; font-weight:400; line-height:1.45; color: var(--text-muted); }
+.choice-list-btn.selected .ft-desc{ color: var(--text); opacity:.8; }
+.ft-all{ margin-top:6px; font-weight:600; text-align:center; border-style:dashed; border-color: var(--accent); color: var(--accent); background: transparent; }
+.ft-all.selected{ border-style:solid; background: var(--accent); color: var(--accent-text); }
+.ft-group{ display:flex; align-items:center; gap:10px; margin:18px 2px 4px; font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color: var(--accent); }
+.ft-group::after{ content:''; flex:1; height:1px; background: var(--border); }
+.ft-group:first-child{ margin-top:0; }
+.ft-details{ display:flex; flex-direction:column; gap:4px; }
+.ft-detail-label{ font-family: var(--serif); font-size:17px; color: var(--text); margin:12px 2px 2px; }
+
+.goal-card{
+  position:relative; margin:0 0 20px; padding:18px 18px 16px 22px; overflow:hidden;
+  background: linear-gradient(160deg, var(--surface) 0%, var(--accent-soft) 140%);
+  border:1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 10px 26px -16px var(--accent);
+}
+.goal-card::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:5px; background: var(--accent); }
+.goal-head{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.goal-icon{
+  flex:none; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background: var(--accent-soft); border:1px solid var(--accent); font-size:17px; line-height:1;
+}
+.goal-title{ flex:1; font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color: var(--accent); }
+.goal-edit{
+  flex:none; width:34px; height:34px; border-radius:50%; padding:0; cursor:pointer;
+  background: var(--surface); border:1px solid var(--border); color: var(--text-muted); font-size:15px;
+  display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color: transparent;
+}
+.goal-text{ font-family: var(--serif); font-size:23px; line-height:1.3; color: var(--text); overflow-wrap:anywhere; }
+.goal-desc{ font-size:15px; line-height:1.5; color: var(--text-muted); margin-top:8px; overflow-wrap:anywhere; }
+.goal-empty{ text-align:center; }
+.goal-empty .goal-head{ justify-content:center; }
+.goal-empty .goal-title{ flex:none; }
+.goal-add{
+  width:100%; margin-top:2px; padding:13px; border-radius: var(--radius-sm); cursor:pointer;
+  background: transparent; border:1px dashed var(--accent); color: var(--accent); font-size:16px; font-weight:600; font-family: var(--sans);
+}
+.goal-hint{
+  margin-top:12px; padding:12px 14px; border-radius: var(--radius-sm); text-align:left;
+  background: var(--accent-soft); font-size:14px; line-height:1.45; color: var(--text);
+}
+.goal-hint-btn{
+  margin-top:10px; background: var(--accent); color: var(--accent-text); border:none; border-radius:999px;
+  padding:8px 16px; font-size:13px; font-weight:600; font-family: var(--sans); cursor:pointer;
+}
+.goal-form .field-label{ margin-top:12px; }
+.goal-form textarea{ min-height:90px; font-size:16px; }
+.goal-form input[type=text]{ font-size:17px; }
+.save-error{ margin:14px 0 0; padding:12px 14px; border-radius: var(--radius-sm); background: rgba(217,95,76,.14); border:1px solid var(--warn); color: var(--text); font-size:14px; line-height:1.45; }
+.db-check{ margin-top:12px; font-size:14px; line-height:1.6; }
+.db-check .bad{ color: var(--warn); }
+.db-check .good{ color: var(--accent); }
+.goal-form .nav-row{ margin-top:14px; padding-bottom:0; }
 </style>
 </head>
 <body>
