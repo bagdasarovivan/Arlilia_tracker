@@ -2106,6 +2106,7 @@ function renderJournalHome(){
       ${consciousDays ? `<div style="font-size:13px; color:var(--text-muted); margin:0 0 4px;">Дней осознанных занятий: ${consciousDays}</div>` : ''}
       ${streak ? `<div style="font-size:13px; color:var(--text-muted); margin:0 0 10px;">🔥 Серия: ${streak} ${ruDays(streak)} подряд</div>` : ''}
       <h1>${todayEntry ? 'Сегодняшняя запись уже есть' : 'Как прошёл день?'}</h1>
+      <div class="autosave-hint" style="margin:8px 0 0;">День засчитывается, когда за него записан хотя бы один подход и заполнен дневник. Дни подряд складываются в серию 🔥.</div>
     </div>
     ${!state.settings.startDate ? `
     <div class="hint-card">
@@ -2360,7 +2361,8 @@ function renderProgress(){
 
   return `
     <div class="eyebrow">Прогресс</div>
-    <h2 style="font-size:24px; margin-bottom:18px;">Календарь</h2>
+    <h2 style="font-size:24px; margin-bottom:8px;">Календарь</h2>
+    <div class="autosave-hint" style="margin:0 0 16px;">День засчитывается, когда за него записан хотя бы один подход и заполнен дневник. Дни подряд складываются в серию 🔥.</div>
 
     ${!state.settings.startDate ? `
     <div class="hint-card">
