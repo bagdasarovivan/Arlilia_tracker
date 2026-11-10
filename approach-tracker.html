@@ -7,8 +7,9 @@
 <meta name="theme-color" content="#1A1D23">
 <meta name="description" content="Дневник речевых подходов и самонаблюдений">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="64x64" href="arlilia-64.png">
+<link rel="icon" type="image/png" sizes="192x192" href="arlilia-192.png">
+<link rel="apple-touch-icon" href="arlilia-180.png">
 <style>
   :root{
     --bg: #F2F7F6;
@@ -156,15 +157,32 @@
   .home-hero{ margin-top: 4px; margin-bottom: 28px; }
   .home-hero h1{ font-size: 34px; line-height:1.25; }
   .today-badge-wrap{ display:flex; justify-content:center; margin: 10px 0 30px; }
+  .today-badge-wrap.has-ring{ margin-bottom:30px; }
   .today-badge{
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     width:176px; height:176px; border-radius:50%;
     background: radial-gradient(circle at 32% 28%, var(--surface) 0%, var(--accent-soft) 72%);
-    border:2px solid var(--accent);
+    border:1px solid var(--border);
     box-shadow: 0 8px 24px -10px var(--accent-soft);
   }
   .today-badge-num{ font-family: var(--serif); font-size:68px; line-height:1; color: var(--accent); }
   .today-badge-lbl{ font-size:13px; color: var(--text-muted); margin-top:8px; text-align:center; letter-spacing:.02em; }
+
+  /* ---- progress ring on the home screen ---- */
+  .ring-wrap{ position:relative; width:206px; height:206px; display:flex; align-items:center; justify-content:center; }
+  .ring-wrap svg{ position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); }
+  .ring-arc{ fill:none; stroke-width:7; stroke-linecap:round; stroke: var(--border); }
+  .ring-arc.on{ stroke: var(--accent); }
+  .ring-caption{ text-align:center; font-size:14px; color: var(--text-muted); margin:-14px 0 24px; }
+  .ring-caption.done{ color: var(--accent); font-weight:600; }
+  .remind-card{ display:flex; align-items:center; gap:12px; background: var(--accent-soft); border:1px solid var(--border); border-radius:14px; padding:12px 14px; margin:0 0 16px; }
+  .remind-card .remind-text{ flex:1; font-size:14px; line-height:1.4; }
+  .remind-card .btn{ padding:9px 14px; font-size:14px; flex:none; width:auto; }
+  .view-switch{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; align-items:center; font-size:13px; color: var(--text-muted); }
+  .view-switch .attempt-mini{ flex:none; }
+  .update-bar{ position:fixed; left:12px; right:12px; top:calc(env(safe-area-inset-top, 0px) + 10px); z-index:9998; display:flex; align-items:center; gap:10px; background:#1f6f68; color:#fff; border-radius:14px; padding:11px 14px; box-shadow:0 8px 24px -8px rgba(0,0,0,.4); font-size:14px; }
+  .update-bar span{ flex:1; }
+  .update-bar button{ background:#fff; color:#1f6f68; border:none; border-radius:10px; padding:8px 14px; font-size:14px; font-weight:600; }
 
   /* ---- Practice wizard ---- */
   .progress-dots{ display:flex; gap:5px; justify-content:center; flex-wrap:wrap; margin-bottom: 6vh; margin-top: 4px; }
@@ -864,6 +882,7 @@ let state = {
   exerciseExpanded: {},       // { [exerciseId]: true } — which rows are expanded
 
   progressMonth: (function(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
+  reportView: (lsGet('arlilia_report_view','table') === 'cards') ? 'cards' : 'table', // attempts report layout
   reportDate: todayKey(), // which single day the PDF/copy exports cover
   lastTab: 'practice', // which bottom-nav tab to return to when leaving Настройки
   streakInfoOpen: false,
@@ -1841,21 +1860,44 @@ function renderTabbar(){
 }
 
 /* ---------- Practice tab ---------- */
+function lastRepeatableAttempt(){
+  let best = null;
+  state.entries.forEach(e=>{ if(e.ft && !e.scrubbed && !e.pending && (!best || e.ts > best.ts)) best = e; });
+  return best;
+}
 function renderPracticeHome(){
   const todayK = todayKey();
   const todayCount = state.entries.filter(e => dateKey(e.ts) === todayK).length;
+  const need = minAttemptsForKey(todayK);
+  const done = Math.min(todayCount, need);
+  // Progress ring: one arc per required attempt, filled as they are recorded.
+  const R = 98, C = 2 * Math.PI * R, gap = 14, arcLen = C / need - gap;
+  const arcs = Array.from({length: need}, (_,i)=>
+    `<circle class="ring-arc${i < done ? ' on' : ''}" cx="103" cy="103" r="${R}" stroke-dasharray="${arcLen.toFixed(1)} ${(C-arcLen).toFixed(1)}" stroke-dashoffset="${(-(C/need)*i - gap/2).toFixed(1)}"/>`).join('');
+  const caption = todayCount >= need
+    ? `Норма на сегодня выполнена ✓${todayCount > need ? ' · всего ' + todayCount : ''}`
+    : `До нормы: ${need - todayCount} из ${need}`;
+  const hour = new Date().getHours();
+  const needJournal = hour >= 19 && !findTodayJournal();
+  const last = lastRepeatableAttempt();
   return `
     <div class="home-hero">
       <div class="eyebrow">Подходы</div>
     </div>
-    <div class="today-badge-wrap">
-      <div class="today-badge">
-        <div class="today-badge-num">${todayCount}</div>
-        <div class="today-badge-lbl">подход${todayCount===1?'':(todayCount>=2&&todayCount<=4?'а':'ов')} сегодня</div>
+    ${needJournal ? `<div class="remind-card"><span class="remind-text">📓 Вечер — самое время заполнить дневник за сегодня</span><button class="btn btn-primary" data-tab="journal">Заполнить</button></div>` : ''}
+    <div class="today-badge-wrap has-ring">
+      <div class="ring-wrap">
+        <svg viewBox="0 0 206 206" aria-hidden="true">${arcs}</svg>
+        <div class="today-badge">
+          <div class="today-badge-num">${todayCount}</div>
+          <div class="today-badge-lbl">подход${todayCount===1?'':(todayCount>=2&&todayCount<=4?'а':'ов')} сегодня</div>
+        </div>
       </div>
     </div>
+    <div class="ring-caption${todayCount >= need ? ' done' : ''}">${caption}</div>
     ${renderDayGoal(todayK)}
     <button class="btn btn-primary" data-action="start-practice">Записать подход</button>
+    ${last ? `<button class="btn btn-ghost" style="margin-top:10px;" data-action="start-practice-repeat">↻ Как в прошлый раз</button>` : ''}
   `;
 }
 
@@ -2414,6 +2456,10 @@ function renderProgress(){
         <div class="report-card-head">
           <span class="report-card-title">🚶 Подходы</span>
           <button class="attempt-mini${state.editListOpen?' active':''}" data-action="toggle-edit-list" aria-label="Изменить или удалить подходы">✏️ Изменить</button>
+        </div>
+        <div class="view-switch"><span>Вид:</span>
+          <button class="attempt-mini${state.reportView==='table'?' active':''}" data-action="set-report-view" data-view="table">Таблица</button>
+          <button class="attempt-mini${state.reportView==='cards'?' active':''}" data-action="set-report-view" data-view="cards">Карточки для телефона</button>
         </div>
         <div class="report-btns">
           <button class="btn btn-primary" data-action="export-attempts-pdf">Скачать PDF</button>
@@ -2996,6 +3042,18 @@ async function onAction(e){
     state.editingAttemptId = null;
     state.practiceActive = true; state.qIndex = 0; state.answers = {}; state.noteOpen = {}; state.wizOtherOpen = {};
     ALL_QUESTIONS.forEach(q => { if(q.type==='scale' || q.type==='scale_note') state.answers[q.id] = 5; });
+  } else if(action === 'start-practice-repeat'){
+    const a = lastRepeatableAttempt();
+    if(!a){ showToast('Нет прошлого подхода для повтора'); return; }
+    const ans = answersFromAttempt(a);
+    // Repeat the setup (type, mood, ritual, method), start the rest fresh.
+    ans.detail = []; delete ans.reactionAfter; delete ans.reactionAfterCustom;
+    ans.hardSel = []; ans.hardOther = []; ans.ritualNote = '';
+    ans.anxiety = 5; ans.anxietyNote = '';
+    state.editingAttemptId = null;
+    state.wizOtherOpen = {}; state.noteOpen = {};
+    state.answers = ans; state.qIndex = 0; state.practiceActive = true;
+    showToast('Подставил из прошлого подхода — проверьте и дополните');
   } else if(action === 'edit-goal'){
     state.goalEditing = true;
   } else if(action === 'cancel-goal'){
@@ -3151,6 +3209,9 @@ async function onAction(e){
     render();
     return;
 
+  } else if(action === 'set-report-view'){
+    state.reportView = e.currentTarget.getAttribute('data-view') === 'cards' ? 'cards' : 'table';
+    lsSet('arlilia_report_view', state.reportView);
   } else if(action === 'export-attempts-pdf'){
     generateAttemptsPdf(); return;
   } else if(action === 'export-journal-pdf'){
@@ -3528,17 +3589,118 @@ function buildAttemptsPages(){
   return { pages, pageBottoms, filename: 'Таблица осознанности ' + ruFileDate(dateStr) + '.pdf' };
 }
 async function generateAttemptsPdf(){
-  const built = buildAttemptsPages();
+  const cards = state.reportView === 'cards';
+  const built = cards ? buildAttemptCardPages() : buildAttemptsPages();
   if(!built){ showToast('За этот день нет записанных подходов'); return; }
   if(!window.jspdf) showToast('Готовим PDF…');
   const ok = await ensureJsPDF();
   if(!ok){ showToast('Не удалось загрузить модуль PDF — проверьте интернет-соединение'); return; }
-  savePdfFromPages(built.pages, built.filename, true);
+  if(cards) savePdfFromPages(built.pages, built.filename, false, true);
+  else savePdfFromPages(built.pages, built.filename, true);
 }
 function copyAttemptsImage(){
-  const built = buildAttemptsPages();
+  const cards = state.reportView === 'cards';
+  const built = cards ? buildAttemptCardPages() : buildAttemptsPages();
   if(!built){ showToast('За этот день нет записанных подходов'); return; }
-  copyCanvasImage(mergeCanvasesVertically(built.pages, built.pageBottoms, PDF_L_MARGIN + 28), 0);
+  copyCanvasImage(mergeCanvasesVertically(built.pages, built.pageBottoms, cards ? PDF_P_MARGIN + 24 : PDF_L_MARGIN + 28), 0);
+}
+
+/* ---- Attempts as phone-width cards: one card per ФТ, large text ---- */
+function buildAttemptCardPages(){
+  const dateStr = state.reportDate || todayKey();
+  const entries = attemptsOnDate(dateStr);
+  if(!entries.length) return null;
+  const W = PDF_P_W, H = PDF_P_H, M = PDF_P_MARGIN;
+  const dayLabel = capitalize(weekdayDateLabel(new Date(dateStr + 'T12:00:00').getTime()));
+  const left = M - 10, right = W - M + 10, textX = M + 14, valueW = right - textX - 14;
+
+  const typeCounts = [];
+  entries.forEach(e=>{
+    if(e.scrubbed) return;
+    const t = e.title || 'Без типа';
+    const row = typeCounts.find(r=>r[0]===t);
+    if(row) row[1]++; else typeCounts.push([t, 1]);
+  });
+  const summaryLine = typeCounts.map(([t,n])=> `${t} — ${n}`).join(' · ');
+
+  const pages = [], pageBottoms = [];
+  let { ctx, y } = newReportPage(pages, W, H);
+  y = drawReportHeader(ctx, W, M, 'Таблица осознанности', dayLabel + ' · подходов: ' + entries.length);
+  const para = (text, font, color, lh)=>{
+    ctx.font = font; ctx.fillStyle = color;
+    wrapLines(ctx, text, W - 2*M).forEach(l=>{ ctx.fillText(l, M, y); y += lh; });
+  };
+  const dg = state.dayGoals && state.dayGoals[dateStr];
+  if(dg && (dg.goal || dg.description)){
+    para('Цель всех ФТ на день: ' + (dg.goal || ''), 'bold 24px ' + REPORT_FONT, RC.text, 33);
+    if(dg.description) para(dg.description, '22px ' + REPORT_FONT, RC.muted, 30);
+    y += 12;
+  }
+  if(entries.some(e=>e.scrubbed)){
+    para('Подробности подходов хранятся 14 дней, потом остаётся только их количество.', 'italic 20px ' + REPORT_FONT, RC.muted, 28);
+    y += 8;
+  }
+  if(summaryLine){ para(summaryLine, '22px ' + REPORT_FONT, RC.muted, 30); y += 14; }
+
+  let idx = 0;
+  entries.forEach((e,i)=>{
+    if(e.scrubbed) return;
+    const fields = [
+      ['Настрой', e.mindsetBefore || '—'],
+      ['Реакция собеседника', e.reactionAfter || '—'],
+      ['Ритуал речи', e.ft ? (e.ft.silent ? 'Режим молчания' : ftCell(e, 'ritual')) : (ritualText(e) || '—')],
+      ['Начало речи', e.ft ? ftCell(e, 'start') : ((e.speechStart || []).join(', ') || '—')],
+      ['Речь по методике', e.ft ? ftCell(e, 'method') : (e.voice != null ? 'Оценка: ' + fmtNum(e.voice) : '—')],
+      ['Голос', e.ft ? ftCell(e, 'voice') : '—'],
+      ['Волнение', fmtNum(e.anxiety) + (e.anxietyNote ? ' — ' + e.anxietyNote : '')],
+      ['Что было трудно', ftHardText(e)],
+    ];
+    if(e.ritualNote) fields.push(['Заметка к ритуалу', e.ritualNote]);
+    const details = e.ft ? ftDetailsText(e.title, e.ft.d) : '';
+    const titleText = (i+1) + '. ' + (e.title || 'Без названия');
+    const lh = 33, labelH = 28, gapF = 10, pad = 18;
+    ctx.font = '23px ' + REPORT_FONT;
+    const detLines = details ? wrapLines(ctx, details, valueW) : [];
+    const wrapped = fields.map(([lbl,val])=> wrapLines(ctx, String(val), valueW));
+    let cardH = pad + 26 + 14 + (detLines.length ? detLines.length*30 + 6 : 0) + 8;
+    wrapped.forEach(w=>{ cardH += 26 + w.length*lh; });
+    cardH += 14;
+
+    if(y + cardH > H - 70){
+      pageBottoms.push(y);
+      ({ ctx, y } = newReportPage(pages, W, H));
+      y = M + 24;
+    }
+    ctx.fillStyle = idx % 2 === 1 ? RC.stripe : RC.bg;
+    ctx.fillRect(left, y, right - left, cardH);
+    ctx.fillStyle = RC.accent; ctx.fillRect(left, y, 4, cardH);
+
+    let ty = y + pad + 26;
+    ctx.fillStyle = RC.accent; ctx.font = 'bold 28px ' + REPORT_FONT;
+    ctx.fillText(titleText, textX, ty); ty += 14;
+    if(detLines.length){
+      ctx.fillStyle = RC.muted; ctx.font = 'italic 21px ' + REPORT_FONT;
+      detLines.forEach(l=>{ ty += 30; ctx.fillText(l, textX, ty); });
+      ty += 6;
+    }
+    ty += 8;
+    fields.forEach(([lbl],fi)=>{
+      ty += labelH - 6;
+      ctx.fillStyle = RC.accent; ctx.font = 'bold 18px ' + REPORT_FONT;
+      ctx.fillText(lbl.toUpperCase(), textX, ty);
+      ctx.fillStyle = RC.text; ctx.font = '23px ' + REPORT_FONT;
+      wrapped[fi].forEach((l,li)=>{ ty += (li === 0 ? 30 : lh); ctx.fillText(l, textX, ty); });
+      ty += gapF - 3;
+    });
+    y += cardH + 12;
+    idx++;
+  });
+  pageBottoms.push(y);
+  const last = pages[pages.length-1], h = Math.min(Math.ceil(y + 30), last.height);
+  const c = document.createElement('canvas'); c.width = last.width; c.height = h;
+  const cx = c.getContext('2d'); cx.fillStyle = RC.bg; cx.fillRect(0,0,c.width,h); cx.drawImage(last,0,0);
+  pages[pages.length-1] = c; pageBottoms[pageBottoms.length-1] = h;
+  return { pages, pageBottoms, filename: 'Таблица осознанности ' + ruFileDate(dateStr) + ' (телефон).pdf' };
 }
 
 /* ---- Journal: one question-and-answer card per field, portrait, one day ----
@@ -3708,6 +3870,38 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   });
 }
+
+/* ---- "New version available" notice. An installed app can stay open in the
+   background for days and keep running old code, so we compare the version
+   the page was opened with against the current one on the server whenever the
+   app comes back to the foreground (and every 30 minutes). Nothing reloads by
+   itself — the person taps «Обновить», so a half-filled form is never lost. */
+let shellVersion = null, updateShown = false;
+async function fetchShellVersion(){
+  try{
+    const res = await fetch('sw.js?v=' + Date.now(), { cache: 'no-store' });
+    if(!res.ok) return null;
+    const m = (await res.text()).match(/CACHE_NAME\s*=\s*'([^']+)'/);
+    return m ? m[1] : null;
+  }catch(e){ return null; }
+}
+async function checkForUpdate(){
+  if(updateShown) return;
+  const v = await fetchShellVersion();
+  if(!v) return;
+  if(shellVersion === null){ shellVersion = v; return; }
+  if(v !== shellVersion){
+    updateShown = true;
+    const bar = document.createElement('div');
+    bar.className = 'update-bar';
+    bar.innerHTML = '<span>Доступна новая версия приложения</span><button type="button">Обновить</button>';
+    bar.querySelector('button').addEventListener('click', ()=> location.reload());
+    document.body.appendChild(bar);
+  }
+}
+window.addEventListener('load', ()=>{ checkForUpdate(); });
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkForUpdate(); });
+setInterval(checkForUpdate, 30 * 60 * 1000);
 </script>
 </body>
 </html>

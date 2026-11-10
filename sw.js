@@ -4,8 +4,8 @@
    calls (Supabase) always go straight to the network — never cached. Bump
    CACHE_NAME whenever the shell itself changes, so clients pick up the
    new version instead of being stuck on a stale cached copy. */
-const CACHE_NAME = 'arlilia-shell-v78';
-const SHELL_FILES = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
+const CACHE_NAME = 'arlilia-shell-v80';
+const SHELL_FILES = ['/', '/manifest.json', '/arlilia-192.png', '/arlilia-512.png', '/arlilia-64.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -32,6 +32,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   const isShellOrLib = url.origin === location.origin || url.hostname === 'cdnjs.cloudflare.com';
   if (!isShellOrLib) return; // Supabase (data + auth) always goes straight to the network
+  if (url.pathname === '/sw.js') return; // version check always hits the network
 
   // The app's HTML (the page itself, '/') changes often while this app is
   // actively being worked on — network-first so a reload always shows the
