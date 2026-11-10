@@ -2158,7 +2158,7 @@ function renderJournalWizardStep(){
     }).join('')}
     ${selId === 'other' ? `<input type="text" id="jw-text-${q.id}Custom" value="${esc(customVal)}" placeholder="Напишите свой вариант" style="margin-top:10px;">` : ''}
     </div>`;
-    if(q.describe && selId !== 'other' && (q.describe === true || q.describe.includes(selId))){
+    if(q.describe && selId !== 'other' && (q.describe === true || !selId || q.describe.includes(selId))){
       const dKey = q.id + 'Note';
       const dVal = state.journalDraft[dKey] || '';
       const dOpen = (state.journalNoteOpen && state.journalNoteOpen[q.id]) || !!dVal;
@@ -2646,7 +2646,7 @@ function attachHandlers(){
       // past it before the person has had a chance to type anything.
       if(val === 'other') return;
       const jq = JOURNAL_STEPS.find(x=>x.id===id);
-      if(jq && jq.describe && (jq.describe === true || jq.describe.includes(val)) && ((state.journalNoteOpen && state.journalNoteOpen[id]) || state.journalDraft[id + 'Note'])) return;
+      if(jq && jq.describe && (jq.describe === true || jq.describe.includes(val))) return; // описание можно добавить — не перескакиваем, человек нажмёт «Далее»
       const targetIndex = state.journalStepIndex;
       setTimeout(()=>{
         if(state.journalStepIndex === targetIndex && state.journalStepIndex < JOURNAL_STEPS.length - 1){
