@@ -147,9 +147,11 @@
   }
   .tab-btn{ min-width:0; padding-left:2px; padding-right:2px; }
   .tab-btn span{ white-space:nowrap; }
-  @media (max-width: 370px){ .tab-btn{ font-size:10.5px; } .tab-btn .ic{ font-size:18px; } }
-  .tab-btn .ic{ font-size:19px; }
-  .tab-btn.active{ color: var(--accent); }
+  @media (max-width: 370px){ .tab-btn{ font-size:10.5px; } .tab-btn .ic{ width:38px; } }
+  .tab-btn .ic{ display:flex; align-items:center; justify-content:center; width:46px; height:28px; border-radius:14px; transition: background .2s ease; }
+  .tab-btn .ic svg{ width:22px; height:22px; display:block; }
+  .tab-btn.active{ color: var(--accent); font-weight:600; }
+  .tab-btn.active .ic{ background: var(--accent-soft); }
 
   /* ---- Home / Practice tab ---- */
   .home-hero{ margin-top: 4px; margin-bottom: 28px; }
@@ -240,14 +242,16 @@
   .flag-dot{ width:8px; height:8px; border-radius:50%; }
   .flag-good{ background: var(--good); }
   .flag-off{ background: var(--border); }
-  .empty{ text-align:center; color: var(--text-muted); padding: 40px 10px; font-size:16px; }
+  .empty{ text-align:center; color: var(--text-muted); padding: 32px 10px; font-size:16px; line-height:1.45; }
+  .empty-art{ display:flex; justify-content:center; margin-bottom:12px; opacity:.95; }
+  .trend-empty .empty-art{ margin-bottom:8px; }
 
   .read-hero{ text-align:center; margin: 14px 0 34px; }
   .read-hero-emoji{ font-size:64px; line-height:1; margin-bottom:12px; }
   .read-hero-mood{ font-family: var(--serif); font-size:26px; }
   .read-row{ display:flex; gap:16px; padding:19px 2px; border-bottom:1px solid var(--border); align-items:flex-start; }
   .read-row:last-child{ border-bottom:none; }
-  .read-icon{ font-size:30px; line-height:1.4; width:36px; text-align:center; flex-shrink:0; }
+  .read-icon{ font-size:22px; line-height:1; width:42px; height:42px; display:flex; align-items:center; justify-content:center; background: var(--accent-soft); border-radius:12px; flex-shrink:0; }
   .read-label{ font-size:14px; color: var(--text-muted); margin-bottom:5px; font-weight:600; }
   .read-text{ font-size:18px; line-height:1.6; }
   .read-big{ font-family: var(--serif); font-size:30px; }
@@ -275,7 +279,7 @@
     background: var(--accent-soft); border:1px solid var(--accent);
     border-radius: var(--radius-sm); padding:14px 16px; margin-bottom:18px;
   }
-  .hint-card-icon{ font-size:22px; flex:none; }
+  .hint-card-icon{ font-size:20px; line-height:1; width:40px; height:40px; display:flex; align-items:center; justify-content:center; background: var(--surface); border-radius:12px; flex:none; }
   .hint-card-text{ flex:1; font-size:14px; line-height:1.4; color: var(--text); }
   .hint-card-btn{
     flex:none; background: var(--accent); color: var(--accent-text);
@@ -349,7 +353,7 @@
     background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
     padding:18px; font-family: var(--sans); color: var(--text); cursor:pointer;
   }
-  .exercise-cat-icon{ font-size:28px; flex-shrink:0; width:40px; text-align:center; }
+  .exercise-cat-icon{ font-size:24px; line-height:1; flex-shrink:0; width:46px; height:46px; display:flex; align-items:center; justify-content:center; background: var(--accent-soft); border-radius:13px; }
   .exercise-cat-body{ flex:1; min-width:0; }
   .exercise-cat-label{ font-family: var(--serif); font-size:19px; }
   .exercise-cat-sub{ font-size:13px; color: var(--text-muted); margin-top:3px; }
@@ -1752,13 +1756,38 @@ function renderLogin(){
   `;
 }
 
+/* ---- Иконки вкладок (одинаковые на iPhone и Android) и картинки для пустых экранов ---- */
+const SVG_OPEN = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+const TAB_ICONS = {
+  practice:  SVG_OPEN + '<path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M8 10h8M8 13h5"/></svg>',
+  journal:   SVG_OPEN + '<path d="M12 6.5C10.3 5.2 8 4.7 4.5 4.7v13c3.5 0 5.8.5 7.5 1.8 1.7-1.3 4-1.8 7.5-1.8v-13c-3.5 0-5.8.5-7.5 1.8z"/><path d="M12 6.5v13"/></svg>',
+  exercises: SVG_OPEN + '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 11l1.6 1.6L13 9.7M8.5 17h7"/></svg>',
+  reference: SVG_OPEN + '<path d="M5 4h10a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M17 8h2v12h-2M9 8h4M9 11.5h4"/></svg>',
+  progress:  SVG_OPEN + '<path d="M4 4v16h16"/><path d="M7.5 15l3.5-4 3 2.5L19 7.5"/><path d="M15.5 7.5H19V11"/></svg>',
+};
+const EMPTY_ART = {
+  journal:  '<svg viewBox="0 0 96 80" width="96" height="80" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="22" y="10" width="52" height="62" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><path d="M32 10v62" stroke="var(--accent)"/><path d="M42 26h22M42 36h22M42 46h14" stroke="var(--text-muted)"/><path d="M70 52l8-8 6 6-8 8-8 2z" fill="var(--surface)" stroke="var(--accent)"/></svg>',
+  attempts: '<svg viewBox="0 0 96 80" width="96" height="80" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 14h46a6 6 0 0 1 6 6v22a6 6 0 0 1-6 6H44l-12 10V48h-14a6 6 0 0 1-6-6V20a6 6 0 0 1 6-6z" fill="var(--accent-soft)" stroke="var(--accent)"/><path d="M26 28h30M26 36h18" stroke="var(--text-muted)"/><circle cx="78" cy="58" r="7" stroke="var(--accent)"/><path d="M78 54v4l3 2" stroke="var(--accent)"/></svg>',
+  chart:    '<svg viewBox="0 0 96 80" width="96" height="80" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 12v56h68" stroke="var(--text-muted)"/><rect x="26" y="42" width="10" height="26" rx="2" fill="var(--accent-soft)" stroke="var(--accent)"/><rect x="44" y="30" width="10" height="38" rx="2" fill="var(--accent-soft)" stroke="var(--accent)"/><rect x="62" y="20" width="10" height="48" rx="2" fill="var(--accent-soft)" stroke="var(--accent)"/></svg>',
+  list:     '<svg viewBox="0 0 96 80" width="96" height="80" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="24" y="8" width="48" height="64" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/><path d="M34 26l4 4 7-8M52 26h12M34 44l4 4 7-8M52 44h12" stroke="var(--accent)"/><path d="M34 62h30" stroke="var(--text-muted)"/></svg>',
+};
+function emptyState(kind, html){
+  return `<div class="empty"><div class="empty-art">${EMPTY_ART[kind] || ''}</div><div>${html}</div></div>`;
+}
+// Короткая вибрация при нажатии (работает на Android; iPhone веб-приложениям вибрацию не отдаёт).
+function haptic(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms || 8); }catch(e){} }
+document.addEventListener('click', (e)=>{
+  const t = e.target && e.target.closest ? e.target.closest('.choice-btn, .choice-list-btn, .tab-btn, .segment-btn, .period-btn, .bool-chip, .btn-primary, .goal-add, .attempt-mini') : null;
+  if(t) haptic(t.classList.contains('btn-primary') ? 14 : 8);
+}, true);
+
 function renderTabbar(){
   const tabs = [
-    {id:'practice', ic:'🚶', label:'Подходы'},
-    {id:'journal', ic:'📓', label:'Дневник'},
-    {id:'exercises', ic:'📋', label:'Упражнения'},
-    {id:'reference', ic:'📚', label:'Справочник'},
-    {id:'progress', ic:'📈', label:'Прогресс'},
+    {id:'practice', ic:TAB_ICONS.practice, label:'Подходы'},
+    {id:'journal', ic:TAB_ICONS.journal, label:'Дневник'},
+    {id:'exercises', ic:TAB_ICONS.exercises, label:'Упражнения'},
+    {id:'reference', ic:TAB_ICONS.reference, label:'Справочник'},
+    {id:'progress', ic:TAB_ICONS.progress, label:'Прогресс'},
   ];
   return `<div class="tabbar">
     ${tabs.map(t=>`
@@ -2011,7 +2040,7 @@ function renderExerciseCategory(catId){
           ${open ? `<div class="exercise-detail">${cat.intro.map(b=>`<p class="exercise-p">${b.title ? `<strong>${b.title}.</strong> ` : ''}${b.text}</p>`).join('')}</div>` : ''}
         </div>`;
       })() : ''}
-      ${cat.items.length ? '' : '<div class="empty">Упражнения скоро появятся</div>'}
+      ${cat.items.length ? '' : emptyState('list','Упражнения скоро появятся')}
       ${cat.items.map((it,ii)=>{
         const open = !!state.exerciseExpanded[it.id];
         const groupHead = it.group && (ii === 0 || cat.items[ii-1].group !== it.group) ? `<div class="exercise-group">${it.group}</div>` : '';
@@ -2085,7 +2114,7 @@ function renderJournalHistory(){
         <div style="color:var(--text-muted); font-size:18px;">›</div>
       </div>
   `;
-  }).join('') : `<div class="empty">Прошлых записей пока нет</div>`;
+  }).join('') : emptyState('journal','Прошлых записей пока нет');
 
   return `
     <div class="top-bar">
@@ -2146,7 +2175,7 @@ function renderJournalRead(entry){
         <div class="read-hero-emoji">🌇</div>
         <div class="read-hero-mood">${moodIcon} ${esc(moodVal)}</div>
       </div>
-      ${rowsHtml || '<div class="empty">Запись пуста</div>'}
+      ${rowsHtml || emptyState('journal','Запись пуста')}
     </div>
   `;
 }
@@ -2283,7 +2312,7 @@ function renderJournalWizardStep(){
 function renderDayAttempts(){
   const dateStr = state.reportDate || todayKey();
   const list = attemptsOnDate(dateStr);
-  if(!list.length) return `<div class="autosave-hint" style="margin:0;">За этот день подходов нет</div>`;
+  if(!list.length) return emptyState('attempts','За этот день подходов нет');
   return `<div class="attempt-list">
     ${list.map((a,i)=>{
       const time = new Date(a.ts).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
@@ -2406,7 +2435,7 @@ function renderCalendar(monthDate){
 function renderTrendChart(monthDate){
   const points = buildMonthTrend(monthDate);
   if(points.length <= 1){
-    return `<div class="trend-empty">В этом месяце пока нет данных для графика</div>`;
+    return `<div class="trend-empty"><div class="empty-art">${EMPTY_ART.chart}</div>В этом месяце пока нет данных для графика</div>`;
   }
   const W = 600, H = 150, padX = 10, padY = 18;
   const maxAbs = Math.max(2, ...points.map(p=>Math.abs(p.val)));
