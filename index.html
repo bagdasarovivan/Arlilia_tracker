@@ -1556,22 +1556,35 @@ function allTimeFullDaysCount(){
   return n;
 }
 
-/* ---------- current streak (consecutive complete days, i.e. a day with
-   both an attempt and a journal entry) and milestone levels — a day still
-   in progress (today) doesn't break the streak, only a day that's fully
-   over and was missed does. ---------- */
+/* ---------- current streak: a running score. Every fully completed day
+   (enough attempts + a journal entry) adds 1, every fully missed day takes 1
+   away (never below 0). Today is still in progress, so it only adds when it
+   is already complete — it never takes anything away. Counting starts at the
+   chosen start date (or the first recorded day). ---------- */
 function currentStreak(){
   const counts = allTimeAttemptCounts();
   const journalSet = allTimeJournalDayKeys();
   const isComplete = (key)=> dayIsComplete(key, counts[key]||0, journalSet.has(key));
-  let streak = 0;
-  const cur = new Date(); cur.setHours(0,0,0,0);
-  if(!isComplete(dateKey(cur.getTime()))) cur.setDate(cur.getDate() - 1);
-  while(isComplete(dateKey(cur.getTime()))){
-    streak++;
-    cur.setDate(cur.getDate() - 1);
+  const today = new Date(); today.setHours(0,0,0,0);
+  let start = null;
+  if(state.settings.startDate){
+    start = new Date(state.settings.startDate + 'T00:00:00');
+  } else {
+    const keys = [...Object.keys(counts), ...journalSet].sort();
+    if(!keys.length) return 0;
+    start = new Date(keys[0] + 'T00:00:00');
   }
-  return streak;
+  start.setHours(0,0,0,0);
+  let score = 0;
+  const cur = new Date(start);
+  while(cur <= today){
+    const k = dateKey(cur.getTime());
+    const isToday = cur.getTime() === today.getTime();
+    if(isComplete(k)) score++;
+    else if(!isToday) score = Math.max(0, score - 1);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return score;
 }
 const STREAK_MILESTONES = [3, 7, 14, 21, 30, 45, 60, 90, 120, 180, 365];
 function nextStreakMilestone(streak){
@@ -1717,7 +1730,7 @@ function renderStreakInfo(){
       <div class="modal-card">
         <div class="modal-title">🔥 Серия дней</div>
         <div class="modal-text">День засчитывается, когда за него записано минимум 3 подхода и заполнен дневник. ${(()=>{ const k=todayKey(), c=todayAttemptsCount(); return c>=minAttemptsForKey(k) ? 'Сегодня норма по подходам выполнена ✓.' : 'Сегодня записано ' + c + ' из ' + minAttemptsForKey(k) + '.'; })()}</div>
-        <div class="modal-text" style="margin-top:10px;">🔥 Серия — это дни подряд, когда выполнены оба задания. Если полностью пропустить день, серия сбрасывается.</div>
+        <div class="modal-text" style="margin-top:10px;">🔥 Серия растёт на 1 за каждый выполненный день (3 подхода и дневник). За каждый пропущенный день она уменьшается на 1, но не ниже нуля.</div>
         <button class="btn btn-primary" data-action="close-streak-info" style="margin-top:18px;">Понятно</button>
       </div>
     </div>
@@ -2112,7 +2125,7 @@ function renderJournalHome(){
       <div class="eyebrow">Дневник дня</div>
       ${days ? `<div style="font-family:var(--serif); font-size:28px; color:var(--accent); margin:4px 0 2px;">День ${days}</div>` : ''}
       ${consciousDays ? `<div style="font-size:13px; color:var(--text-muted); margin:0 0 4px;">Дней осознанных занятий: ${consciousDays}</div>` : ''}
-      ${streak ? `<div style="font-size:13px; color:var(--text-muted); margin:0 0 10px;">🔥 Серия: ${streak} ${ruDays(streak)} подряд</div>` : ''}
+      ${streak ? `<div style="font-size:13px; color:var(--text-muted); margin:0 0 10px;">🔥 Серия: ${streak} ${ruDays(streak)}</div>` : ''}
       <h1>${todayEntry ? 'Сегодняшняя запись уже есть' : 'Как прошёл день?'}</h1>
     </div>
     ${!state.settings.startDate ? `
