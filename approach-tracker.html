@@ -180,6 +180,7 @@
     .remind-card{ display:flex; align-items:center; gap:12px; background: var(--accent-soft); border:1px solid var(--border); border-radius:14px; padding:12px 14px; margin:0 0 16px; }
   .remind-card .remind-text{ flex:1; font-size:14px; line-height:1.4; }
   .remind-card .btn{ padding:9px 14px; font-size:14px; flex:none; width:auto; }
+  .pw-form{ display:flex; flex-direction:column; gap:10px; margin-bottom:12px; }
   .view-switch{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; align-items:center; font-size:13px; color: var(--text-muted); }
   .view-switch .attempt-mini{ flex:none; }
   .update-bar{ position:fixed; left:12px; right:12px; top:calc(env(safe-area-inset-top, 0px) + 10px); z-index:9998; display:flex; align-items:center; gap:10px; background:#1f6f68; color:#fff; border-radius:14px; padding:11px 14px; box-shadow:0 8px 24px -8px rgba(0,0,0,.4); font-size:14px; }
@@ -884,6 +885,7 @@ let state = {
   exerciseExpanded: {},       // { [exerciseId]: true } — which rows are expanded
 
   progressMonth: (function(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })(),
+  pwOpen: false, pwBusy: false,
   reportView: (lsGet('arlilia_report_view','table') === 'cards') ? 'cards' : 'table', // attempts report layout
   reportDate: todayKey(), // which single day the PDF/copy exports cover
   lastTab: 'practice', // which bottom-nav tab to return to when leaving Настройки
@@ -1900,14 +1902,14 @@ function renderPracticeHome(){
       ? `<span style="color:${tier.c}">Рекорд дня</span> · всего ${todayCount}`
       : `<span style="color:${tier.c}">${tier.name}</span>${ti === 1 || ti === 5 ? ' ✓' : ''} · до «${nextTier.name}» ещё ${nextTier.at - todayCount}`;
   const numColor = todayCount >= need ? tier.c : 'var(--accent)';
-  const hour = new Date().getHours();
-  const needJournal = hour >= 19 && !findTodayJournal();
+  const remind = getRemind();
+  const needJournal = remind.on && new Date().getHours() >= remind.hour && !findTodayJournal();
   const last = lastRepeatableAttempt();
   return `
     <div class="home-hero">
       <div class="eyebrow">Подходы</div>
     </div>
-    ${needJournal ? `<div class="remind-card"><span class="remind-text">📓 Вечер — самое время заполнить дневник за сегодня</span><button class="btn btn-primary" data-tab="journal">Заполнить</button></div>` : ''}
+    ${needJournal ? `<div class="remind-card"><span class="remind-text">📓 Не забудьте заполнить дневник за сегодня</span><button class="btn btn-primary" data-tab="journal">Заполнить</button></div>` : ''}
     <div class="today-badge-wrap has-ring">
       <div class="ring-wrap">
         <svg viewBox="0 0 206 206" aria-hidden="true">${arcs}</svg>
@@ -2590,7 +2592,53 @@ function renderTrendChart(monthDate){
 }
 
 /* ---------- Settings tab ---------- */
+function getRemind(){
+  const v = lsGet('arlilia_remind', null) || {};
+  const hour = Number.isInteger(v.hour) && v.hour >= 0 && v.hour <= 23 ? v.hour : 19;
+  return { on: v.on !== false, hour };
+}
+function appVersionLabel(){
+  const m = String(shellVersion || '').match(/v(\d+)/);
+  return m ? m[1] : '—';
+}
+async function changePassword(){
+  const msg = (t, ok)=>{ const el = document.getElementById('pw-msg'); if(el){ el.textContent = t; el.style.color = ok ? 'var(--accent)' : 'var(--warn)'; } };
+  const cur = (document.getElementById('pw-current')||{}).value || '';
+  const n1 = (document.getElementById('pw-new')||{}).value || '';
+  const n2 = (document.getElementById('pw-new2')||{}).value || '';
+  if(!cur || !n1 || !n2){ msg('Заполните все три поля'); return; }
+  if(n1.length < 6){ msg('Новый пароль должен быть не короче 6 символов'); return; }
+  if(n1 !== n2){ msg('Новые пароли не совпадают'); return; }
+  if(n1 === cur){ msg('Новый пароль совпадает с текущим'); return; }
+  if(state.pwBusy) return;
+  state.pwBusy = true; msg('Проверяем…', true);
+  try{
+    // Confirm the current password first (also gives a fresh session for the change).
+    const chk = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method:'POST', headers:{ 'apikey': SUPABASE_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify({ email: auth.email, password: cur }),
+    });
+    if(!chk.ok){ msg(chk.status === 400 ? 'Текущий пароль неверный' : 'Не удалось проверить пароль: ' + chk.status); return; }
+    setSession(await chk.json());
+    const res = await sbFetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ password: n1 }),
+    });
+    if(!res.ok){
+      let data = null; try{ data = await res.json(); }catch(e){}
+      msg(translateAuthError(data, 'Не удалось сменить пароль: ' + res.status));
+      return;
+    }
+    state.pwOpen = false;
+    showToast('Пароль изменён');
+    render();
+  }catch(e){
+    msg('Нет соединения — пароль не изменён');
+  }finally{
+    state.pwBusy = false;
+  }
+}
 function renderSettings(){
+  const remind = getRemind();
   const days = daysSinceStart();
   const consciousDays = allTimeFullDaysCount();
   return `
@@ -2621,7 +2669,41 @@ function renderSettings(){
     <div class="card" style="margin-bottom:16px;">
       <div class="jc-title">Аккаунт</div>
       <div class="autosave-hint" style="margin:0 0 14px;">${esc(auth.email)}</div>
+      ${state.pwOpen ? `
+        <div class="pw-form">
+          <input type="password" id="pw-current" placeholder="Текущий пароль" autocomplete="current-password">
+          <input type="password" id="pw-new" placeholder="Новый пароль (минимум 6 символов)" autocomplete="new-password">
+          <input type="password" id="pw-new2" placeholder="Новый пароль ещё раз" autocomplete="new-password">
+          <div id="pw-msg" class="autosave-hint" style="margin:0; color: var(--warn); min-height:18px;"></div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn btn-ghost" style="flex:1;" data-action="toggle-pw-form">Отмена</button>
+            <button class="btn btn-primary" style="flex:1;" data-action="save-password">Сохранить</button>
+          </div>
+        </div>
+      ` : `
+        <button class="btn btn-ghost" style="margin-bottom:10px;" data-action="toggle-pw-form">Сменить пароль</button>
+      `}
       <button class="btn btn-ghost" data-action="logout">Выйти</button>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="jc-title">Напоминание про дневник</div>
+      <div class="autosave-hint" style="margin:0 0 12px;">Карточка на главном экране, если вечером дневник за сегодня ещё не заполнен. Работает, пока приложение открыто.</div>
+      <div class="choice-row" style="margin-bottom:12px;">
+        <button class="choice-btn ${remind.on?'selected':''}" style="min-width:0; padding-left:6px; padding-right:6px;" data-action="remind-on">Включено</button>
+        <button class="choice-btn ${!remind.on?'selected':''}" style="min-width:0; padding-left:6px; padding-right:6px;" data-action="remind-off">Выключено</button>
+      </div>
+      ${remind.on ? `
+        <div class="autosave-hint" style="margin:0 0 8px;">Напоминать с:</div>
+        <div class="choice-row" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px;">${[17,18,19,20,21,22].map(h=>`<button class="choice-btn ${remind.hour===h?'selected':''}" data-action="remind-hour" data-hour="${h}">${h}:00</button>`).join('')}</div>
+      ` : ''}
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="jc-title">О приложении</div>
+      <div class="autosave-hint" style="margin:0 0 8px;"><b>Как засчитывается день.</b> Нужно минимум 3 подхода и заполненный дневник. Серия растёт на 1 за каждый такой день и уменьшается на 1 за каждый пропущенный (не ниже нуля).</div>
+      <div class="autosave-hint" style="margin:0 0 8px;"><b>Сколько хранятся записи.</b> Подробности подходов 14 дней, дневника 30 дней. Потом остаются только отметки и число подходов, поэтому календарь и серия не пропадают.</div>
+      <div class="autosave-hint" style="margin:0;">Версия: ${esc(appVersionLabel())}</div>
     </div>
 
     <div class="card" style="margin-bottom:16px; border-color: var(--warn);">
@@ -3231,6 +3313,16 @@ async function onAction(e){
     render();
     return;
 
+  } else if(action === 'toggle-pw-form'){
+    state.pwOpen = !state.pwOpen;
+  } else if(action === 'save-password'){
+    changePassword(); return;
+  } else if(action === 'remind-on'){
+    lsSet('arlilia_remind', { on: true, hour: getRemind().hour });
+  } else if(action === 'remind-off'){
+    lsSet('arlilia_remind', { on: false, hour: getRemind().hour });
+  } else if(action === 'remind-hour'){
+    lsSet('arlilia_remind', { on: true, hour: parseInt(e.currentTarget.getAttribute('data-hour'), 10) || 19 });
   } else if(action === 'set-report-view'){
     state.reportView = e.currentTarget.getAttribute('data-view') === 'cards' ? 'cards' : 'table';
     lsSet('arlilia_report_view', state.reportView);
