@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>LOG</title>
+<title>Arlilia</title>
 <meta name="theme-color" content="#1A1D23">
 <meta name="description" content="Дневник речевых подходов и самонаблюдений">
 <link rel="manifest" href="manifest.json">
@@ -1704,7 +1704,7 @@ function renderAppBar(){
             <rect x="2" y="19.3" width="28" height="4.6" rx="2.3" fill="#2F6FED" transform="rotate(-26 16 16)"/>
           </svg>
         </span>
-        <span class="brand-text">LOG</span>
+        <span class="brand-text">Arlilia</span>
       </div>
       <div class="app-bar-right">
         ${streak ? `<button class="streak-pill" data-action="toggle-streak-info">🔥 ${streak}</button>` : ''}
@@ -1739,7 +1739,7 @@ function renderOnboarding(){
       <div class="modal-backdrop" data-action="onboarding-skip">
         <div class="modal-card" style="text-align:center;">
           <div style="font-size:34px; margin-bottom:6px;">👋</div>
-          <div class="modal-title">Добро пожаловать в LOG</div>
+          <div class="modal-title">Добро пожаловать в Arlilia</div>
           <div class="modal-text">Прежде чем начать — укажите дату начала занятий. Тогда дневник будет считать дни по порядку и показывать пропущенные.</div>
           <div style="display:flex; gap:10px; margin-top:20px;">
             <button class="btn btn-ghost" style="flex:1;" data-action="onboarding-skip">Пропустить</button>
@@ -1771,7 +1771,7 @@ function renderLogin(){
   return `
     <div style="padding:14vh 20px 24px; max-width:360px; margin:0 auto;">
       <div class="eyebrow" style="text-align:center;">${isSignup ? 'Регистрация' : 'Вход'}</div>
-      <h1 style="text-align:center; margin-bottom:34px;">LOG</h1>
+      <h1 style="text-align:center; margin-bottom:34px;">Arlilia</h1>
       <div class="choice-row" style="margin-bottom:22px;">
         <button class="choice-btn ${!isSignup?'selected':''}" data-action="auth-mode-login">Вход</button>
         <button class="choice-btn ${isSignup?'selected':''}" data-action="auth-mode-signup">Регистрация</button>
