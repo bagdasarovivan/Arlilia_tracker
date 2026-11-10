@@ -298,7 +298,13 @@
   .trend-svg{ width:100%; height:120px; display:block; }
   .trend-legend{ display:flex; justify-content:space-between; font-size:12px; color: var(--text-muted); margin-top:6px; flex-wrap:wrap; gap:8px; }
   .trend-empty{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); padding:24px 12px; margin-top:16px; text-align:center; color: var(--text-muted); font-size:13px; }
-  .report-actions{ margin-top:20px; display:flex; flex-direction:column; gap:10px; }
+  .report-actions{ margin-top:4px; display:flex; flex-direction:column; gap:14px; }
+  .report-card{ background: var(--surface); border:1px solid var(--border); border-radius: var(--radius); padding:14px 14px 14px 16px; }
+  .report-card-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; min-height:32px; }
+  .report-card-title{ font-family: var(--serif); font-size:19px; }
+  .report-btns{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .report-btns .btn{ width:100%; padding:14px 8px; font-size:16px; white-space:nowrap; min-width:0; }
+  .attempt-mini.active{ background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
   .attempt-list{ border:1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
   .attempt-row{ padding:6px 10px; border-bottom:1px solid var(--border); }
   .attempt-row:last-child{ border-bottom:none; }
@@ -307,10 +313,6 @@
   .attempt-row-title{ flex:1; min-width:0; font-size:14px; overflow-wrap:anywhere; }
   .attempt-mini{ flex:none; background:none; border:1px solid var(--border); border-radius:8px; padding:5px 9px; font-size:13px; color: var(--text); cursor:pointer; font-family:inherit; }
   .attempt-mini.danger{ color: var(--warn); border-color: var(--warn); }
-  @media (max-width:370px){ .report-row.nowrap .btn{ font-size:14px; white-space:nowrap; } .report-row.nowrap .btn-ghost{ padding-left:8px !important; padding-right:8px !important; } }
-  .report-row{ display:flex; gap:8px; align-items:stretch; flex-wrap:wrap; }
-  .report-row .btn-primary{ flex:1 1 140px; }
-  .report-row .btn-ghost{ width:auto; flex:0 0 auto; padding-left:14px; padding-right:14px; white-space:nowrap; }
   .delta-flat{ color: var(--text-muted); }
   .chart-card{ margin-bottom: 20px; }
   .chart-card h3{ font-size:15px; margin-bottom: 10px; color: var(--text-muted); font-family: var(--sans); }
@@ -2303,7 +2305,7 @@ function renderJournalWizardStep(){
 function renderDayAttempts(){
   const dateStr = state.reportDate || todayKey();
   const list = attemptsOnDate(dateStr);
-  if(!list.length) return emptyState('attempts','За этот день подходов нет');
+  if(!list.length) return `<div class="autosave-hint" style="margin:0; text-align:center;">За этот день подходов нет</div>`;
   return `<div class="attempt-list">
     ${list.map((a,i)=>{
       const time = new Date(a.ts).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
@@ -2358,15 +2360,25 @@ function renderProgress(){
       <input type="date" id="report-date" value="${state.reportDate || todayKey()}">
     </div>
     <div class="report-actions">
-      <div class="report-row nowrap" style="flex-wrap:nowrap;">
-        <button class="btn btn-primary" style="flex:1 1 0; min-width:0; padding-left:8px; padding-right:8px;" data-action="export-attempts-pdf">PDF подходов</button>
-        <button class="btn btn-ghost" data-action="copy-attempts-image" title="Скопировать картинкой">📋 Копировать</button>
-        <button class="btn btn-ghost${state.editListOpen?' active':''}" data-action="toggle-edit-list" title="Изменить или удалить подходы" aria-label="Изменить или удалить подходы" style="padding-left:12px;padding-right:12px;">✏️</button>
+      <div class="report-card">
+        <div class="report-card-head">
+          <span class="report-card-title">🚶 Подходы</span>
+          <button class="attempt-mini${state.editListOpen?' active':''}" data-action="toggle-edit-list" aria-label="Изменить или удалить подходы">✏️ Изменить</button>
+        </div>
+        <div class="report-btns">
+          <button class="btn btn-primary" data-action="export-attempts-pdf">Скачать PDF</button>
+          <button class="btn btn-ghost" data-action="copy-attempts-image" title="Скопировать картинкой">Копировать</button>
+        </div>
+        ${state.editListOpen ? `<div style="margin-top:12px;">${renderDayAttempts()}</div>` : ''}
       </div>
-      ${state.editListOpen ? renderDayAttempts() : ''}
-      <div class="report-row">
-        <button class="btn btn-primary" data-action="export-journal-pdf">PDF дневника</button>
-        <button class="btn btn-ghost" data-action="copy-journal-image" title="Скопировать картинкой">📋 Копировать</button>
+      <div class="report-card">
+        <div class="report-card-head">
+          <span class="report-card-title">📓 Дневник</span>
+        </div>
+        <div class="report-btns">
+          <button class="btn btn-primary" data-action="export-journal-pdf">Скачать PDF</button>
+          <button class="btn btn-ghost" data-action="copy-journal-image" title="Скопировать картинкой">Копировать</button>
+        </div>
       </div>
     </div>
   `;
