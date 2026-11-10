@@ -1308,7 +1308,7 @@ async function fetchAllRows(url){
   return { res, rows: all };
 }
 // Понятное сообщение: чаще всего причина — в базе ещё не выполнен SQL с новыми колонками.
-const APP_VERSION = 'v60';
+const APP_VERSION = 'v61';
 function saveErrorText(status, errText){
   const t = saveErrorText0(status, errText);
   state.lastSaveError = t + ' (код ' + status + ')';
@@ -2491,13 +2491,6 @@ function renderSettings(){
     <h2 style="font-size:24px; margin-bottom:18px;">Параметры</h2>
 
     <div class="card" style="margin-bottom:16px;">
-      <div class="jc-title">Проверка базы данных</div>
-      <div style="font-size:14px; color: var(--text-muted); margin:4px 0 12px;">Версия приложения: ${APP_VERSION}. Если ФТ или дневник не сохраняются, нажмите — приложение проверит, всё ли настроено.</div>
-      <button class="btn btn-ghost" data-action="check-db" ${state.dbCheckBusy ? 'disabled' : ''}>${state.dbCheckBusy ? 'Проверяем…' : 'Проверить базу'}</button>
-      ${state.dbCheck ? `<div class="db-check">${state.dbCheck}</div>` : ''}
-    </div>
-
-    <div class="card" style="margin-bottom:16px;">
       <div class="jc-title">Дата начала занятий</div>
       <div class="date-input-wrap">
         <input type="date" id="settings-start-date" value="${state.settings.startDate || ''}">
@@ -2943,24 +2936,6 @@ async function onAction(e){
     state.authMode = 'signup'; state.loginError = null; state.loginNotice = null; render(); return;
   } else if(action === 'logout'){
     logout(); return;
-  } else if(action === 'check-db'){
-    state.dbCheckBusy = true; state.dbCheck = ''; render();
-    const checks = [
-      ['Подходы (ФТ)', `attempts?select=ft&limit=1`],
-      ['Дневник', `journal_entries?select=lessons,ft_notes,sleep_quality&limit=1`],
-      ['Цель дня', `day_goals?select=goal_date&limit=1`],
-    ];
-    const lines = [];
-    let bad = 0;
-    for(const [name, q] of checks){
-      try{
-        const res = await sbFetch(`${SUPABASE_URL}/rest/v1/${q}`);
-        if(res.ok) lines.push(`<div class="good">✓ ${name}: готово</div>`);
-        else { bad++; const t = (await res.text()).slice(0, 120); lines.push(`<div class="bad">✗ ${name}: не готово (код ${res.status}) ${esc(t)}</div>`); }
-      }catch(e){ bad++; lines.push(`<div class="bad">✗ ${name}: нет связи с сервером</div>`); }
-    }
-    lines.push(bad ? '<div style="margin-top:8px;">Выполните SQL из инструкции в Supabase (SQL Editor) и проверьте ещё раз.</div>' : '<div style="margin-top:8px;">Всё настроено — сохранение должно работать.</div>');
-    state.dbCheckBusy = false; state.dbCheck = lines.join('');
   } else if(action === 'ask-reset-data'){
     state.confirmReset = true; render(); return;
   } else if(action === 'cancel-reset-data'){
