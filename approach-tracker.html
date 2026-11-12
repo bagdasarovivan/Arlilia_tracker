@@ -417,6 +417,27 @@
   .cal-arrow{ position:absolute; top:3px; right:4px; font-size:10px; line-height:1; }
   .cal-arrow.up{ color: var(--good); }
   .cal-arrow.down{ color: var(--warn); }
+  .pg-sec{ background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:16px 14px 18px; margin-top:18px; box-shadow:0 6px 18px rgba(30,56,56,.05); }
+  :root[data-theme="dark"] .pg-sec{ box-shadow:0 6px 18px rgba(0,0,0,.18); }
+  .pg-head{ display:flex; align-items:center; gap:10px; font-family:var(--serif); font-size:19px; margin:0 2px 14px; }
+  .pg-bar{ width:4px; height:20px; border-radius:3px; background:var(--accent); flex:none; }
+  .pg-sec .trend-wrap{ background:none; border:none; padding:0; margin-top:0; }
+  .pg-sec .report-card{ background:var(--surface-2); }
+  .pg-sec .cal-cell:not(.tier):not(.empty){ background:var(--surface-2); }
+  .cal-cell[data-action]{ cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .cal-cell.tier{ background: color-mix(in srgb, var(--tc) 20%, var(--surface)); border-color: color-mix(in srgb, var(--tc) 55%, var(--border)); }
+  .cal-cell.tier .cal-count{ color: var(--tc); }
+  .cal-cell.part{ border-style:dashed; border-color: color-mix(in srgb, var(--text-muted) 70%, var(--border)); }
+  .cal-cell.part .cal-count{ color: var(--text-muted); }
+  .cal-cell.future{ opacity:.55; }
+  .cal-emojis .ghost{ opacity:.28; filter:grayscale(1); }
+  .cal-dot{ position:absolute; bottom:6px; left:50%; width:4px; height:4px; margin-left:-2px; border-radius:50%; background:var(--text-muted); opacity:.45; }
+  .cal-star{ position:absolute; top:2px; left:4px; font-size:11px; line-height:1; color:#C9A24E; }
+  .cal-sw i{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:2px; }
+  .cal-day-card{ max-width:340px; }
+  .cal-day-row{ display:flex; justify-content:space-between; font-size:14.5px; padding:6px 0; border-top:1px solid var(--border); } .cal-day-row b{ font-weight:600; }
+  .cal-day-list{ font-size:13px; color:var(--text-muted); line-height:1.6; max-height:150px; overflow:auto; padding:4px 0 6px; } .cal-day-list span{ color:var(--accent); font-variant-numeric:tabular-nums; margin-right:6px; }
+  .cal-day-aw{ margin-top:8px; padding:10px 12px; border-radius:12px; background:rgba(201,162,78,.14); font-size:13.5px; } .cal-day-aw b{ display:block; color:#B88A2E; margin-bottom:2px; font-weight:600; } :root[data-theme="dark"] .cal-day-aw b{ color:#DDB964; }
   .cal-legend{ display:flex; flex-wrap:wrap; justify-content:center; gap:14px 18px; margin-top:14px; font-size:12px; color: var(--text-muted); align-items:center; text-align:center; width:100%; }
   .cal-legend span{ display:inline-flex; align-items:center; gap:5px; }
 
@@ -2107,6 +2128,7 @@ function renderAppBar(){
     ${(typeof navigator !== 'undefined' && navigator.onLine === false) ? '<div class="offline-strip">Нет сети — записи сохранятся на телефоне и отправятся позже</div>' : ''}
     ${state.streakInfoOpen ? renderStreakInfo() : ''}
     ${state.awardDetail ? renderAwardDetail() : ''}
+    ${state.calDay ? renderCalDay() : ''}
   `;
 }
 
@@ -2819,8 +2841,8 @@ function renderProgress(){
   const monthLabel = capitalize(monthDate.toLocaleDateString('ru-RU', {month:'long', year:'numeric'}));
 
   return `
-    <div class="eyebrow">Прогресс</div>
-    <h2 style="font-size:24px; margin-bottom:18px;">Календарь</h2>
+    <div class="eyebrow">Занятия</div>
+    <h2 style="font-size:24px; margin-bottom:18px;">Прогресс</h2>
 
     ${!state.settings.startDate ? `
     <div class="hint-card">
@@ -2834,17 +2856,23 @@ function renderProgress(){
       <div class="metric-tile good"><div class="num">${todayAttemptsCount()}</div><div class="lbl">подходов сегодня</div></div>
     </div>
 
-    <div class="period-row" style="align-items:center; margin-top:10px;">
+    <section class="pg-sec">
+    <div class="pg-head"><span class="pg-bar"></span>Календарь</div>
+    <div class="period-row" style="align-items:center; margin-top:2px;">
       <button class="segment-btn" data-action="progress-prev-month" style="flex:0 0 46px;">‹</button>
       <div style="flex:1; text-align:center; font-family:Georgia,serif; font-size:16px;">${monthLabel}</div>
       <button class="segment-btn" data-action="progress-next-month" style="flex:0 0 46px;">›</button>
     </div>
     ${renderCalendar(monthDate)}
+    </section>
 
-    <div class="jc-title" style="margin-top:22px;">Динамика месяца</div>
+    <section class="pg-sec">
+    <div class="pg-head"><span class="pg-bar"></span>Динамика месяца</div>
     ${renderTrendChart(monthDate)}
+    </section>
 
-    <div class="jc-title" style="margin-top:22px;">Отчёт за день</div>
+    <section class="pg-sec">
+    <div class="pg-head"><span class="pg-bar"></span>Отчёт за день</div>
     <div class="date-input-wrap" style="margin-bottom:14px;">
       <input type="date" id="report-date" value="${state.reportDate || todayKey()}">
     </div>
@@ -2871,6 +2899,7 @@ function renderProgress(){
         </div>
       </div>
     </div>
+    </section>
   `;
 }
 
@@ -2885,30 +2914,42 @@ function renderCalendar(monthDate){
   const isCurMonth = today.getFullYear()===monthDate.getFullYear() && today.getMonth()===monthDate.getMonth();
   const weekdays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 
+  const A = computeAwards();
+  const awardDays = {};
+  A.all.forEach(it=>{ if(!it.on) return; (it.dates || [it.date]).forEach(d=>{ if(d) awardDays[d] = true; }); });
   let cells = '';
   for(let i=0;i<offset;i++) cells += `<div class="cal-cell empty"></div>`;
   for(let day=1; day<=total; day++){
     const count = countsByDay[day] || 0;
     const hasJournal = journalDays.has(day);
     const cellDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
+    const key = localDateKey(cellDate);
     const isToday = isCurMonth && today.getDate() === day;
     // A day before the chosen start date was never meant to be tracked —
     // don't mark it as a missed day, only days from the start date onward.
     const isAfterStart = startDate === null || cellDate.getTime() >= startDate;
     const isPastOrToday = cellDate.getTime() <= todayStart && isAfterStart;
-    const complete = dayIsComplete(localDateKey(cellDate), count, hasJournal);
+    const isFuture = cellDate.getTime() > todayStart;
+    const need = minAttemptsForKey(key);
+    const complete = dayIsComplete(key, count, hasJournal);
+    const tier = complete ? dayTierIdx(key, count) : 0;
+    const partial = !complete && (count > 0 || hasJournal);
+    const missed = !complete && !partial && isPastOrToday && !isToday;
     let arrow = '';
-    if(isPastOrToday) arrow = complete
-      ? `<span class="cal-arrow up">↑</span>`
-      : `<span class="cal-arrow down">↓</span>`;
-    cells += `<div class="cal-cell${isToday?' today':''}${complete&&isPastOrToday?' done':''}">
-      ${arrow}
+    if(isPastOrToday && complete) arrow = `<span class="cal-arrow up">↑</span>`;
+    const star = awardDays[key] ? `<span class="cal-star" aria-label="Награда">★</span>` : '';
+    const cls = ['cal-cell', isToday?'today':'', (complete&&isPastOrToday)?'done tier':'', partial?'part':'', missed?'miss':'', isFuture?'future':''].filter(Boolean).join(' ');
+    const style = tier ? ` style="--tc:var(--t${tier})"` : '';
+    const countTxt = count ? (complete || count >= need ? '×'+count : count+'/'+need) : '';
+    cells += `<div class="${cls}"${style}${isFuture ? '' : ` data-action="cal-day" data-day="${key}"`}>
+      ${arrow}${star}
       <div class="cal-day-num">${day}</div>
       <div class="cal-emojis">
-        ${hasJournal ? `<span>📓</span>` : ''}
-        ${count ? `<span>🚶</span>` : ''}
+        ${(hasJournal || partial) ? `<span class="${hasJournal ? '' : 'ghost'}">📓</span>` : ''}
+        ${(count || partial) ? `<span class="${count ? '' : 'ghost'}">🚶</span>` : ''}
       </div>
-      <div class="cal-count">${count ? '×'+count : ''}</div>
+      <div class="cal-count">${countTxt}</div>
+      ${missed ? '<span class="cal-dot"></span>' : ''}
     </div>`;
   }
 
@@ -2917,12 +2958,52 @@ function renderCalendar(monthDate){
     <div class="cal-grid">${cells}</div>
     <div class="cal-legend">
       <span>📓 дневник</span>
-      <span>🚶 подход</span>
-      <span>×N — подходов за день (нужно 5+)</span>
-      <span style="color:var(--good);">↑ день выполнен</span>
-      <span style="color:var(--warn);">↓ день пропущен</span>
+      <span>🚶 подходы</span>
+      <span style="color:var(--good);">↑ день засчитан</span>
+      <span class="cal-sw"><i style="background:var(--t1)"></i><i style="background:var(--t2)"></i><i style="background:var(--t3)"></i><i style="background:var(--t4)"></i><i style="background:var(--t5)"></i> цвет — число подходов (5, 10, 15, 20, 25)</span>
+      <span>пунктир — день не засчитан, не хватает 📓 или подходов</span>
+      <span><span style="color:#C9A24E;">★</span> в этот день получена награда</span>
+      <span>Нажмите на день, чтобы увидеть итог</span>
     </div>
   `;
+}
+function dayTierIdx(key, count){
+  const need = minAttemptsForKey(key);
+  if(count < need) return 0;
+  return [need, 10, 15, 20, 25].filter(t=> count >= t).length;
+}
+function renderCalDay(){
+  const key = state.calDay;
+  if(!key) return '';
+  const entries = state.entries.filter(e=> dateKey(e.ts) === key).sort((a,b)=> a.ts - b.ts);
+  const count = entries.length;
+  const hasJournal = allTimeJournalDayKeys().has(key);
+  const need = minAttemptsForKey(key);
+  const complete = dayIsComplete(key, count, hasJournal);
+  const tierNames = ['', 'Норма', 'Хорошо', 'Отлично', 'Цель дня', 'Рекорд'];
+  const ti = complete ? dayTierIdx(key, count) : 0;
+  const aw = computeAwards().all.filter(it=> it.on && (it.dates ? it.dates.includes(key) : it.date === key));
+  const d = new Date(key + 'T12:00:00');
+  const title = `${d.getDate()} ${['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'][d.getMonth()]}`;
+  const status = complete
+    ? `<span style="color:var(--good);">День засчитан${ti ? ' · ' + tierNames[ti] : ''}</span>`
+    : (key === todayKey() ? '<span style="color:var(--text-muted);">День ещё идёт</span>' : `<span style="color:var(--text-muted);">День не засчитан${!hasJournal ? ' — нет дневника' : ''}${count < need ? ` — подходов ${count} из ${need}` : ''}</span>`);
+  const time = (ts)=>{ const x = new Date(ts); return String(x.getHours()).padStart(2,'0') + ':' + String(x.getMinutes()).padStart(2,'0'); };
+  return `
+    <div class="modal-backdrop" data-action="close-cal-day">
+      <div class="modal-card cal-day-card">
+        <div class="modal-title">${title}</div>
+        <div style="font-size:14px; margin-bottom:12px;">${status}</div>
+        <div class="cal-day-row"><span>📓 Дневник</span><b>${hasJournal ? 'заполнен' : 'нет'}</b></div>
+        <div class="cal-day-row"><span>🚶 Подходы</span><b>${count}</b></div>
+        ${entries.length ? `<div class="cal-day-list">${entries.slice(0, 12).map(e=>`<div><span>${time(e.ts)}</span> ${e.scrubbed ? 'Подробности удалены' : esc(e.title || 'Без названия')}</div>`).join('')}${entries.length > 12 ? `<div style="color:var(--text-muted);">и ещё ${entries.length - 12}</div>` : ''}</div>` : ''}
+        ${aw.length ? `<div class="cal-day-aw"><b>★ Награды за этот день</b>${aw.map(x=>`<div>${esc(x.label)}</div>`).join('')}</div>` : ''}
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <button class="btn btn-ghost" style="flex:1;" data-action="cal-day-report">Отчёт за день</button>
+          <button class="btn btn-primary" style="flex:1;" data-action="close-cal-day">Закрыть</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 function renderTrendChart(monthDate){
@@ -3441,6 +3522,15 @@ async function onAction(e){
     if(state.tab === 'awards'){ state.tab = state.lastTab || 'practice'; }
     else { state.lastTab = state.tab; state.tab = 'awards'; }
     render(); return;
+  } else if(action === 'cal-day'){
+    state.calDay = e.currentTarget.getAttribute('data-day'); render(); return;
+  } else if(action === 'close-cal-day'){
+    state.calDay = null; render(); return;
+  } else if(action === 'cal-day-report'){
+    state.reportDate = state.calDay; state.calDay = null; render();
+    const el = document.getElementById('report-date');
+    if(el){ el.scrollIntoView({ block:'center', behavior:'smooth' }); }
+    return;
   } else if(action === 'award-detail'){
     state.awardDetail = e.currentTarget.getAttribute('data-aid'); render(); return;
   } else if(action === 'close-award-detail'){
