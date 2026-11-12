@@ -124,6 +124,30 @@
   .aw-toast{ position:fixed; left:12px; right:12px; top:calc(12px + env(safe-area-inset-top)); z-index:1200; background:var(--surface); border:1px solid #C9A24E; border-radius:18px; padding:10px 14px; display:flex; gap:12px; align-items:center; box-shadow:0 10px 26px rgba(201,162,78,.3); transform:translateY(-130%); transition:transform .35s ease; cursor:pointer; }
   .aw-toast.show{ transform:none; } .aw-toast .aw-m{ width:52px; height:60px; } .aw-toast b{ display:block; font-size:14px; } .aw-toast span{ font-size:12.5px; color:var(--text-muted); }
   @media (prefers-reduced-motion: reduce){ .aw-toast{ transition:none; } }
+  .aw-celebrate{ position:fixed; inset:0; z-index:1300; background:rgba(8,16,15,.72); display:flex; align-items:center; justify-content:center; padding:24px; animation:aw-fade .3s ease; overflow:hidden; }
+  .aw-celebrate.out{ opacity:0; transition:opacity .25s; }
+  .aw-cel-card{ position:relative; text-align:center; width:100%; max-width:340px; background:var(--surface); border:1px solid var(--border); border-radius:26px; padding:26px 22px 20px; box-shadow:0 20px 60px rgba(0,0,0,.4); animation:aw-card .45s cubic-bezier(.2,.9,.3,1.2); overflow:hidden; }
+  .aw-celebrate.grand .aw-cel-card{ border-color:#C9A24E; box-shadow:0 20px 70px rgba(201,162,78,.35); }
+  .aw-cel-medal{ position:relative; z-index:1; margin-top:0; animation:aw-medal .7s cubic-bezier(.2,1.1,.3,1.25) .15s both; }
+  .aw-celebrate.mid .aw-cel-medal{ animation:aw-medal-soft .55s ease-out .1s both; width:170px; height:196px; }
+  .aw-cel-rays{ position:absolute; left:50%; top:112px; width:520px; height:520px; margin:-260px 0 0 -260px; background:repeating-conic-gradient(from 0deg, rgba(221,185,100,.30) 0 7deg, rgba(221,185,100,0) 7deg 22.5deg); -webkit-mask-image:radial-gradient(circle, #000 18%, transparent 62%); mask-image:radial-gradient(circle, #000 18%, transparent 62%); animation:aw-spin 26s linear infinite; }
+  .aw-cel-glow{ position:absolute; left:50%; top:100px; width:260px; height:260px; margin:-130px 0 0 -130px; background:radial-gradient(circle, rgba(63,167,160,.35), transparent 65%); animation:aw-pulse 2.4s ease-in-out infinite; }
+  .aw-cel-k{ position:relative; font-size:12.5px; letter-spacing:.14em; text-transform:uppercase; color:#B88A2E; margin-top:6px; animation:aw-up .5s ease .45s both; } :root[data-theme="dark"] .aw-cel-k{ color:#DDB964; }
+  .aw-cel-t{ position:relative; font-family:var(--serif); font-size:25px; margin:4px 0 6px; animation:aw-up .5s ease .55s both; }
+  .aw-cel-d{ position:relative; font-size:14.5px; color:var(--text-muted); line-height:1.45; animation:aw-up .5s ease .65s both; }
+  .aw-cel-more{ position:relative; font-size:12.5px; color:var(--text-muted); margin-top:8px; }
+  .aw-cel-btn{ position:relative; margin-top:18px; animation:aw-up .5s ease .75s both; }
+  .aw-cel-link{ position:relative; background:none; border:none; color:var(--accent); font-size:14px; margin-top:10px; padding:6px 10px; cursor:pointer; font-family:var(--sans); }
+  .aw-confetti{ position:absolute; inset:0; pointer-events:none; overflow:hidden; } .aw-confetti i{ position:absolute; top:-24px; border-radius:2px; opacity:0; animation:aw-fall linear 1 both; }
+  @keyframes aw-fade{ from{ opacity:0; } to{ opacity:1; } }
+  @keyframes aw-card{ from{ opacity:0; transform:translateY(24px) scale(.92); } to{ opacity:1; transform:none; } }
+  @keyframes aw-medal{ 0%{ opacity:0; transform:scale(.2) rotate(-14deg); } 60%{ opacity:1; transform:scale(1.12) rotate(3deg); } 100%{ opacity:1; transform:none; } }
+  @keyframes aw-medal-soft{ from{ opacity:0; transform:scale(.7); } to{ opacity:1; transform:none; } }
+  @keyframes aw-up{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+  @keyframes aw-spin{ to{ transform:rotate(360deg); } }
+  @keyframes aw-pulse{ 0%,100%{ opacity:.7; transform:scale(.95); } 50%{ opacity:1; transform:scale(1.05); } }
+  @keyframes aw-fall{ 0%{ opacity:0; transform:translateY(0) rotate(var(--r)); } 8%{ opacity:1; } 100%{ opacity:.9; transform:translateY(110vh) rotate(calc(var(--r) + 540deg)); } }
+  @media (prefers-reduced-motion: reduce){ .aw-celebrate *{ animation:none !important; } .aw-confetti{ display:none; } }
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:50;
     display:flex; align-items:center; justify-content:center; padding:24px;
@@ -1714,7 +1738,7 @@ function computeAwards(){
       else if(g.id === 'days'){ value = fullKeys.length; if(fullKeys.length >= n){ on = true; date = fullKeys[n-1]; } }
       else { value = journalKeys.length; if(journalKeys.length >= n){ on = true; date = journalKeys[n-1]; } }
       const last = i === g.ns.length - 1;
-      const tier = g.ns.length === 6 ? [1,2,3,4,4,5][i] : i + 1;
+      const tier = g.ns.length === 6 ? [1,2,3,4,5,5][i] : i + 1;
       const keys = on ? (dates ? dates.map(d=> g.id + ':' + n + '@' + d) : [g.id + ':' + n]) : [];
       return { id: g.id + ':' + n, n, on, date, dates, count: dates ? dates.length : (on ? 1 : 0), lastDate: dates ? dates[dates.length-1] : date, keys, tier, color: 't' + Math.min(6, i + 1), top: last, label: g.label(n), desc: g.desc(n), tail: g.tail[i] };
     });
@@ -1784,17 +1808,18 @@ function awardMedal(it, icon){
    <linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
    <filter id="${id}d" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2.2" stdDeviation="2" flood-color="${lo}" flood-opacity=".45"/></filter></defs>
    ${rays}
-   <path d="M27 63 L20 90 L30 83 L36 92 L42 66Z" fill="${lo}"/><path d="M53 63 L60 90 L50 83 L44 92 L38 66Z" fill="${a}"/>
-   ${t>=3 ? awLaurel(`url(#${id}g)`) : ''}
+   ${t>=2 ? `<path d="M27 63 L20 90 L30 83 L36 92 L42 66Z" fill="${lo}"/><path d="M53 63 L60 90 L50 83 L44 92 L38 66Z" fill="${a}"/>` : ''}
+   ${t>=4 ? awLaurel(`url(#${id}g)`) : ''}
+   ${t>=5 ? `<path d="${awShape(shape,34)}" fill="none" stroke="url(#${id}g)" stroke-width="1.6" stroke-linejoin="round" stroke-opacity=".9"/>` : ''}
    <g filter="url(#${id}d)"><path d="${awShape(shape,30.5)}" fill="url(#${id}r)" stroke="${awMix(a,-.35)}" stroke-width=".8" stroke-linejoin="round"/></g>
-   <path d="${awShape(shape,27.2)}" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".7" stroke-linejoin="round" stroke-dasharray="${shape==='day'?'0':'1 2.4'}"/>
+   ${t>=3 ? `<path d="${awShape(shape,27.2)}" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".7" stroke-linejoin="round" stroke-dasharray="${shape==='day'?'0':'1 2.4'}"/>` : ''}
    <path d="${awShape(shape,24.2)}" fill="url(#${id}f)" stroke="${awMix(a,-.25)}" stroke-width=".9" stroke-linejoin="round"/>
    <path d="${awShape(shape,24.2)}" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width=".6" stroke-linejoin="round" transform="translate(-.5 -.5)"/>
-   <path d="M20 31 A22 22 0 0 1 50 17 A27 27 0 0 0 20 31Z" fill="url(#${id}s)"/>
+   ${t>=3 ? `<path d="M20 31 A22 22 0 0 1 50 17 A27 27 0 0 0 20 31Z" fill="url(#${id}s)"/>` : ''}
    <g transform="translate(40 28) scale(.66)" fill="#fff" fill-opacity=".95" stroke="${awMix(a,-.3)}" stroke-width=".7" stroke-opacity=".6">${AW_ICON[icon]}</g>
    <text x="40" y="49.5" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="${big?19:23}" fill="#fff" stroke="${awMix(a,-.35)}" stroke-width=".7" paint-order="stroke">${it.n}</text>
    ${it.top ? `<path d="M29 7 L31 -2 L36 4 L40 -5 L44 4 L49 -2 L51 7Z" fill="url(#${id}g)" stroke="${AW_GOLD[0]}" stroke-width=".6" stroke-linejoin="round"/><circle cx="40" cy="-4" r="1.6" fill="#fff"/>` : ''}
-   ${t>=2 ? awSparkle(71,15,3.6) + awSparkle(7,44,2.6) : ''}${t>=4 ? awSparkle(13,13,2.4) + awSparkle(74,48,2.2) : ''}
+   ${t>=3 ? awSparkle(71,15,3.6) + awSparkle(7,44,2.6) : ''}${t>=4 ? awSparkle(13,13,2.4) + awSparkle(74,48,2.2) : ''}${t>=5 ? awSparkle(76,30,2.6) + awSparkle(4,24,3) + awSparkle(66,74,2.2) : ''}
   </svg>`;
 }
 function renderAwards(){
@@ -1850,6 +1875,43 @@ function renderAwardDetail(){
       </div>
     </div>`;
 }
+function awConfetti(n){
+  const cols = ['#C9A24E','#DDB964','#3FA7A0','#5C8FBF','#8C78B8','#5FA87F','#C85A55'];
+  let h = '';
+  for(let i=0;i<n;i++){
+    const l = Math.random()*100, d = (Math.random()*1.6).toFixed(2), t = (2.6+Math.random()*2).toFixed(2), r = Math.round(Math.random()*360), w = 6+Math.round(Math.random()*5);
+    h += `<i style="left:${l.toFixed(1)}%;background:${cols[i%cols.length]};width:${w}px;height:${Math.round(w*1.6)}px;animation-delay:${d}s;animation-duration:${t}s;--r:${r}deg"></i>`;
+  }
+  return `<div class="aw-confetti" aria-hidden="true">${h}</div>`;
+}
+function showAwardCelebration(items){
+  const it = items[0];
+  const g = computeAwards().groups.find(x=> x.items.some(y=>y.id === it.id));
+  const grand = it.tier >= 5 || it.top;
+  const old = document.getElementById('aw-celebrate'); if(old) old.remove();
+  const el = document.createElement('div');
+  el.id = 'aw-celebrate';
+  el.className = 'aw-celebrate ' + (grand ? 'grand' : 'mid');
+  const more = items.length > 1 ? `<div class="aw-cel-more">и ещё ${items.length - 1} ${items.length - 1 === 1 ? 'награда' : 'награды'}</div>` : '';
+  el.innerHTML = `
+    ${grand ? awConfetti(48) : ''}
+    <div class="aw-cel-card">
+      ${grand ? '<div class="aw-cel-rays"></div>' : '<div class="aw-cel-glow"></div>'}
+      <div class="aw-m aw-m-xl aw-cel-medal">${awardMedal(it, g.icon)}</div>
+      <div class="aw-cel-k">Новая награда!</div>
+      <div class="aw-cel-t">${esc(it.label)}</div>
+      <div class="aw-cel-d">${esc(it.tail)}</div>
+      ${more}
+      <button class="btn btn-primary aw-cel-btn" data-cel="close">${grand ? 'Ура!' : 'Спасибо!'}</button>
+      <button class="aw-cel-link" data-cel="all">Все награды</button>
+    </div>`;
+  el.addEventListener('click', (e)=>{
+    const t = e.target.closest('[data-cel]');
+    if(t && t.getAttribute('data-cel') === 'all'){ el.remove(); if(state.tab !== 'awards'){ state.lastTab = state.tab; state.tab = 'awards'; render(); } return; }
+    if(t || e.target === el){ el.classList.add('out'); setTimeout(()=> el.remove(), 250); }
+  });
+  document.body.appendChild(el);
+}
 function showAwardToast(items){
   const it = items[0];
   const g = computeAwards().groups.find(x=> x.items.some(y=>y.id === it.id));
@@ -1863,6 +1925,7 @@ function showAwardToast(items){
 }
 function checkNewAwards(){
   if(!state.loggedIn || !state.loaded || !auth.userId) return;
+  if(state.practiceActive || state.journalFormActive) return; // не мешаем заполнению — покажем после
   const key = 'arlilia_awards_seen_' + auth.userId;
   const A = computeAwards();
   const seen = lsGet(key, null);
@@ -1875,7 +1938,11 @@ function checkNewAwards(){
   const fresh = A.earned.filter(x=> x.keys.some(k=> !seenSet.has(k)));
   if(!fresh.length) return;
   lsSet(key, seen.concat(fresh.flatMap(x=> x.keys.filter(k=> !seenSet.has(k)))));
-  showAwardToast(fresh.slice().sort((x,y)=> y.tier - x.tier));
+  const sorted = fresh.slice().sort((x,y)=> (y.tier + (y.top?1:0)) - (x.tier + (x.top?1:0)));
+  const best = sorted[0];
+  // праздничный экран — только за первую такую награду; ежедневные повторы идут маленькой карточкой
+  const firstTime = !best.dates || best.dates.length === 1;
+  if(best.tier >= 3 && firstTime) showAwardCelebration(sorted); else showAwardToast(sorted);
 }
 
 const STREAK_MILESTONES = [3, 7, 14, 21, 30, 45, 60, 90, 120, 180, 365];
