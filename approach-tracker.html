@@ -102,6 +102,28 @@
     border-radius:999px; padding:6px 12px; font-size:14px; font-family: var(--sans);
     border:none; cursor:pointer; -webkit-tap-highlight-color: transparent;
   }
+  :root{ --lockA:#E3ECEA; --lockB:#C9D8D6; --lockT:#9DB1AE; }
+  :root[data-theme="dark"]{ --lockA:#2A3C3A; --lockB:#223230; --lockT:#546D6A; }
+  .trophy-pill{ display:inline-flex; align-items:center; gap:4px; background:rgba(201,162,78,.16); color:#B88A2E; font-weight:600; border-radius:999px; padding:6px 11px; font-size:14px; font-family:var(--sans); border:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  :root[data-theme="dark"] .trophy-pill{ color:#DDB964; }
+  .aw-m{ display:block; width:76px; height:88px; flex:none; } .aw-m{ position:relative; } .aw-m svg{ width:100%; height:100%; overflow:visible; display:block; }
+  .aw-x{ position:absolute; right:-6px; top:-2px; font-style:normal; font-size:11.5px; font-weight:700; background:var(--accent); color:#fff; border-radius:999px; padding:2px 7px; box-shadow:0 2px 6px rgba(0,0,0,.2); }
+  .aw-sub{ font-size:12.5px; color:var(--text-muted); margin-top:8px; }
+  .aw-m-lg{ width:84px; height:96px; } .aw-m-xl{ width:200px; height:230px; margin:6px auto 0; }
+  .aw-next{ background:linear-gradient(135deg,var(--surface),var(--surface-2,var(--surface))); border:1px solid var(--border); border-radius:20px; padding:14px; display:flex; gap:14px; align-items:center; margin-bottom:16px; box-shadow:0 6px 18px rgba(30,56,56,.06); }
+  .aw-next-t{ font-family:var(--serif); font-size:17px; }
+  .aw-next-k{ font-size:12.5px; color:var(--text-muted); }
+  .aw-bar{ height:7px; border-radius:9px; background:var(--lockA); margin:10px 0 6px; overflow:hidden; } .aw-bar i{ display:block; height:100%; border-radius:9px; background:linear-gradient(90deg,#C9A24E,#E3C57A); }
+  .aw-card{ background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:16px 10px 14px; margin-bottom:14px; }
+  .aw-ct{ display:flex; justify-content:space-between; align-items:center; margin:0 6px 14px; } .aw-ct b{ font-family:var(--serif); font-weight:400; font-size:17px; } .aw-ct span{ font-size:12px; color:var(--text-muted); }
+  .aw-row{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px 4px; }
+  .aw-b{ background:none; border:none; padding:0; display:flex; flex-direction:column; align-items:center; text-align:center; gap:5px; cursor:pointer; font-family:var(--sans); color:var(--text); -webkit-tap-highlight-color:transparent; }
+  .aw-b small{ font-size:11.5px; line-height:1.2; color:var(--text-muted); } .aw-b.on small{ color:var(--text); font-weight:500; }
+  .aw-b em{ font-style:normal; font-size:10.5px; color:var(--text-muted); margin-top:-2px; }
+  .aw-detail{ text-align:center; } .aw-chip{ display:inline-block; margin-top:12px; background:rgba(201,162,78,.16); color:#B88A2E; border-radius:999px; padding:7px 14px; font-size:13px; } :root[data-theme="dark"] .aw-chip{ color:#DDB964; } .aw-chip-off{ background:var(--accent-soft); color:var(--text-muted); }
+  .aw-toast{ position:fixed; left:12px; right:12px; top:calc(12px + env(safe-area-inset-top)); z-index:1200; background:var(--surface); border:1px solid #C9A24E; border-radius:18px; padding:10px 14px; display:flex; gap:12px; align-items:center; box-shadow:0 10px 26px rgba(201,162,78,.3); transform:translateY(-130%); transition:transform .35s ease; cursor:pointer; }
+  .aw-toast.show{ transform:none; } .aw-toast .aw-m{ width:52px; height:60px; } .aw-toast b{ display:block; font-size:14px; } .aw-toast span{ font-size:12.5px; color:var(--text-muted); }
+  @media (prefers-reduced-motion: reduce){ .aw-toast{ transition:none; } }
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:50;
     display:flex; align-items:center; justify-content:center; padding:24px;
@@ -1239,7 +1261,7 @@ async function loadAll(){
     if(savedTheme) state.settings.theme = savedTheme;
   }catch(e){}
   applyTheme();
-  state.loaded = true;
+  state.loaded = true; state.awardsReady = true;
   mergeOutboxIntoEntries();
   if(!state.loadOffline){ saveCache(); touchLastSeen(); flushOutbox(); }
   return true;
@@ -1621,6 +1643,241 @@ function currentStreak(){
   }
   return score;
 }
+/* ---------- Награды: всё считается из записей, ничего отдельно не хранится.
+   Награды не отнимаются — достаточно один раз достичь значения. ---------- */
+const AWARD_DEFS = [
+  { id:'day',    title:'Подходов за день', icon:'day',   ns:[10,20,30,50,75,100],      label:n=>`${n} за день`,
+    desc:n=>`${n} подходов за один день`, tail:['Хорошее начало!','Отличный день!','Серьёзный результат!','Очень много для одного дня!','Почти сотня!','Целая сотня за день. Высшая награда за день!'] },
+  { id:'total',  title:'Всего подходов',   icon:'total', ns:[50,100,500,1000,2500,5000], label:n=>`${n} подходов`,
+    desc:n=>`${n} подходов за всё время`, tail:['Первые шаги сделаны.','Сотня позади.','Полтысячи подходов!','Тысяча подходов!','Огромный путь пройден.','Пять тысяч подходов. Это настоящая работа!'] },
+  { id:'streak', title:'Серия дней',       icon:'streak',ns:[7,15,30,90,180,365],      label:n=>`Серия ${n} ${ruDays(n)}`,
+    desc:n=>`Серия достигла ${n} ${ruDays(n)}`, tail:['Неделя занятий.','Две недели с лишним.','Месяц постоянства.','Три месяца. Это уже привычка.','Полгода занятий!','Год занятий. Поздравляем!'] },
+  { id:'days',   title:'Засчитанных дней', icon:'cal',   ns:[15,30,90,180,365],        label:n=>`${n} ${ruDays(n)}`,
+    desc:n=>`${n} засчитанных ${ruDays(n)} (подходы и дневник)`, tail:['Полмесяца занятий.','Месяц занятий.','Три месяца занятий.','Полгода занятий!','Целый год занятий!'] },
+  { id:'diary',  title:'Дневник',          icon:'book',  ns:[10,30,90,180,365],        label:n=>`${n} ${ruDiaries(n)}`,
+    desc:n=>`${n} заполненных ${ruDiaries(n)}`, tail:['Привычка складывается.','Месяц записей.','Три месяца записей.','Полгода записей!','Год записей. Это целая книга!'] },
+];
+function ruTimes(n){ const a=n%10,b=n%100; return (a>=2&&a<=4&&(b<12||b>14)) ? 'раза' : 'раз'; }
+function ruDiaries(n){
+  const n10 = n % 10, n100 = n % 100;
+  if(n100 >= 11 && n100 <= 14) return 'дневников';
+  if(n10 === 1) return 'дневник';
+  if(n10 >= 2 && n10 <= 4) return 'дневника';
+  return 'дневников';
+}
+function streakHistory(thresholds){
+  const counts = allTimeAttemptCounts();
+  const journalSet = allTimeJournalDayKeys();
+  const reach = {};
+  let best = 0, score = 0;
+  const today = new Date(); today.setHours(0,0,0,0);
+  let start = null;
+  if(state.settings.startDate){ start = new Date(state.settings.startDate + 'T00:00:00'); }
+  else {
+    const keys = [...Object.keys(counts), ...journalSet].sort();
+    if(!keys.length) return { reach, best, score };
+    start = new Date(keys[0] + 'T00:00:00');
+  }
+  start.setHours(0,0,0,0);
+  const cur = new Date(start);
+  while(cur <= today){
+    const k = dateKey(cur.getTime());
+    const isToday = cur.getTime() === today.getTime();
+    if(dayIsComplete(k, counts[k]||0, journalSet.has(k))) score++;
+    else if(!isToday) score = Math.max(0, score - 1);
+    if(score > best) best = score;
+    thresholds.forEach(t=>{ if(score >= t && !reach[t]) reach[t] = k; });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return { reach, best, score };
+}
+let _awSig = null, _awVal = null;
+function computeAwards(){
+  const last = state.entries.length ? state.entries[state.entries.length-1].ts : 0;
+  const sig = [state.entries.length, last, state.journalEntries.length, state.settings.startDate || '', todayKey(), auth.userId].join('|');
+  if(sig === _awSig && _awVal) return _awVal;
+  const counts = allTimeAttemptCounts();
+  const dayKeys = Object.keys(counts).sort();
+  const sortedTs = state.entries.map(e=>e.ts).sort((a,b)=>a-b);
+  const journalKeys = [...allTimeJournalDayKeys()].sort();
+  const fullKeys = journalKeys.filter(k=> dayIsComplete(k, counts[k]||0, true));
+  const stHist = streakHistory(AWARD_DEFS.find(g=>g.id==='streak').ns);
+  const maxDay = dayKeys.reduce((m,k)=>Math.max(m, counts[k]), 0);
+  const groups = AWARD_DEFS.map(g=>{
+    let value = 0;
+    const items = g.ns.map((n, i)=>{
+      let date = null, on = false;
+      let dates = null;
+      if(g.id === 'day'){ value = maxDay; dates = dayKeys.filter(k=>counts[k] >= n); date = dates[0] || null; on = !!date; }
+      else if(g.id === 'total'){ value = sortedTs.length; if(sortedTs.length >= n){ on = true; date = dateKey(sortedTs[n-1]); } }
+      else if(g.id === 'streak'){ value = stHist.score; if(stHist.reach[n]){ on = true; date = stHist.reach[n]; } }
+      else if(g.id === 'days'){ value = fullKeys.length; if(fullKeys.length >= n){ on = true; date = fullKeys[n-1]; } }
+      else { value = journalKeys.length; if(journalKeys.length >= n){ on = true; date = journalKeys[n-1]; } }
+      const last = i === g.ns.length - 1;
+      const tier = g.ns.length === 6 ? [1,2,3,4,4,5][i] : i + 1;
+      const keys = on ? (dates ? dates.map(d=> g.id + ':' + n + '@' + d) : [g.id + ':' + n]) : [];
+      return { id: g.id + ':' + n, n, on, date, dates, count: dates ? dates.length : (on ? 1 : 0), lastDate: dates ? dates[dates.length-1] : date, keys, tier, color: 't' + Math.min(6, i + 1), top: last, label: g.label(n), desc: g.desc(n), tail: g.tail[i] };
+    });
+    return { id: g.id, title: g.title, icon: g.icon, value, items };
+  });
+  const all = groups.flatMap(g=>g.items);
+  _awVal = { groups, all, earned: all.filter(x=>x.on), total: all.length };
+  _awSig = sig;
+  return _awVal;
+}
+const AW_MONTHS = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','нояб','дек'];
+function awDate(k){ if(!k) return ''; const p = k.split('-'); return `${+p[2]} ${AW_MONTHS[+p[1]-1]}`; }
+function awMix(h,p){
+  const n = parseInt(h.slice(1),16); let r=n>>16, g=n>>8&255, b=n&255;
+  const f = p<0?0:255, q=Math.abs(p);
+  r=Math.round(r+(f-r)*q); g=Math.round(g+(f-g)*q); b=Math.round(b+(f-b)*q);
+  return '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+const AW_ICON = {
+  day:'<path d="M0-8 L2.2-2.6 L8-2.2 L3.6 1.6 L5 7.4 L0 4.2 L-5 7.4 L-3.6 1.6 L-8-2.2 L-2.2-2.6Z"/>',
+  total:'<path d="M0-8 L7-4.5 V1 C7 5 3.5 7.6 0 9 C-3.5 7.6 -7 5 -7 1 V-4.5Z"/>',
+  streak:'<path d="M1-9 C3-4 8-3 8 3 C8 7 4.5 9 0 9 C-4.5 9 -7 6.5 -7 3 C-7 0 -5-1.5 -4-4 C-2-2.5-1.5-1 -1 0 C0-3 0-6 1-9Z"/>',
+  book:'<path d="M-8-6 C-4-7 -1-6 0-4.5 C1-6 4-7 8-6 V6 C4 5 1 6 0 7.5 C-1 6 -4 5 -8 6Z"/>',
+  cal:'<path d="M-7-5 H7 V8 H-7Z M-7-5 V-7 H7 V-5 M-4-9 V-6 M4-9 V-6" fill-rule="evenodd"/><path d="M-4 0 H4 M-4 4 H2" stroke="#fff" stroke-opacity=".0" />'
+};
+const AW_GOLD = ['#B98A2E','#F0D58A'];
+function awShape(kind, r){
+  const CX=40, CY=40;
+  if(kind==='day'){ let d=''; for(let i=0;i<=120;i++){ const t=i/120*2*Math.PI, rr=r+2.2*Math.cos(t*14); d+=(i?'L':'M')+(CX+Math.sin(t)*rr).toFixed(2)+' '+(CY-Math.cos(t)*rr).toFixed(2); } return d+'Z'; }
+  if(kind==='total'){ const k=r/30; return `M${CX} ${CY-31*k} L${CX+27*k} ${CY-20*k} V${CY+4*k} C${CX+27*k} ${CY+22*k} ${CX+12*k} ${CY+32*k} ${CX} ${CY+37*k} C${CX-12*k} ${CY+32*k} ${CX-27*k} ${CY+22*k} ${CX-27*k} ${CY+4*k} V${CY-20*k}Z`; }
+  if(kind==='streak'){ let d=''; for(let i=0;i<6;i++){ const t=(i*60)*Math.PI/180; d+=(i?'L':'M')+(CX+Math.sin(t)*r*1.05).toFixed(2)+' '+(CY-Math.cos(t)*r*1.05).toFixed(2); } return d+'Z'; }
+  if(kind==='cal'){ let d=''; for(let i=0;i<=72;i++){ const t=i/72*2*Math.PI; d+=(i?'L':'M')+(CX+Math.sin(t)*r).toFixed(2)+' '+(CY-Math.cos(t)*r).toFixed(2); } return d+'Z'; }
+  let d=''; for(let i=0;i<8;i++){ const t=(i*45+22.5)*Math.PI/180; d+=(i?'L':'M')+(CX+Math.sin(t)*r*1.04).toFixed(2)+' '+(CY-Math.cos(t)*r*1.04).toFixed(2); } return d+'Z';
+}
+function awSparkle(x,y,s){ return `<path d="M${x} ${y-s} Q${x} ${y} ${x+s} ${y} Q${x} ${y} ${x} ${y+s} Q${x} ${y} ${x-s} ${y} Q${x} ${y} ${x} ${y-s}Z" fill="#fff"/>`; }
+function awLaurel(fill){
+  let o='';
+  for(const sd of [-1,1]) for(let i=0;i<9;i++){
+    const deg=200-i*15, t=deg*Math.PI/180, R=37;
+    const px=40+sd*Math.abs(Math.sin(t))*R, py=40-Math.cos(t)*R;
+    o+=`<ellipse cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" rx="2.3" ry="5" transform="rotate(${(sd*(180-deg)).toFixed(0)} ${px.toFixed(1)} ${py.toFixed(1)})" fill="${fill}"/>`;
+  }
+  return o;
+}
+let _awUid = 0;
+function awardMedal(it, icon){
+  const id = 'aw' + (_awUid++);
+  const cs = getComputedStyle(document.documentElement);
+  const a = (it.color === 't6' ? cs.getPropertyValue('--accent') : cs.getPropertyValue('--' + it.color)).trim() || '#3FA7A0';
+  const b = awMix(a, .22), hi = awMix(b,.4), lo = awMix(a,-.3), big = String(it.n).length > 2;
+  const shape = icon;
+  if(!it.on){
+    return `<svg viewBox="0 0 80 92" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--lockA)"/><stop offset="1" stop-color="var(--lockB)"/></linearGradient></defs>
+    <path d="${awShape(shape,30)}" fill="url(#${id})" stroke="var(--lockT)" stroke-opacity=".45" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="${awShape(shape,23)}" fill="none" stroke="var(--lockT)" stroke-opacity=".4" stroke-dasharray="2 3" stroke-width="1" stroke-linejoin="round"/>
+    <g transform="translate(40 29) scale(.62)" fill="var(--lockT)" opacity=".65">${AW_ICON[icon]}</g>
+    <text x="40" y="54" text-anchor="middle" font-family="Georgia,serif" font-size="${big?18:21}" fill="var(--lockT)">${it.n}</text>
+    <g transform="translate(59 62)" fill="var(--lockT)" opacity=".8"><rect x="-4" y="-1" width="8" height="6" rx="1.4"/><path d="M-2.6-1 V-3 A2.6 2.6 0 0 1 2.6-3 V-1" fill="none" stroke="var(--lockT)" stroke-width="1.3"/></g></svg>`;
+  }
+  let rays = '';
+  if(it.top){ for(let i=0;i<16;i++){ const t=i*22.5*Math.PI/180; rays+=`<path d="M40 40 L${(40+Math.sin(t-.07)*46).toFixed(1)} ${(40-Math.cos(t-.07)*46).toFixed(1)} L${(40+Math.sin(t+.07)*46).toFixed(1)} ${(40-Math.cos(t+.07)*46).toFixed(1)}Z" fill="${hi}" opacity=".28"/>`; } }
+  const t = it.tier;
+  return `<svg viewBox="0 0 80 92" aria-hidden="true"><defs>
+   <linearGradient id="${id}r" x1=".1" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="${awMix(b,.55)}"/><stop offset=".35" stop-color="${hi}"/><stop offset=".6" stop-color="${a}"/><stop offset="1" stop-color="${lo}"/></linearGradient>
+   <radialGradient id="${id}f" cx=".32" cy=".25" r=".95"><stop offset="0" stop-color="${awMix(b,.6)}"/><stop offset=".55" stop-color="${b}"/><stop offset="1" stop-color="${awMix(a,-.05)}"/></radialGradient>
+   <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${AW_GOLD[1]}"/><stop offset="1" stop-color="${AW_GOLD[0]}"/></linearGradient>
+   <linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+   <filter id="${id}d" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="2.2" stdDeviation="2" flood-color="${lo}" flood-opacity=".45"/></filter></defs>
+   ${rays}
+   <path d="M27 63 L20 90 L30 83 L36 92 L42 66Z" fill="${lo}"/><path d="M53 63 L60 90 L50 83 L44 92 L38 66Z" fill="${a}"/>
+   ${t>=3 ? awLaurel(`url(#${id}g)`) : ''}
+   <g filter="url(#${id}d)"><path d="${awShape(shape,30.5)}" fill="url(#${id}r)" stroke="${awMix(a,-.35)}" stroke-width=".8" stroke-linejoin="round"/></g>
+   <path d="${awShape(shape,27.2)}" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".7" stroke-linejoin="round" stroke-dasharray="${shape==='day'?'0':'1 2.4'}"/>
+   <path d="${awShape(shape,24.2)}" fill="url(#${id}f)" stroke="${awMix(a,-.25)}" stroke-width=".9" stroke-linejoin="round"/>
+   <path d="${awShape(shape,24.2)}" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width=".6" stroke-linejoin="round" transform="translate(-.5 -.5)"/>
+   <path d="M20 31 A22 22 0 0 1 50 17 A27 27 0 0 0 20 31Z" fill="url(#${id}s)"/>
+   <g transform="translate(40 28) scale(.66)" fill="#fff" fill-opacity=".95" stroke="${awMix(a,-.3)}" stroke-width=".7" stroke-opacity=".6">${AW_ICON[icon]}</g>
+   <text x="40" y="49.5" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="${big?19:23}" fill="#fff" stroke="${awMix(a,-.35)}" stroke-width=".7" paint-order="stroke">${it.n}</text>
+   ${it.top ? `<path d="M29 7 L31 -2 L36 4 L40 -5 L44 4 L49 -2 L51 7Z" fill="url(#${id}g)" stroke="${AW_GOLD[0]}" stroke-width=".6" stroke-linejoin="round"/><circle cx="40" cy="-4" r="1.6" fill="#fff"/>` : ''}
+   ${t>=2 ? awSparkle(71,15,3.6) + awSparkle(7,44,2.6) : ''}${t>=4 ? awSparkle(13,13,2.4) + awSparkle(74,48,2.2) : ''}
+  </svg>`;
+}
+function renderAwards(){
+  const A = computeAwards();
+  // ближайшая награда: где выполнена наибольшая доля пути
+  let next = null;
+  A.groups.forEach(g=>{
+    const it = g.items.find(x=>!x.on); if(!it) return;
+    const prev = [...g.items].reverse().find(x=>x.on);
+    const from = prev ? prev.n : 0;
+    const ratio = Math.max(0, Math.min(1, (g.value - from) / (it.n - from)));
+    if(!next || ratio > next.ratio) next = { g, it, ratio, left: Math.max(0, it.n - g.value) };
+  });
+  const valLabel = { day:'Рекорд дня', total:'Сейчас', streak:'Серия сейчас', days:'Сейчас', diary:'Сейчас' };
+  const nextHtml = next ? `
+    <div class="aw-next">
+      <div class="aw-m aw-m-lg">${awardMedal(next.it, next.g.icon)}</div>
+      <div style="flex:1; min-width:0;">
+        <div class="aw-next-k">Ближайшая награда</div>
+        <div class="aw-next-t">${esc(next.it.label)}</div>
+        <div class="aw-bar"><i style="width:${Math.round(next.ratio*100)}%"></i></div>
+        <div class="aw-next-k">${valLabel[next.g.id]}: ${next.g.value} · осталось ${next.left}</div>
+      </div>
+    </div>` : `<div class="aw-next"><div style="flex:1; text-align:center;"><div class="aw-next-t">Все награды получены 🎉</div></div></div>`;
+  return `
+    <div class="top-bar"><h1>Награды</h1></div>
+    <div class="autosave-hint" style="margin:-6px 0 14px;">Получено ${A.earned.length} из ${A.total}. Награды остаются навсегда, даже если серия прервалась.</div>
+    ${nextHtml}
+    ${A.groups.map(g=>`
+      <div class="aw-card">
+        <div class="aw-ct"><b>${g.title}</b><span>${g.items.filter(x=>x.on).length} из ${g.items.length}</span></div>
+        <div class="aw-row">${g.items.map(it=>`
+          <button class="aw-b ${it.on?'on':'off'}" data-action="award-detail" data-aid="${it.id}">
+            <span class="aw-m">${awardMedal(it, g.icon)}${it.count > 1 ? `<i class="aw-x">×${it.count}</i>` : ''}</span>
+            <small>${esc(it.label)}</small>${it.on ? `<em>${awDate(it.lastDate)}</em>` : ''}
+          </button>`).join('')}</div>
+      </div>`).join('')}
+  `;
+}
+function renderAwardDetail(){
+  const A = computeAwards();
+  const it = A.all.find(x=>x.id === state.awardDetail);
+  if(!it) return '';
+  const g = A.groups.find(x=> x.items.includes(it));
+  return `
+    <div class="modal-backdrop" data-action="close-award-detail">
+      <div class="modal-card aw-detail">
+        <div class="aw-m aw-m-xl">${awardMedal(it, g.icon)}</div>
+        <div class="modal-title" style="margin:8px 0 6px;">${esc(it.label)}</div>
+        <div class="modal-text">${it.on ? esc(it.tail) : esc(it.desc)}</div>
+        ${it.on ? (it.count > 1 ? `<div class="aw-chip">Получена ${it.count} ${ruTimes(it.count)}</div><div class="aw-sub">Впервые ${awDate(it.date)} · последний раз ${awDate(it.lastDate)}</div>` : `<div class="aw-chip">Получена ${awDate(it.date)}</div>`) : `<div class="aw-chip aw-chip-off">Ещё не получена</div>`}
+        <button class="btn btn-primary" data-action="close-award-detail" style="margin-top:18px;">Закрыть</button>
+      </div>
+    </div>`;
+}
+function showAwardToast(items){
+  const it = items[0];
+  const g = computeAwards().groups.find(x=> x.items.some(y=>y.id === it.id));
+  const el = document.createElement('div');
+  el.className = 'aw-toast';
+  el.innerHTML = `<div class="aw-m">${awardMedal(it, g.icon)}</div><div><b>Новая награда!</b><span>${esc(it.desc)}${it.count > 1 ? ` · уже ${it.count} ${ruTimes(it.count)}` : ''}${items.length > 1 ? ` · и ещё ${items.length - 1}` : ''}</span></div>`;
+  el.addEventListener('click', ()=>{ el.remove(); if(state.tab !== 'awards'){ state.lastTab = state.tab; state.tab = 'awards'; render(); } });
+  document.body.appendChild(el);
+  requestAnimationFrame(()=> el.classList.add('show'));
+  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=> el.remove(), 300); }, 6500);
+}
+function checkNewAwards(){
+  if(!state.loggedIn || !state.loaded || !auth.userId) return;
+  const key = 'arlilia_awards_seen_' + auth.userId;
+  const A = computeAwards();
+  const seen = lsGet(key, null);
+  if(seen === null){
+    // первый запуск: уже полученные раньше награды выдаём тихо, без всплывающих карточек
+    if(state.awardsReady) lsSet(key, A.earned.flatMap(x=>x.keys));
+    return;
+  }
+  const seenSet = new Set(seen);
+  const fresh = A.earned.filter(x=> x.keys.some(k=> !seenSet.has(k)));
+  if(!fresh.length) return;
+  lsSet(key, seen.concat(fresh.flatMap(x=> x.keys.filter(k=> !seenSet.has(k)))));
+  showAwardToast(fresh.slice().sort((x,y)=> y.tier - x.tier));
+}
+
 const STREAK_MILESTONES = [3, 7, 14, 21, 30, 45, 60, 90, 120, 180, 365];
 function nextStreakMilestone(streak){
   return STREAK_MILESTONES.find(m => m > streak) ?? null;
@@ -1728,6 +1985,7 @@ function render(){
     if(el && lastViewKey !== null){ el.classList.add('step-in'); setTimeout(()=>el.classList.remove('step-in'), 300); }
   } else if(prevY){ window.scrollTo(0, prevY); }
   lastViewKey = key;
+  try{ checkNewAwards(); }catch(err){ console.error('awards', err); }
 }
 function renderInner(){
   const app = document.getElementById('app');
@@ -1751,6 +2009,7 @@ function renderInner(){
     else if(state.tab === 'exercises') body = state.exerciseCategory ? renderExerciseCategory(state.exerciseCategory) : renderExercisesHome(false);
     else if(state.tab === 'reference') body = state.exerciseCategory ? renderExerciseCategory(state.exerciseCategory) : renderExercisesHome(true);
     else if(state.tab === 'progress') body = renderProgress();
+    else if(state.tab === 'awards') body = renderAwards();
     else body = renderSettings();
     app.innerHTML = `${renderAppBar()}<div class="content">${body}</div>${renderTabbar()}${state.tab !== 'settings' ? renderOnboarding() : ''}`;
   }
@@ -1774,11 +2033,13 @@ function renderAppBar(){
       <div class="app-bar-right">
         ${pendingSyncCount() ? `<button class="sync-pill" data-action="retry-sync" aria-label="Ждёт отправки">⏳ ${pendingSyncCount()}</button>` : ''}
         <button class="streak-pill" data-action="toggle-streak-info">🔥 ${streak}</button>
+        <button class="trophy-pill" data-action="open-awards" aria-label="Награды">🏆 ${computeAwards().earned.length}</button>
         <button class="gear-btn ${state.tab==='settings'?'active':''}" data-action="toggle-settings" aria-label="Настройки">⚙</button>
       </div>
     </div>
     ${(typeof navigator !== 'undefined' && navigator.onLine === false) ? '<div class="offline-strip">Нет сети — записи сохранятся на телефоне и отправятся позже</div>' : ''}
     ${state.streakInfoOpen ? renderStreakInfo() : ''}
+    ${state.awardDetail ? renderAwardDetail() : ''}
   `;
 }
 
@@ -3109,6 +3370,14 @@ async function onAction(e){
     state.streakInfoOpen = true; render(); return;
   } else if(action === 'close-streak-info'){
     state.streakInfoOpen = false; render(); return;
+  } else if(action === 'open-awards'){
+    if(state.tab === 'awards'){ state.tab = state.lastTab || 'practice'; }
+    else { state.lastTab = state.tab; state.tab = 'awards'; }
+    render(); return;
+  } else if(action === 'award-detail'){
+    state.awardDetail = e.currentTarget.getAttribute('data-aid'); render(); return;
+  } else if(action === 'close-award-detail'){
+    state.awardDetail = null; render(); return;
   } else if(action === 'toggle-settings'){
     if(state.tab === 'settings'){
       state.tab = state.lastTab || 'practice';
