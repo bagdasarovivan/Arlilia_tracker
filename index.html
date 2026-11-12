@@ -2868,13 +2868,6 @@ function attachHandlers(){
       // filled in, stay on the step (so the text isn't skipped); otherwise go on.
       const noteOpenNow = (state.noteOpen && state.noteOpen[id]) || !!state.answers[id + 'Note'];
       if(manual && noteOpenNow) return;
-      const targetIndex = state.qIndex;
-      setTimeout(()=>{
-        if(state.qIndex === targetIndex && state.qIndex < activeQuestions().length - 1){
-          state.qIndex++;
-          render();
-        }
-      }, 260);
     });
   });
   app.querySelectorAll('[data-choice-id]').forEach(el=>{
@@ -2884,13 +2877,6 @@ function attachHandlers(){
       state.answers[id] = val;
       render();
       if(val === 'other') return;
-      const targetIndex = state.qIndex;
-      setTimeout(()=>{
-        if(state.qIndex === targetIndex && state.qIndex < activeQuestions().length - 1){
-          state.qIndex++;
-          render();
-        }
-      }, 260);
     });
   });
   app.querySelectorAll('[data-note-toggle]').forEach(el=>{
@@ -2921,13 +2907,6 @@ function attachHandlers(){
       state.journalDraft[id] = e.currentTarget.getAttribute('data-jw-val') === 'true';
       scheduleJournalSave();
       render();
-      const targetIndex = state.journalStepIndex;
-      setTimeout(()=>{
-        if(state.journalStepIndex === targetIndex && state.journalStepIndex < JOURNAL_STEPS.length - 1){
-          state.journalStepIndex++;
-          render();
-        }
-      }, 260);
     });
   });
   app.querySelectorAll('[data-jw-sleepq]').forEach(el=>{
@@ -2950,13 +2929,6 @@ function attachHandlers(){
       if(val === 'other') return;
       const jq = JOURNAL_STEPS.find(x=>x.id===id);
       if(jq && jq.describe && (jq.describe === true || jq.describe.includes(val))) return; // описание можно добавить — не перескакиваем, человек нажмёт «Далее»
-      const targetIndex = state.journalStepIndex;
-      setTimeout(()=>{
-        if(state.journalStepIndex === targetIndex && state.journalStepIndex < JOURNAL_STEPS.length - 1){
-          state.journalStepIndex++;
-          render();
-        }
-      }, 260);
     });
   });
   app.querySelectorAll('[data-jw-multi]').forEach(el=>{
