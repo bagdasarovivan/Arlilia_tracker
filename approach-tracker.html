@@ -442,6 +442,7 @@
   .cal-day-row{ display:flex; justify-content:space-between; font-size:14.5px; padding:6px 0; border-top:1px solid var(--border); } .cal-day-row b{ font-weight:600; }
   .cal-day-list{ font-size:13px; color:var(--text-muted); line-height:1.6; max-height:150px; overflow:auto; padding:4px 0 6px; } .cal-day-list span{ color:var(--accent); font-variant-numeric:tabular-nums; margin-right:6px; }
   .cal-day-aw{ margin-top:8px; padding:10px 12px; border-radius:12px; background:rgba(201,162,78,.14); font-size:13.5px; } .cal-day-aw b{ display:block; color:#B88A2E; margin-bottom:2px; font-weight:600; } :root[data-theme="dark"] .cal-day-aw b{ color:#DDB964; }
+  .cal-legend-toggle{ display:block; margin:12px auto 0; background:none; border:none; color:var(--text-muted); font-size:13px; font-family:var(--sans); padding:6px 12px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .cal-legend{ display:flex; flex-wrap:wrap; justify-content:center; gap:14px 18px; margin-top:14px; font-size:12px; color: var(--text-muted); align-items:center; text-align:center; width:100%; }
   .cal-legend span{ display:inline-flex; align-items:center; gap:5px; }
 
@@ -2960,7 +2961,8 @@ function renderCalendar(monthDate){
   return `
     <div class="cal-grid cal-weekdays">${weekdays.map(w=>`<div class="cal-weekday">${w}</div>`).join('')}</div>
     <div class="cal-grid">${cells}</div>
-    <div class="cal-legend">
+    <button class="cal-legend-toggle" data-action="toggle-cal-legend" aria-expanded="${state.calLegendOpen ? 'true' : 'false'}">Обозначения ${state.calLegendOpen ? '▴' : '▾'}</button>
+    ${state.calLegendOpen ? `<div class="cal-legend">
       <span>📓 дневник</span>
       <span>🚶 подходы</span>
       <span style="color:var(--good);">↑ день засчитан</span>
@@ -2968,7 +2970,7 @@ function renderCalendar(monthDate){
       <span>пунктир — день не засчитан, не хватает 📓 или подходов</span>
       <span><span style="color:#C9A24E;">★</span> в этот день получена награда</span>
       <span>Нажмите на день, чтобы увидеть итог</span>
-    </div>
+    </div>` : ''}
   `;
 }
 function dayTierIdx(key, count){
@@ -3540,6 +3542,8 @@ async function onAction(e){
     if(state.tab === 'awards'){ state.tab = state.lastTab || 'practice'; }
     else { state.lastTab = state.tab; state.tab = 'awards'; }
     render(); return;
+  } else if(action === 'toggle-cal-legend'){
+    state.calLegendOpen = !state.calLegendOpen; render(); return;
   } else if(action === 'cal-day'){
     state.calDay = e.currentTarget.getAttribute('data-day'); render(); return;
   } else if(action === 'close-cal-day'){
