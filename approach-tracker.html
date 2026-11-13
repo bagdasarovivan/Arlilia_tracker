@@ -852,7 +852,7 @@ const FT_LISTS = {
   ]},
 };
 const FT_LIST_KEYS = ['ritual', 'start', 'method', 'voice'];
-const FT_SPEECH_KEYS = ['start', 'method', 'voice']; // skipped in silent mode
+const FT_SPEECH_KEYS = ['start', 'method', 'voice'];
 const FT_ITEM_SHORT = {};
 FT_LIST_KEYS.forEach(k=> FT_LISTS[k].items.forEach(it=>{ FT_ITEM_SHORT[it.id] = it.s; }));
 function ftDetailsText(title, d){
@@ -873,11 +873,10 @@ const ALL_QUESTIONS = [
   { id:'anxiety', type:'scale_note', label:'Речевое волнение', lowLabel:'спокоен', highLabel:'максимум', hint:'Уровень своей тревоги по поводу ФТ по 10-балльной шкале' },
   { id:'hard', type:'fthard', label:'Что было трудно', hint:'Выделите наиболее трудные элементы ФТ для дальнейших тренировок — можно выбрать несколько' },
 ];
-// In silent mode ("Режим молчания") there is no speech to rate, so the speech and hand questions are skipped.
+// «Режим молчания» — только отметка в ритуале; все остальные шаги остаются (по просьбе логопеда).
 function activeQuestions(){
   const title = state.answers.title;
   return ALL_QUESTIONS.filter(q =>
-    !(FT_SPEECH_KEYS.includes(q.id) && state.answers.silent) &&
     !(q.id === 'details' && !FT_DETAIL_LABELS[title]));
 }
 
@@ -1010,7 +1009,7 @@ function ritualToRow(e){
   const lines = [];
   if(e.silent) lines.push(SILENT_LABEL);
   if(items.length) lines.push(RITUAL_PREFIX + items.join(', '));
-  const st = e.silent ? [] : (e.speechStart || []).map(x=>String(x).replace(/,/g,' ').trim()).filter(Boolean);
+  const st = (e.speechStart || []).map(x=>String(x).replace(/,/g,' ').trim()).filter(Boolean);
   if(st.length) lines.push(START_PREFIX + st.join(', '));
   if(e.ritualNote) lines.push(e.ritualNote);
   return {
@@ -1042,8 +1041,8 @@ function rowToAttempt(r){
 }
 function ftFromAnswers(e){
   const silent = !!e.silent;
-  const pick = (k)=> (silent && FT_SPEECH_KEYS.includes(k)) ? [] : (e[k + 'Sel'] || []);
-  const allowed = new Set(FT_LIST_KEYS.filter(k=> !(silent && FT_SPEECH_KEYS.includes(k))).flatMap(k=> FT_LISTS[k].items.map(it=>it.id)));
+  const pick = (k)=> (e[k + 'Sel'] || []);
+  const allowed = new Set(FT_LIST_KEYS.flatMap(k=> FT_LISTS[k].items.map(it=>it.id)));
   const titleName = e.title === 'other' ? '' : e.title;
   return {
     d: FT_DETAIL_LABELS[titleName] ? (e.detail || []).slice(0,3).map(x=>String(x||'').trim()) : [],
@@ -2452,7 +2451,7 @@ function renderPracticeWizard(){
     const sel = state.answers.hardSel || [];
     const customs = state.answers.hardOther || [];
     const otherOpen = !!(state.wizOtherOpen && state.wizOtherOpen.hardOther);
-    const keys = FT_LIST_KEYS.filter(k=> !(state.answers.silent && FT_SPEECH_KEYS.includes(k)));
+    const keys = FT_LIST_KEYS;
     control = `<div class="choice-list">
       ${keys.map(k=>`<div class="ft-group">${esc(FT_LISTS[k].label)}</div>
         ${FT_LISTS[k].items.map(it=>`<button class="choice-list-btn ${sel.includes(it.id)?'selected':''}" data-ft-hard="${it.id}">${esc(it.t)}</button>`).join('')}`).join('')}
@@ -4031,7 +4030,6 @@ const ATT_COLS = [
 function ftCell(e, k){
   const ft = e.ft;
   if(!ft) return null;
-  if(ft.silent && FT_SPEECH_KEYS.includes(k)) return '—';
   const L = FT_LISTS[k], sel = ft[k] || [];
   if(!sel.length) return '—';
   if(L.items.every(it=>sel.includes(it.id))) return L.allShort;
@@ -4113,7 +4111,7 @@ function buildAttemptsPages(){
       mindset: e.mindsetBefore || '—',
       reaction: e.reactionAfter || '—',
       anxiety: fmtNum(e.anxiety),
-      ritual: e.ft ? (e.ft.silent ? 'Режим молчания' : ftCell(e, 'ritual')) : (ritualText(e) || '—'),
+      ritual: e.ft ? (e.ft.silent ? 'Режим молчания' + (((e.ft.ritual||[]).length) ? ' · ' + ftCell(e, 'ritual') : '') : ftCell(e, 'ritual')) : (ritualText(e) || '—'),
       start: e.ft ? ftCell(e, 'start') : ((e.speechStart || []).join(', ') || '—'),
       method: e.ft ? ftCell(e, 'method') : (e.voice != null ? 'Оценка: ' + fmtNum(e.voice) : '—'),
       voice: e.ft ? ftCell(e, 'voice') : '—',
@@ -4239,7 +4237,7 @@ function buildAttemptCardPages(){
     const fields = [
       ['Настрой', e.mindsetBefore || '—'],
       ['Реакция собеседника', e.reactionAfter || '—'],
-      ['Ритуал речи', e.ft ? (e.ft.silent ? 'Режим молчания' : ftCell(e, 'ritual')) : (ritualText(e) || '—')],
+      ['Ритуал речи', e.ft ? (e.ft.silent ? 'Режим молчания' + (((e.ft.ritual||[]).length) ? ' · ' + ftCell(e, 'ritual') : '') : ftCell(e, 'ritual')) : (ritualText(e) || '—')],
       ['Начало речи', e.ft ? ftCell(e, 'start') : ((e.speechStart || []).join(', ') || '—')],
       ['Речь по методике', e.ft ? ftCell(e, 'method') : (e.voice != null ? 'Оценка: ' + fmtNum(e.voice) : '—')],
       ['Голос', e.ft ? ftCell(e, 'voice') : '—'],
