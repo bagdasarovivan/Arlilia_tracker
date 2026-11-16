@@ -284,6 +284,7 @@
   input[type=number]{ -moz-appearance: textfield; }
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .quick-save{ align-self:center; background:none; border:none; color:var(--accent); font-family:var(--sans); font-size:14.5px; padding:8px 14px; cursor:pointer; -webkit-tap-highlight-color:transparent; text-decoration:underline; text-underline-offset:3px; }
   .nav-row{ display:flex; gap:10px; margin-top:auto; padding:14px 0 calc(16px + env(safe-area-inset-bottom)); position:sticky; bottom:0; background: linear-gradient(to top, var(--bg) 75%, transparent); }
   .nav-row .btn-ghost{ flex: 0 0 84px; }
 
@@ -2257,6 +2258,17 @@ function pendingSyncCount(){
   if(!auth.userId) return 0;
   return (lsGet(outboxKey(), []) || []).length + Object.keys(lsGet(jPendKey(), {}) || {}).length;
 }
+function getQuick(){ return lsGet('arlilia_quick', false) === true; }
+function quickAnswersFromLast(){
+  const a = lastRepeatableAttempt();
+  if(!a) return null;
+  const ans = answersFromAttempt(a);
+  // Повторяем настройку (ФТ, настрой, ритуал, метод…), а то, что у каждого подхода своё, оставляем пустым.
+  ans.detail = []; delete ans.reactionAfter; delete ans.reactionAfterCustom;
+  ans.hardSel = []; ans.hardOther = []; ans.ritualNote = '';
+  ans.anxiety = 5; ans.anxietyNote = '';
+  return ans;
+}
 function lastRepeatableAttempt(){
   let best = null;
   state.entries.forEach(e=>{ if(e.ft && !e.scrubbed && !e.pending && (!best || e.ts > best.ts)) best = e; });
@@ -2314,6 +2326,7 @@ function renderPracticeHome(){
     <div class="ring-caption">${caption}</div>
     ${renderDayGoal(todayK)}
     <button class="btn btn-primary" data-action="start-practice">Записать подход</button>
+    ${(getQuick() && last) ? `<button class="btn btn-ghost" style="margin-top:10px;" data-action="repeat-save">Ещё такой же${last.title ? ': ' + esc(String(last.title).slice(0, 28)) : ''}</button>` : ''}
     ${state.entries.length === 0 ? '<div class="autosave-hint" style="text-align:center; margin-top:12px;">Здесь появятся ваши подходы. Начните с кнопки «Записать подход».</div>' : ''}
   `;
 }
@@ -2495,6 +2508,7 @@ function renderPracticeWizard(){
         ${control}
       </div>
       ${(isLast && state.saveError) ? `<div class="save-error">⚠️ ${esc(state.saveError)}</div>` : ''}
+      ${(getQuick() && !isLast && state.answers.title) ? `<button class="quick-save" data-action="save-practice">Сохранить сейчас</button>` : ''}
       <div class="nav-row">
         <button class="btn btn-ghost" data-action="${isFirst ? 'cancel-practice' : 'prev-question'}">${isFirst ? 'Отмена' : 'Назад'}</button>
         <button class="btn btn-primary" data-action="${isLast ? 'save-practice' : 'next-question'}">${isLast ? 'Сохранить' : 'Далее'}</button>
@@ -3166,6 +3180,15 @@ function renderSettings(){
     </div>
 
     <div class="card" style="margin-bottom:16px;">
+      <div class="jc-title">Быстрый ввод подходов</div>
+      <div class="autosave-hint" style="margin:0 0 12px;">Ответы из прошлого подхода подставляются заранее, на любом шаге есть «Сохранить сейчас», а на главном экране появляется кнопка «Ещё такой же» — копия прошлого подхода одним нажатием.</div>
+      <div class="choice-row">
+        <button class="choice-btn ${getQuick()?'selected':''}" style="min-width:0; padding-left:6px; padding-right:6px;" data-action="quick-on">Включено</button>
+        <button class="choice-btn ${!getQuick()?'selected':''}" style="min-width:0; padding-left:6px; padding-right:6px;" data-action="quick-off">Выключено</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
       <div class="jc-title">Напоминание про дневник</div>
       <div class="autosave-hint" style="margin:0 0 12px;">Карточка на главном экране, если вечером дневник за сегодня ещё не заполнен. Работает, пока приложение открыто.</div>
       <div class="choice-row" style="margin-bottom:12px;">
@@ -3616,6 +3639,31 @@ async function onAction(e){
     state.editingAttemptId = null;
     state.practiceActive = true; state.qIndex = 0; state.answers = {}; state.noteOpen = {}; state.wizOtherOpen = {};
     ALL_QUESTIONS.forEach(q => { if(q.type==='scale' || q.type==='scale_note') state.answers[q.id] = 5; });
+    if(getQuick()){
+      const q = quickAnswersFromLast();
+      if(q){ state.answers = q; showToast('Подставил ответы из прошлого подхода'); }
+    }
+  } else if(action === 'repeat-save'){
+    const a = lastRepeatableAttempt();
+    if(!a){ showToast('Нет прошлого подхода'); return; }
+    // Ещё такой же: полная копия прошлого подхода с новым временем — без шагов.
+    const row = { ...attemptToRow(answersFromAttempt(a)), created_at: new Date().toISOString() };
+    const tempId = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    lsSet(outboxKey(), lsGet(outboxKey(), []).concat([{ tempId, row }]));
+    state.entries.push({ ...rowToAttempt({ ...row, id: tempId }), pending: true });
+    saveCache();
+    render();
+    showToast('Сохранено ✓');
+    flushOutbox().then(()=>{
+      if(lsGet(outboxKey(), []).some(x=>x.tempId === tempId)){
+        showToast(state.flushError ? ('Запись на телефоне, пока не отправилась: ' + state.flushError) : 'Нет сети — запись сохранена на телефоне и отправится позже');
+      }
+    });
+    return;
+  } else if(action === 'quick-on'){
+    lsSet('arlilia_quick', true);
+  } else if(action === 'quick-off'){
+    lsSet('arlilia_quick', false);
   } else if(action === 'start-practice-repeat'){
     const a = lastRepeatableAttempt();
     if(!a){ showToast('Нет прошлого подхода для повтора'); return; }
