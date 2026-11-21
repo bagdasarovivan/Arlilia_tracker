@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Arlilia</title>
 <meta name="theme-color" content="#1A1D23">
 <meta name="description" content="Дневник речевых подходов и самонаблюдений">
@@ -257,6 +257,7 @@
   .choice-list{ display:flex; flex-direction:column; gap:10px; }
   .choice-list-btn{ text-align:left; padding:18px 18px; border-radius: var(--radius-sm); border:1px solid var(--border); background: var(--surface); color: var(--text); font-size:18px; }
   .choice-list-btn.selected{ background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight:600; }
+  html, body, button{ touch-action: manipulation; }
   textarea, input[type=text], input[type=number], input[type=email], input[type=password], input[type=date]{
     width:100%; max-width:100%; min-width:0; box-sizing:border-box;
     background: var(--surface); border:1px solid var(--border);
@@ -4535,6 +4536,8 @@ async function checkForUpdate(){
 window.addEventListener('load', ()=>{ checkForUpdate(); });
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkForUpdate(); });
 setInterval(checkForUpdate, 30 * 60 * 1000);
+
+try{ ['gesturestart','gesturechange','gestureend'].forEach(function(ev){ document.addEventListener(ev, function(e){ e.preventDefault(); }, {passive:false}); }); }catch(e){}
 </script>
 </body>
 </html>
